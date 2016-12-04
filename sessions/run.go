@@ -1,7 +1,13 @@
-func Create(int id, string email string name) {
+package main
+
+import (
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+    "log"
+)
+
+func Create(id int, email  string , name string) {
     db := dbConn()
-    name := r.FormValue("name")
-    email := r.FormValue("email")
 
     createSess, err := db.Prepare("INSERT INTO sessions(name, email) VALUES(?,?)")
 
@@ -14,7 +20,7 @@ func Create(int id, string email string name) {
     defer db.Close()
 }
 
-func ReadAll()([]Sessions{}){
+func ReadAll() []Sessions {
     db := dbConn()
     selDB, err := db.Query("SELECT * FROM sessions ORDER BY id DESC")
     if err != nil {
@@ -34,15 +40,14 @@ func ReadAll()([]Sessions{}){
         n.Email = email
         narr = append(narr, n)
     }
-    fmt.Println(narr)
     defer db.Close()
     return narr
 }
 
-func Read(int id)(Sessions{}) {
+func Read(id int) Sessions {
 
     db := dbConn()
-    selDB, err := db.Query("SELECT * FROM sessions WHERE id=?", nId)
+    selDB, err := db.Query("SELECT * FROM sessions WHERE id=?", id)
     if err != nil {
         panic(err.Error())
     }
@@ -58,16 +63,14 @@ func Read(int id)(Sessions{}) {
         n.Name = name
         n.Email = email
     }
+    log.Println(n.Name)
     defer db.Close()
     return n
 }
 
-func Update(int id string email string name) {
+func Update(id int, email  string , name string) {
 
     db := dbConn()
-    id := r.FormValue("id")
-    email := r.FormValue("email")
-    name := r.FormValue("name")
 
     createSess, err := db.Prepare("UPDATE sessions SET name=?, email=? WHERE id=?")
 
@@ -79,7 +82,7 @@ func Update(int id string email string name) {
     defer db.Close()
 }
 
-func Destroy(int id) {
+func Destroy(id int) {
 
     db := dbConn()
     delSess, err := db.Prepare("DELETE FROM sessions WHERE id=?")
@@ -95,6 +98,22 @@ type Sessions struct {
     Id    int
     Name  string
     Email string
+}
+
+func main() {
+//    Create(1, "john@ymail.com", "John")
+//    Create(2, "random@ymail.com", "Random")
+
+/*    var res Sessions
+      res = Read(2)
+      log.Println(res.Id)
+
+      var res2 []Sessions
+      res2 = ReadAll()
+      log.Println(res2) */
+
+//    Destroy(2)
+
 }
 
 func dbConn() (db *sql.DB) {
