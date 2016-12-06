@@ -6,14 +6,14 @@ import (
 	"log"
 )
 
-func Create(parameter1 int, parameter3 string, parameter2 string) {
+func Create(parameter1 int, parameter3 string, parameter2 string, parameter4 string) {
 	db := dbConn()
-	createSess, err := db.Prepare("INSERT INTO sessions(parameter2, parameter3) VALUES(?,?)")
+	createSess, err := db.Prepare("INSERT INTO sessions(parameter2, parameter3, parameter4) VALUES(?,?,?)")
 	if err != nil {
 		panic(err.Error())
 	}
 	createSess.Exec(parameter2, parameter3)
-	log.Println("INSERT: parameter2: " + parameter2 + " | E-mail: " + parameter3)
+	log.Println("INSERT: parameter2: " + parameter2 + "parameter3 " + parameter3 + "parameter4 " + parameter4)
 	defer db.Close()
 
 }
