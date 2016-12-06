@@ -6,19 +6,14 @@ import (
 	"log"
 )
 
-func Create(parameter1 int, parameter3 string, parameter2 string, parameter4 string) {
-	db := dbConn()
-	createSess, err := db.Prepare("INSERT INTO sessions(parameter2, parameter3, parameter4) VALUES(?,?,?)")
-	if err != nil {
-		panic(err.Error())
-	}
-	createSess.Exec(parameter2, parameter3)
-	log.Println("INSERT: parameter2: " + parameter2 + "parameter3 " + parameter3 + "parameter4 " + parameter4)
-	defer db.Close()
-
+type Session struct {
+	parameter1 int
+	parameter2 string
+	parameter3 string
+	parameter4 string
 }
 
-func Read(parameter1 int) Session {
+func getSession(parameter1 int) Session {
 
 	db := dbConn()
 	selDB, err := db.Query("SELECT * FROM sessions WHERE parameter1=?", parameter1)
@@ -43,41 +38,102 @@ func Read(parameter1 int) Session {
 
 }
 
-// Save by searching for the element (key-value pair) using parameter1 and update the other 3
-func Save(session Session, locsession LocSession) Session {
+func getparam2(stringsearch string) Session {
 
-	parameter1 = locsession.parameter1
-	parameter2 = locsession.parameter2
-	parameter3 = locsession.parameter3
-	parameter4 = locsession.parameter4
+	db := dbConn()
+	selDB, err := db.Query("SELECT * FROM sessions WHERE parameter2=?", stringsearch)
+	if err != nil {
+		panic(err.Error())
+	}
+	n := Session{}
+	for selDB.Next() {
+		var parameter1 int
+		var parameter2, parameter3 string
+		err = selDB.Scan(&parameter1, &parameter2, &parameter3)
+		if err != nil {
+			panic(err.Error())
+		}
+		n.parameter1 = parameter1 //put parameters in caps here to return json properly
+		n.parameter2 = parameter2
+		n.parameter3 = parameter3
+	}
+	return n
+}
+
+func getparam3(stringsearch string) Session {
+
+	db := dbConn()
+	selDB, err := db.Query("SELECT * FROM sessions WHERE parameter3=?", stringsearch)
+	if err != nil {
+		panic(err.Error())
+	}
+	n := Session{}
+	for selDB.Next() {
+		var parameter1 int
+		var parameter2, parameter3 string
+		err = selDB.Scan(&parameter1, &parameter2, &parameter3)
+		if err != nil {
+			panic(err.Error())
+		}
+		n.parameter1 = parameter1 //put parameters in caps here to return json properly
+		n.parameter2 = parameter2
+		n.parameter3 = parameter3
+	}
+	return n
+}
+
+func getparam4(stringsearch string) Session {
+
+	db := dbConn()
+	selDB, err := db.Query("SELECT * FROM sessions WHERE parameter4=?", stringsearch)
+	if err != nil {
+		panic(err.Error())
+	}
+	n := Session{}
+	for selDB.Next() {
+		var parameter1 int
+		var parameter2, parameter3 string
+		err = selDB.Scan(&parameter1, &parameter2, &parameter3)
+		if err != nil {
+			panic(err.Error())
+		}
+		n.parameter1 = parameter1 //put parameters in caps here to return json properly
+		n.parameter2 = parameter2
+		n.parameter3 = parameter3
+	}
+	return n
+}
+
+func Setparam2(session Session, strinput string) {
+	session.parameter2 = strinput
+}
+func Setparam3(session Session, strinput string) {
+	session.parameter3 = strinput
+}
+func Setparam4(session Session, strinput string) {
+	session.parameter4 = strinput
+}
+
+func Save(session Session) {
+
+	parameter1 = session.parameter1
+	parameter2 = session.parameter2
+	parameter3 = session.parameter3
+	parameter4 = session.parameter4
 	db := dbConn()
 	createSess, err := db.Prepare("UPDATE sessions SET parameter2=?, parameter3=?, parameter4=? WHERE parameter1=?")
 	if err != nil {
 		panic(err.Error())
 	}
-	createSess.Exec(parameter2, parameter3, parameter1)
+	createSess.Exec(parameter4, parameter3, parameter2, parameter1)
 	log.Println("SAVE: parameter2: " + parameter2 + " parameter3: " + parameter3 + " parameter4: " + parameter4)
 	defer db.Close()
-	session.parameter1 = locsession.parameter1
-	session.parameter2 = locsession.parameter2
-	session.parameter3 = locsession.parameter3
-	session.parameter4 = locsession.parameter4
-	return session
 
 }
 
-func Updateparam2(session LocSession, parameter2 string) {
-	session.parameter2 = parameter2
-}
-func Updateparam3(session LocSession, parameter3 string) {
-	session.parameter3 = parameter3
-}
-func Updateparam2(session LocSession, parameter4 string) {
-	session.parameter4 = parameter4
-}
+func Destroy(session Session) {
 
-func Destroy(parameter1 int) {
-
+	parameter1 = session.parameter1
 	db := dbConn()
 	delSess, err := db.Prepare("DELETE FROM sessions WHERE parameter1=?")
 	if err != nil {
@@ -87,23 +143,6 @@ func Destroy(parameter1 int) {
 	log.Println("DELETE")
 	defer db.Close()
 
-}
-
-//here paramter 1 is used as the primary key
-// Add more parameters if required
-// Rename parameters to their respective names
-type Session struct {
-	parameter1 int
-	parameter2 string
-	parameter3 string
-	parameter4 string
-}
-
-type LocSession struct {
-	parameter1 int
-	parameter2 string
-	parameter3 string
-	parameter4 string
 }
 
 func dbConn() (db *sql.DB) {
