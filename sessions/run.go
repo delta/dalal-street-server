@@ -67,13 +67,13 @@ func Save(session Session, locsession LocSession) Session {
 }
 
 func Updateparam2(session LocSession, parameter2 string) {
-	LocSession.parameter2 = parameter2
+	session.parameter2 = parameter2
 }
 func Updateparam3(session LocSession, parameter3 string) {
-	LocSession.parameter3 = parameter3
+	session.parameter3 = parameter3
 }
 func Updateparam2(session LocSession, parameter4 string) {
-	LocSession.parameter4 = parameter4
+	session.parameter4 = parameter4
 }
 
 func Destroy(parameter1 int) {
