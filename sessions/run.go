@@ -42,8 +42,9 @@ func Read(parameter1 int) Session {
 	return n
 
 }
+
 // Save by searching for the element (key-value pair) using parameter1 and update the other 3
-func Save(session Session locsession LocSession) Session {
+func Save(session Session, locsession LocSession) Session {
 
 	parameter1 = locsession.parameter1
 	parameter2 = locsession.parameter2
@@ -65,14 +66,14 @@ func Save(session Session locsession LocSession) Session {
 
 }
 
-func Updateparam2(session LocSession parameter2 string) {
-	LocSession.parameter2 = parameter2;
+func Updateparam2(session LocSession, parameter2 string) {
+	LocSession.parameter2 = parameter2
 }
-func Updateparam3(session LocSession parameter3 string) {
-	LocSession.parameter3 = parameter3;
+func Updateparam3(session LocSession, parameter3 string) {
+	LocSession.parameter3 = parameter3
 }
-func Updateparam2(session LocSession parameter4 string) {
-	LocSession.parameter4 = parameter4;
+func Updateparam2(session LocSession, parameter4 string) {
+	LocSession.parameter4 = parameter4
 }
 
 func Destroy(parameter1 int) {
@@ -87,6 +88,7 @@ func Destroy(parameter1 int) {
 	defer db.Close()
 
 }
+
 //here paramter 1 is used as the primary key
 // Add more parameters if required
 // Rename parameters to their respective names
@@ -97,7 +99,7 @@ type Session struct {
 	parameter4 string
 }
 
-type LocSession struct{
+type LocSession struct {
 	parameter1 int
 	parameter2 string
 	parameter3 string
