@@ -38,8 +38,37 @@ func (session Session) get(str string) string {
 		return "NULL"
 	}
 }
+
 func (session Session) destroy() {
 	for k, v := range m {
 		delete(m, k)
+	}
+}
+
+// The first time you access the database, save it
+func (session Session) save() {
+
+	length = len(m)
+	for k, v := range m {
+		createSess, err := db.Prepare("INSERT INTO sessions(sessionID, k, v) VALUES(?,?,?)")
+		if err != nil {
+			panic(err.Error())
+		}
+		createSess.Exec(sessionID, k, v)
+		log.Println("Saved Key" + k + "Value:" + v)
+	}
+}
+
+// Update from the next time
+func (session Session) update() {
+
+	length = len(m)
+	for k, v := range m {
+		createSess, err := db.Prepare("UPDATE sessions SET k=?, v=? WHERE sessionID=?")
+		if err != nil {
+			panic(err.Error())
+		}
+		createSess.Exec(k, v, sessionID)
+		log.Println("Updated Key" + k + "Value:" + v)
 	}
 }
