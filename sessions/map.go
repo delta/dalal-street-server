@@ -39,10 +39,21 @@ func (session Session) get(str string) string {
 	}
 }
 
-func (session Session) destroy() {
+func (session Session) delete() {
 	for k, v := range m {
 		delete(m, k)
 	}
+	log.Println("Deleted Map")
+}
+
+func (session Session) destroy() {
+	delSess, err := db.Prepare("DELETE FROM sessions WHERE sessionID=?")
+	if err != nil {
+		panic(err.Error())
+	}
+	delSess.Exec(sessionID)
+	log.Println("Deleted from Database" + sessionID)
+	defer db.Close()
 }
 
 // The first time you access the database, save it
@@ -55,7 +66,7 @@ func (session Session) save() {
 			panic(err.Error())
 		}
 		createSess.Exec(sessionID, k, v)
-		log.Println("Saved Key" + k + "Value:" + v)
+		log.Println("Saved Value Key" + k + "Value:" + v)
 	}
 }
 
