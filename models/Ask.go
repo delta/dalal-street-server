@@ -1,6 +1,24 @@
 package models
 
-type Bids struct {
+type OrderType uint8
+
+const (
+	Limit OrderType = iota
+	Market
+	Stoploss
+)
+
+var orderTypes = [...]string{
+	"Limit",
+	"Market",
+	"Stoploss",
+}
+
+func (ot OrderType) String() string {
+	return orderTypes[ot-1]
+}
+
+type Ask struct {
 	Id                     uint32       `gorm:"primary_key;AUTO_INCREMENT"`
 	UserId                 uint32       `gorm:"column:userId;not null"`
 	StockId                uint32       `gorm:"column:stockId;not null"`
@@ -11,9 +29,8 @@ type Bids struct {
 	IsClosed               uint8        `gorm:"column:isClosed;not null"`
 	CreatedAt              string       `gorm:"column:createdAt;not null"`
 	UpdatedAt              string       `gorm:"column:updatedAt;not null"`
-	OrderFills             []OrderFills `gorm:"ForeignKey:bidId"`
 }
 
-func (Bids) TableName() string {
-	return "Bids"
+func (Ask) TableName() string {
+	return "Asks"
 }

@@ -1,6 +1,6 @@
 package models
 
-type MarketEvents struct {
+type MarketEvent struct {
 	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT"`
 	StockId      uint32 `gorm:"column:stockId;not null"`
 	EmotionScore int32  `gorm:"column:emotionScore;not null"`
@@ -8,6 +8,6 @@ type MarketEvents struct {
 	CreatedAt    string `gorm:"column:createdAt;not null"`
 }
 
-func (MarketEvents) TableName() string {
+func (MarketEvent) TableName() string {
 	return "MarketEvents"
 }
