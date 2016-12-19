@@ -1,6 +1,6 @@
 package models
 
-type Stocks struct {
+type Stock struct {
 	Id               uint32         `gorm:"primary_key;AUTO_INCREMENT"`
 	ShortName        string         `gorm:"column:shortName;not null"`
 	FullName         string         `gorm:"column:fullName;not null"`
@@ -13,12 +13,8 @@ type Stocks struct {
 	UpOrDown         uint8          `gorm:"column:upOrDown;not null"`
 	CreatedAt        string         `gorm:"column:createdAt;not null"`
 	UpdatedAt        string         `gorm:"column:updatedAt;not null"`
-	StockHistories   []StockHistory `gorm:"ForeignKey:stockId"`
-	BidsMade         []Bids         `gorm:"ForeignKey:stockId"`
-	Events           []MarketEvents `gorm:"ForeignKey:stockId"`
-	Transactions     []Transactions `gorm:"ForeignKey:stockId"`
 }
 
-func (Stocks) TableName() string {
+func (Stock) TableName() string {
 	return "Stocks"
 }

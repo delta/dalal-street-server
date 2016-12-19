@@ -1,6 +1,6 @@
 package models
 
-type Asks struct {
+type Bid struct {
 	Id                     uint32       `gorm:"primary_key;AUTO_INCREMENT"`
 	UserId                 uint32       `gorm:"column:userId;not null"`
 	StockId                uint32       `gorm:"column:stockId;not null"`
@@ -11,9 +11,8 @@ type Asks struct {
 	IsClosed               uint8        `gorm:"column:isClosed;not null"`
 	CreatedAt              string       `gorm:"column:createdAt;not null"`
 	UpdatedAt              string       `gorm:"column:updatedAt;not null"`
-	OrderFills             []OrderFills `gorm:"ForeignKey:askId"`
 }
 
-func (Asks) TableName() string {
-	return "Asks"
+func (Bid) TableName() string {
+	return "Bids"
 }
