@@ -9,14 +9,14 @@ import (
 
 type Session struct {
 	Id string
-	m         map[string]string
+	m  map[string]string
 }
 
 func GetSession(id string) (Session, error) {
 	var session Session
 	var results map[string]string
 	db, err := dbConn()
-	if err != nil{
+	if err != nil {
 		return session, err
 	}
 
