@@ -1,0 +1,13 @@
+{
+   "EventId": "22",
+   "EventSecret": "s3kr3t",
+
+   "LogFileName": "./dalalstreet.log",
+   "LogMaxSize": 50,
+   "LogLevel": "debug",
+
+   "DbUser": "root",
+   "DbPassword": "",
+   "DbHost": "localhost",
+   "DbName": "dalalstreet"
+}
