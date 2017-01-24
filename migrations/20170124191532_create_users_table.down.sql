@@ -1,0 +1,3 @@
+ALTER TABLE Users DROP COLUMN email;
+ALTER TABLE Users ADD COLUMN pragyanId int(11) NOT NULL;
+
