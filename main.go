@@ -5,10 +5,9 @@ import (
 )
 
 func main() {
-	utils.InitConfiguration()
+	utils.InitConfiguration("config.json")
 	utils.InitLogger()
 
 	// start http server
 	// do cool stuff
 }
-
