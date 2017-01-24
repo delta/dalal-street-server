@@ -39,10 +39,10 @@ var Configuration = struct {
 
 // InitConfiguration reads the config.json file and loads the
 // config options into Configuration
-func InitConfiguration() {
-	configFile, err := os.Open("config.json")
+func InitConfiguration(configFileName string) {
+	configFile, err := os.Open(configFileName)
 	if err != nil {
-		log.Fatal("Failed to open config.json. Cannot proceed")
+		log.Fatal("Failed to open %s. Cannot proceed", configFileName)
 		return
 	}
 	defer configFile.Close()
@@ -54,6 +54,6 @@ func InitConfiguration() {
 		log.Fatal("Failed to load configuration. Cannot proceed. Error: ", err)
 	}
 
-	log.Printf("Loaded configuration from config.json: %+v\n", Configuration)
+	log.Printf("Loaded configuration from %s: %+v\n", configFileName, Configuration)
 }
 

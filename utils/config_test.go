@@ -19,28 +19,28 @@ var validContent = `
    "DbUser": "root",
    "DbPassword": "",
    "DbHost": "localhost",
-   "DbName": "dalalstreet"
+   "DbName": "dalalstreet_test"
 }
 `
 
 func TestInitConfiguration(t *testing.T) {
-	err := os.Rename("config.json", "config.json.bkp")
+	err := os.Rename("config_test.json", "config_test.json.bkp")
 
 	// It's okay if config.json did not exist before
 	// Something else is not
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal("Unexpected error occured: ", err)
 	} else {
-		defer os.Rename("config.json.bkp", "config.json")
+		defer os.Rename("config_test.json.bkp", "config_test.json")
 	}
 
-	f, err := os.Create("config.json")
+	f, err := os.Create("config_test.json")
 	f.WriteString(validContent)
 	f.Close()
 
-	InitConfiguration()
+	InitConfiguration("config_test.json")
 
 	loadedConfig, _ := json.Marshal(Configuration)
 
-	assert.JSONEq(t, string(loadedConfig), validContent, "config.json parsed correctly")
+	assert.JSONEq(t, string(loadedConfig), validContent, "config_test.json parsed correctly")
 }
