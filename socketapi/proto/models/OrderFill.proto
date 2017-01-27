@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.models;
+
+message OrderFill {
+  int32 transaction_id = 1;
+  int32 bid_id = 2;
+  int32 ask_id = 3;
+}

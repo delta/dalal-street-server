@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.errors;
+
+message BadRequestError {
+    string reason = 1;
+}
+
+message InternalServerError {
+    string reason = 1;
+}

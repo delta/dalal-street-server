@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.models;
+
+message Stock {
+  int32 id = 1;
+  string short_name = 2;
+  string full_name = 3;
+  int32 current_price = 4;
+  int32 day_high = 5;
+  int32 day_low = 6;
+  int32 all_time_high = 7;
+  int32 all_time_low = 8;
+  int32 stocks_in_exchange = 9;
+  int32 stocks_in_market = 10;
+  bool up_or_down = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}

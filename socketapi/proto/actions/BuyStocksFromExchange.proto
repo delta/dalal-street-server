@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "errors/Errors.proto";
+
+message BuyStocksFromExchangeRequest {
+    uint32 stock_id = 1;
+    uint32 stock_quantity = 2;
+}
+
+message BuyStocksFromExchangeResponse {
+    message BuyStocksFromExchangeSuccessResponse {
+        uint32 trading_price = 1;   //price of stocks when the server processed the request
+    }
+
+    message NotEnoughCashError {
+        string reason = 1;
+    }
+
+    message BuyLimitExceededError {
+        string reason = 1;
+    }
+
+    oneof response {
+        BuyStocksFromExchangeSuccessResponse result = 1;
+        NotEnoughCashError not_enough_cash_error = 2;
+        BuyLimitExceededError buy_limit_exceeded_error = 3;
+        errors.BadRequestError bad_request_error = 4;
+        errors.InternalServerError internal_server_error = 5;
+    }
+}

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.models;
+
+enum TransactionType {
+    FROM_EXCHANGE_TRANSACTION = 0;
+    ORDER_FILL_TRANSACTION = 1;
+    MORTGAGE_TRANSACTION = 2;
+    DIVIDEND_TRANSACTION = 3;
+}
+
+message Transaction {
+  int32 id = 1;
+  int32 user_id = 2;
+  int32 stock_id = 3;
+  string type = 4;
+  TransactionType stock_quantity = 5;
+  int32 price = 6;
+  string created_at = 7;
+}

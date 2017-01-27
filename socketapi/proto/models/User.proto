@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.models;
+
+message User {
+  uint32 id = 1;
+  string email = 2;
+  string name = 3;
+  int32 cash = 4;
+  int32 total = 5;
+  string created_at = 6;
+}

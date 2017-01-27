@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.datastreams;
+
+import "models/MarketEvent.proto";
+
+message MarketEventUpdate {
+    models.MarketEvent market_event = 1;
+}

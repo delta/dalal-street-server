@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.datastreams;
+
+message StockExchangeDataPoint {
+    uint32 price = 1;
+    uint32 stock_count = 2;
+}
+
+message StockExchangeUpdate {
+    map<uint32, StockExchangeDataPoint> stocks_in_exchange = 1;
+}

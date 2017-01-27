@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.models;
+
+import "models/OrderType.proto";
+
+message Bid {
+  int32 id = 1;
+  int32 user_id = 2;
+  int32 stock_id = 3;
+  int32 price = 4;
+  OrderType order_type = 5;
+  int32 stock_quantity = 6;
+  int32 stock_quantity_fulfilled = 7;
+  bool is_closed = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}

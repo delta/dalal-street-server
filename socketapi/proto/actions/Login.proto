@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "errors/Errors.proto";
+
+message LoginRequest {
+    string email = 1;
+    string password = 2;
+}
+
+message LoginResponse {
+    message LoginSuccessResponse {
+        string session_id = 1;
+    }
+
+    message InvalidCredentialsError {
+        string reason = 1;
+    }
+
+    oneof response {
+        LoginSuccessResponse result = 1;
+        InvalidCredentialsError invalid_credentials_error = 2;
+        errors.BadRequestError bad_request_error = 3;
+        errors.InternalServerError internal_server_error = 4;
+    }
+}

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "errors/Errors.proto";
+
+message LogoutRequest {
+    string request_id = 1;
+    string session_id = 2;
+}
+
+message LogoutResponse {
+    message LogoutSuccessResponse {
+        bool success = 1;
+    }
+
+    oneof response {
+        LogoutSuccessResponse result = 1;
+        errors.BadRequestError bad_request_error = 2;
+        errors.InternalServerError internal_server_error = 3;
+    }
+}
