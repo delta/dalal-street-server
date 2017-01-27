@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "errors/Errors.proto";
+
+message CancelBidOrderRequest {
+    uint32 stock_id = 1;
+    uint32 bid_id = 2;
+}
+
+message CancelBidOrderResponse {
+    message CancelBidOrderSuccessResponse {
+        bool success = 1;
+    }
+
+    message InvalidBidIdError {
+        string reason = 1;
+    }
+
+    oneof response {
+        CancelBidOrderSuccessResponse result = 1;
+        InvalidBidIdError invalid_bid_id_error = 2;
+        errors.BadRequestError bad_request_error = 3;
+        errors.InternalServerError internal_server_error = 4;
+    }
+}

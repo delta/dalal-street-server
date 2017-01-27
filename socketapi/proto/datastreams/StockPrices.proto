@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.datastreams;
+
+message StockPricesUpdate {
+    map<uint32, uint32> prices = 1; // key: stockId, value: price
+}

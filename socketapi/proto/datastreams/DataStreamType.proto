@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.datastreams;
+
+enum DataStreamType {
+    MARKET_DEPTH = 0;
+    TRANSACTIONS = 1;
+    NOTIFICATIONS = 2;
+    STOCK_PRICES = 3;
+    STOCK_EXCHANGE = 4;
+    MARKET_EVENTS = 5;
+}

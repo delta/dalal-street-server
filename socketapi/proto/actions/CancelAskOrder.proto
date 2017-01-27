@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "errors/Errors.proto";
+
+message CancelAskOrderRequest {
+    uint32 stock_id = 1;
+    uint32 ask_id = 2;
+}
+
+message CancelAskOrderResponse {
+    message CancelAskOrderSuccessResponse {
+        bool success = 1;
+    }
+
+    message InvalidAskIdError {
+        string reason = 1;
+    }
+
+    oneof response {
+        CancelAskOrderSuccessResponse result = 1;
+        InvalidAskIdError invalid_ask_id_error = 2;
+        errors.BadRequestError bad_request_error = 3;
+        errors.InternalServerError internal_server_error = 4;
+    }
+}

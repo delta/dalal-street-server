@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "models/OrderType.proto";
+import "errors/Errors.proto";
+
+message PlaceAskOrderRequest {
+    uint32 stock_id = 1;
+    models.OrderType order_type = 2;
+    uint32 price = 3;
+    uint32 stock_quantity = 4;
+}
+
+message PlaceAskOrderResponse {
+    message PlaceAskOrderSuccessResponse {
+        uint32 ask_id = 1;
+    }
+
+    message AskLimitExceededError {
+        string reason = 1;
+    }
+
+    message NotEnoughStocksError {
+        string reason = 1;
+    }
+
+    oneof response {
+        PlaceAskOrderSuccessResponse result = 1;
+        AskLimitExceededError ask_limit_exceeded_error = 2;
+        NotEnoughStocksError not_enough_stocks_error = 3;
+        errors.BadRequestError bad_request_error = 4;
+        errors.InternalServerError internal_server_error = 5;
+    }
+}

@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.models;
+
+enum OrderType {
+    LIMIT = 0;
+    MARKET = 1;
+    STOPLOSS = 2;
+}

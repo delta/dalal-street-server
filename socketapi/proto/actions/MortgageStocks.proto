@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "errors/Errors.proto";
+
+message MortgageStocksRequest {
+    uint32 stock_id = 1;
+    uint32 stock_quantity = 2;
+}
+
+message MortgageStocksResponse {
+    message MortgageStocksSuccessResponse {
+        bool success = 1;
+        uint32 trading_price = 2;   //price of stocks that the bank paid the user
+    }
+
+    message NotEnoughStocksError {
+        string reason = 1;
+    }
+
+    oneof response {
+        MortgageStocksSuccessResponse result = 1;
+        NotEnoughStocksError not_enough_stocks_error = 2;
+        errors.BadRequestError bad_request_error = 3;
+        errors.InternalServerError internal_server_error = 4;
+    }
+}

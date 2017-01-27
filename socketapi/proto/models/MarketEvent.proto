@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.models;
+
+message MarketEvent {
+    int32 id = 1;
+    int32 stock_id = 2;
+    string text = 3;
+    sint32 emotion_score = 4;
+    string created_at = 5;
+}

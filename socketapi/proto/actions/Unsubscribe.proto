@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.actions;
+
+import "datastreams/DataStreamType.proto";
+import "errors/Errors.proto";
+
+message UnsubscribeRequest {
+    datastreams.DataStreamType data_stream_type = 1;
+    string data_stream_id = 2;    // useful for MARKET_DEPTH & maybe some others
+}
+
+message UnsubscribeResponse {
+    message UnsubscribeSuccessResponse {
+        bool success = 1;
+    }
+
+    oneof response {
+        UnsubscribeSuccessResponse result = 1;
+        errors.BadRequestError bad_request_error = 2;
+        errors.InternalServerError internal_server_error = 3;
+    }
+}

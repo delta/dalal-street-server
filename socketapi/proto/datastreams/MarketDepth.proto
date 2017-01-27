@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.datastreams;
+
+message MarketDepthUpdate {
+    uint32 stock_id = 1;
+    map<uint32, uint32> ask_depth = 2;
+    map<uint32, uint32> bid_depth = 3;
+}

@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package dalalstreet.socketapi.datastreams;
+
+import "models/Transaction.proto";
+
+message TransactionUpdate {
+    models.Transaction transaction = 1;
+}
