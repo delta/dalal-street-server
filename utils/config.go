@@ -56,4 +56,3 @@ func InitConfiguration(configFileName string) {
 
 	log.Printf("Loaded configuration from %s: %+v\n", configFileName, Configuration)
 }
-

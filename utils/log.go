@@ -47,4 +47,3 @@ func InitLogger() {
 
 	Logger.Info("Logger started")
 }
-
