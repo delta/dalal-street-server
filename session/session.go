@@ -1,10 +1,25 @@
 package session
 
 import (
-	"encoding/base64"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx"
+	"fmt"
 	"math/rand"
+
+	"github.com/jmoiron/sqlx"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/Sirupsen/logrus"
+
+	"github.com/thakkarparth007/dalal-street-server/utils"
+)
+
+const sidLen = 32
+
+var (
+	dbUser string
+	dbPass string
+	dbHost string
+	dbName string
+
+	logger *logrus.Entry
 )
 
 type Session struct {
@@ -12,17 +27,28 @@ type Session struct {
 	m  map[string]string
 }
 
-func GetSession(id string) (Session, error) {
-	var session Session
-	var results map[string]string
+func Load(id string) (*Session, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "Load",
+		"id": id,
+	})
+
+	var (
+		session *Session
+		results map[string]string
+	)
+
 	db, err := dbConn()
 	if err != nil {
-		return session, err
+		return nil, err
 	}
+	defer db.Close()
 
+	l.Debugf("SessionId: %s", id)
 	rows, err := db.Queryx("SELECT `key`, `value` FROM Sessions WHERE id=?", id)
 	if err != nil {
-		return session, err
+		l.Errorf("Error loading session: '%s'", err)
+		return nil, err
 	}
 
 	results = make(map[string]string)
@@ -31,61 +57,85 @@ func GetSession(id string) (Session, error) {
 		var key, value string
 		err = rows.Scan(&key, &value)
 		if err != nil {
-			return session, err
+			return nil, err
 		}
 		results[key] = value
 	}
 
 	session.Id = id
 	session.m = results
-	return session, err
+
+	l.Debugf("Loaded session: %+v", session)
+	return session, nil
 }
 
-func NewSession() (Session, error) {
-	var session Session
-	size := 6 // change the length of the generated random string here
-	rb := make([]byte, size)
+func New() (*Session, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "New",
+	})
+
+	var session *Session
+
+	rb := make([]byte, sidLen)
 	_, err := rand.Read(rb)
 	if err != nil {
-		return session, err
+		return nil, err
 	}
-	rs := base64.URLEncoding.EncodeToString(rb)
-	session.Id = rs
+
+	session.Id = string(rb)
 	session.m = make(map[string]string)
-	return session, err
+
+	l.Debugf("Created session: %+v", session)
+	return session, nil
 }
 
 // Set a key value pair in the map
-func (session Session) Set(k string, v string) error {
-	db, err := dbConn()
+func (session *Session) Set(k string, v string) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "Set",
+		"session": fmt.Sprintf("%v", session),
+		"k": k,
+		"v": v,
+	})
 
+	db, err := dbConn()
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
 	sql := "INSERT INTO Sessions VALUES (?,?,?) ON DUPLICATE KEY UPDATE `id`=?, `key`=?, `value`=?"
 	_, err = db.Exec(sql, session.Id, k, v, session.Id, k, v)
 
 	if err != nil {
+		l.Errorf("Error in setting-value query: '%s'", err)
 		return err
 	}
 
+	l.Debugf("Set key in database")
 	session.m[k] = v
 	return nil
 }
 
 // Get the value providing key to the get function
-func (session Session) Get(str string) (string, bool) {
+func (session *Session) Get(str string) (string, bool) {
 	value, ok := session.m[str] // return value if found or ok=false if not found
 	return value, ok
 }
 
-func (session Session) Delete(str string) error {
-	db, err := dbConn()
+func (session *Session) Delete(str string) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "Delete",
+		"session": fmt.Sprintf("%v", session),
+		"str": str,
+	})
+	l.Debug("Deleting")
 
+	db, err := dbConn()
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
 	sql := "Delete FROM Sessions WHERE id=? AND `key`=?"
 	_, err = db.Exec(sql, session.Id, str)
@@ -95,11 +145,17 @@ func (session Session) Delete(str string) error {
 
 // Delete the entire session from database
 func (session Session) Destroy() error {
-	db, err := dbConn()
+	var l = logger.WithFields(logrus.Fields{
+		"method": "Delete",
+		"session": fmt.Sprintf("%v", session),
+	})
+	l.Debug("Destroying")
 
+	db, err := dbConn()
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
 	sql := "DELETE FROM Sessions WHERE id=?"
 	_, err = db.Exec(sql, session.Id)
@@ -108,14 +164,24 @@ func (session Session) Destroy() error {
 }
 
 func dbConn() (*sqlx.DB, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "dbConn",
+	})
+
 	var db *sqlx.DB
-	dbDriver := "mysql" // Database driver
-	dbUser := "root"    // Mysql username
-	dbPass := ""        // Mysql password
-	dbName := "gotest"  // Mysql schema
-	db, err := sqlx.Open(dbDriver, dbUser+":"+dbPass+"@/"+dbName)
+	db, err := sqlx.Open("mysql", dbUser+":"+dbPass+"@"+dbHost+"/"+dbName)
 	if err != nil {
-		return db, err
+		l.Errorf("Error opening database: '%s'", err)
 	}
 	return db, err
+}
+
+func InitSession() {
+	logger = utils.Logger.WithFields(logrus.Fields{
+		"module": "session",
+	})
+	dbUser = utils.Configuration.DbUser
+	dbPass = utils.Configuration.DbPassword
+	dbName = utils.Configuration.DbName
+	dbHost = utils.Configuration.DbHost
 }
