@@ -19,7 +19,9 @@ var validContent = `
    "DbUser": "root",
    "DbPassword": "",
    "DbHost": "localhost",
-   "DbName": "dalalstreet_test"
+   "DbName": "dalalstreet_test",
+
+   "HttpPort": 3000
 }
 `
 
