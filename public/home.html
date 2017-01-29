@@ -1,0 +1,9 @@
+<html>
+<head><title>Home Page</title></head>
+<body>
+		<h1>Dalal Street<h1>
+		{{ with .User }}
+				<h2>Hello {{ .Username }}</h2>
+				<p><a href="/logout">Logout</a></p>
+		{{ end }}
+</body>
