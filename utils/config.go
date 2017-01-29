@@ -35,6 +35,11 @@ var Configuration = struct {
 	DbHost string
 	// DbName is the name of the database
 	DbName string
+
+	// HTTP Server related options
+
+	// HttpPort is the port on which the http server will run
+	HttpPort int
 }{}
 
 // InitConfiguration reads the config.json file and loads the

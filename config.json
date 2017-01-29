@@ -9,5 +9,7 @@
    "DbUser": "root",
    "DbPassword": "",
    "DbHost": "localhost",
-   "DbName": "dalalstreet"
+   "DbName": "dalalstreet",
+
+   "httpPort": 3000
 }
