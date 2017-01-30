@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-package dalalstreet.socketapi.datastreams;
-
-import "models/Notification.proto";
-
-message NotificationUpdate {
-    models.Notification notification = 1;
-}
