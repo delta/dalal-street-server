@@ -1,0 +1,3 @@
+[submodule "socketapi/proto"]
+	path = socketapi/proto
+	url = git@github.com:thakkarparth007/dalal-street-proto
