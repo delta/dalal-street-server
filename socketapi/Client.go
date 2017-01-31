@@ -8,8 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/thakkarparth007/dalal-street-server/session"
-	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto"
-	//actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto/actions"
+	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
 )
 
 const (

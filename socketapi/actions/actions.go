@@ -5,7 +5,7 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/utils"
-	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto/actions"
+	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/actions"
 )
 
 var logger *logrus.Entry
