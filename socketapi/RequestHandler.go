@@ -8,9 +8,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/thakkarparth007/dalal-street-server/socketapi/actions"
-	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto"
-	//actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto/actions"
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto/datastreams"
+	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
+	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
 )
 
 func makeResponseExceptSubscribe(c *client, reqwrap *socketapi_proto.RequestWrapper) (*socketapi_proto.DalalMessage, error) {
