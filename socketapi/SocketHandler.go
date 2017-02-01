@@ -8,6 +8,7 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/socketapi/actions"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
@@ -23,6 +24,7 @@ func InitSocketApi() {
 		"module": "socketapi/SocketHandler",
 	})
 	actions.InitActions()
+	datastreams.InitDataStreams()
 }
 
 func loadSession(r *http.Request) (session.Session, error) {
