@@ -1,0 +1,15 @@
+language: go
+
+go:
+    - 1.5
+    - 1.6
+    - 1.7.x
+
+before_install:
+    - wget https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip
+    - unzip protoc-3.2.0rc2-linux-x86_64.zip
+    - export PATH=$PATH:$(pwd)/bin
+    - go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+    - cd socketapi/
+    - ./build_proto.sh
+    - cd ..
