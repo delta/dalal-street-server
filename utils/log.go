@@ -2,7 +2,7 @@ package utils
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/natefinch/lumberjack"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Logger is an instance of logrus.Logger
