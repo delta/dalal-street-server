@@ -8,7 +8,9 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/actions"
+	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
 	errors_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/errors"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
@@ -636,6 +638,15 @@ func Subscribe(done <-chan struct{}, updates chan interface{}, sess session.Sess
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 	l.Infof("Subscribe requested")
+
+	switch req.DataStreamType {
+	case datastreams_proto.DataStreamType_NOTIFICATIONS:
+		datastreams.RegNotificationListener(done, updates, getUserId(sess), sess.GetId())
+	case datastreams_proto.DataStreamType_STOCK_PRICES:
+		datastreams.RegStockPricesListener(done, updates, sess.GetId())
+	case datastreams_proto.DataStreamType_STOCK_EXCHANGE:
+		datastreams.RegStockExchangeListener(done, updates, sess.GetId())
+	}
 
 	resp := &actions_proto.SubscribeResponse{}
 	resp.Response = &actions_proto.SubscribeResponse_Result{

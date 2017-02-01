@@ -10,6 +10,7 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/socketapi/actions"
 	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
+	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/actions"
 	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
 )
 
@@ -105,9 +106,12 @@ func makeResponseExceptSubscribe(c *client, reqwrap *socketapi_proto.RequestWrap
 	return dm, nil
 }
 
-func makeDataStreamUpdate(update interface{}) (*socketapi_proto.DalalMessage, error) {
+func makeDataStreamUpdate(req *actions_proto.SubscribeRequest, update interface{}) (*socketapi_proto.DalalMessage, error) {
 	dm := &socketapi_proto.DalalMessage{}
-	dsuw := &socketapi_proto.DataStreamUpdateWrapper{}
+	dsuw := &socketapi_proto.DataStreamUpdateWrapper{
+		DataStreamType: req.DataStreamType,
+		DataStreamId:   req.DataStreamId,
+	}
 
 	dm.MessageType = &socketapi_proto.DalalMessage_DataStreamUpdateWrapper{
 		DataStreamUpdateWrapper: dsuw,
@@ -240,7 +244,7 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 				return
 			}
 
-			dm, err := makeDataStreamUpdate(update)
+			dm, err := makeDataStreamUpdate(reqwrap.GetSubscribeRequest(), update)
 			if err != nil {
 				l.Errorf("Unable to convert update into datastream. Update: '%+v'", update)
 				return
