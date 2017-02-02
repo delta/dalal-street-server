@@ -1,3 +1,0 @@
-ALTER TABLE Users DROP COLUMN pragyanId;
-ALTER TABLE Users ADD COLUMN email varchar(255) UNIQUE;
-
