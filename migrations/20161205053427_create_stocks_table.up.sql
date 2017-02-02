@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS Stocks (
 	id int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
 	shortName varchar(255) NOT NULL,
 	fullName varchar(255) NOT NULL,
+	description text NOT NULL,
 	currentPrice int(11) UNSIGNED NOT NULL,
 	dayHigh int(11) UNSIGNED NOT NULL,
 	dayLow int(11) UNSIGNED NOT NULL,
