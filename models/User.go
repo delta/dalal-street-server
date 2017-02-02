@@ -25,7 +25,7 @@ type User struct {
 	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT"`
 	Email     string `gorm:"unique;not null"`
 	Name      string `gorm:"not null"`
-	Cash      int32  `gorm:"not null"`
+	Cash      uint32 `gorm:"not null"`
 	Total     int32  `gorm:"not null"`
 	CreatedAt string `gorm:"column:createdAt;not null"`
 }

@@ -8,7 +8,7 @@ type Bid struct {
 	Price                  uint32    `gorm:"not null"`
 	StockQuantity          uint32    `gorm:"column:stockQuantity;not null"`
 	StockQuantityFulFilled uint32    `gorm:"column:stockQuantityFulFilled;not null"`
-	IsClosed               uint8     `gorm:"column:isClosed;not null"`
+	IsClosed               bool      `gorm:"column:isClosed;not null"`
 	CreatedAt              string    `gorm:"column:createdAt;not null"`
 	UpdatedAt              string    `gorm:"column:updatedAt;not null"`
 }

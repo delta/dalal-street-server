@@ -10,7 +10,7 @@ type Stock struct {
 	AllTimeHigh      uint32 `gorm:"column:allTimeHigh;not null"`
 	AllTimeLow       uint32 `gorm:"column:allTimeLow;not null"`
 	StocksInExchange uint32 `gorm:"column:stocksInExchange;not null"`
-	UpOrDown         uint8  `gorm:"column:upOrDown;not null"`
+	UpOrDown         bool   `gorm:"column:upOrDown;not null"`
 	CreatedAt        string `gorm:"column:createdAt;not null"`
 	UpdatedAt        string `gorm:"column:updatedAt;not null"`
 }
