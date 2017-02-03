@@ -74,7 +74,7 @@ func New() (*Session, error) {
 		"method": "New",
 	})
 
-	var session *Session
+	var session = &Session{}
 
 	rb := make([]byte, sidLen)
 	_, err := rand.Read(rb)
