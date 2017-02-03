@@ -61,3 +61,34 @@ func Subscribe(done <-chan struct{}, updates chan interface{}, sess *session.Ses
 	return nil
 }
 
+func GetCompanyProfile(sess *session.Session, req *actions_proto.GetCompanyProfileRequest) *actions_proto.GetCompanyProfileResponse {
+	return nil
+}
+
+func GetMarketEvents(sess *session.Session, req *actions_proto.GetMarketEventsRequest) *actions_proto.GetMarketEventsResponse {
+	return nil
+}
+
+func GetMyAsks(sess *session.Session, req *actions_proto.GetMyAsksRequest) *actions_proto.GetMyAsksResponse {
+	return nil
+}
+
+func GetMyBids(sess *session.Session, req *actions_proto.GetMyBidsRequest) *actions_proto.GetMyBidsResponse {
+	return nil
+}
+
+func GetNotifications(sess *session.Session, req *actions_proto.GetNotificationsRequest) *actions_proto.GetNotificationsResponse {
+	return nil
+}
+
+func GetTransactions(sess *session.Session, req *actions_proto.GetTransactionsRequest) *actions_proto.GetTransactionsResponse {
+	return nil
+}
+
+func GetMortgageDetails(sess *session.Session, req *actions_proto.GetMortgageDetailsRequest) *actions_proto.GetMortgageDetailsResponse {
+	return nil
+}
+
+func GetLeaderboard(sess *session.Session, req *actions_proto.GetLeaderboardRequest) *actions_proto.GetLeaderboardResponse {
+	return nil
+}
