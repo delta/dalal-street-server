@@ -62,6 +62,41 @@ func makeResponseExceptSubscribe(c *client, reqwrap *socketapi_proto.RequestWrap
 		rw.Response = &socketapi_proto.ResponseWrapper_UnsubscribeResponse{
 			UnsubscribeResponse: actions.Unsubscribe(c.sess, req),
 		}
+	// The ugly 'GetGet' is unfortunate, but that ugliness remains contained within
+	// this file. The first Get is Protobuf's 'Get'. The second Get is part of the
+	// actual request name
+	} else if req := reqwrap.GetGetCompanyProfileRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetCompanyProfileResponse{
+			GetCompanyProfileResponse: actions.GetCompanyProfile(c.sess, req),
+		}
+	} else if req := reqwrap.GetGetMarketEventsRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetMarketEventsResponse{
+			GetMarketEventsResponse: actions.GetMarketEvents(c.sess, req),
+		}
+	} else if req := reqwrap.GetGetMyAsksRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetMyAsksResponse{
+			GetMyAsksResponse: actions.GetMyAsks(c.sess, req),
+		}
+	} else if req := reqwrap.GetGetMyBidsRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetMyBidsResponse{
+			GetMyBidsResponse: actions.GetMyBids(c.sess, req),
+		}
+	} else if req := reqwrap.GetGetNotificationsRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetNotificationsResponse{
+			GetNotificationsResponse: actions.GetNotifications(c.sess, req),
+		}
+	} else if req := reqwrap.GetGetTransactionsRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetTransactionsResponse{
+			GetTransactionsResponse: actions.GetTransactions(c.sess, req),
+		}
+	} else if req := reqwrap.GetGetMortgageDetailsRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetMortgageDetailsResponse{
+			GetMortgageDetailsResponse: actions.GetMortgageDetails(c.sess, req),
+		}
+	} else if req := reqwrap.GetGetLeaderboardRequest(); req != nil {
+		rw.Response = &socketapi_proto.ResponseWrapper_GetLeaderboardResponse{
+			GetLeaderboardResponse: actions.GetLeaderboard(c.sess, req),
+		}
 	} else {
 		return nil, errors.New(fmt.Sprintf("Unexpected type '%T'", reqwrap))
 	}
