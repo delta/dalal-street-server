@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS Leaderboard (
 	id int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
 	userId int(11) UNSIGNED NOT NULL,
 	cash int(11) UNSIGNED NOT NULL,
+	rank int(11) UNSIGNED NOT NULL,
 	debt int(11) UNSIGNED NOT NULL,
 	stockWorth int(11) SIGNED NOT NULL,
 	totalWorth int(11) SIGNED NOT NULL,
