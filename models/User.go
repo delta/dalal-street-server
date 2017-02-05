@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/thakkarparth007/dalal-street-server/utils"
+	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
 var (
@@ -22,12 +23,23 @@ var (
 
 // User models the User object.
 type User struct {
-	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT"`
-	Email     string `gorm:"unique;not null"`
-	Name      string `gorm:"not null"`
-	Cash      uint32 `gorm:"not null"`
-	Total     int32  `gorm:"not null"`
-	CreatedAt string `gorm:"column:createdAt;not null"`
+	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Email     string `gorm:"unique;not null" json:"email"`
+	Name      string `gorm:"not null" json:"name"`
+	Cash      uint32 `gorm:"not null" json:"cash"`
+	Total     int32  `gorm:"not null" json:"total"`
+	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
+}
+
+func (u *User) ToProto() *models_proto.User {
+	return &models_proto.User{
+		Id: u.Id,
+		Email: u.Email,
+		Name: u.Name,
+		Cash: u.Cash,
+		Total: u.Total,
+		CreatedAt: u.CreatedAt,
+	}
 }
 
 // pragyanUser is the structure returned by Pragyan API
