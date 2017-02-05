@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func init() {
@@ -28,7 +29,7 @@ func init() {
 		utils.Configuration.DbName,
 	)
 
-	allErrors, ok := migrate.UpSync(connStr, "../migrations")
+	allErrors, ok := migrate.ResetSync(connStr, "../migrations")
 	if !ok {
 		log.Fatal(allErrors)
 	}
@@ -73,4 +74,22 @@ func TestLogin(t *testing.T) {
 	}
 
 	//allErrors, ok = migrate.DownSync(connStr, "../migrations")
+}
+
+func TestUserToProto(t *testing.T) {
+	o := &User{
+		Id: 2,
+		Email: "test@testmail.com",
+		Name: "test user",
+		Cash: 10000,
+		Total: -200,
+		CreatedAt: "2017-06-08T00:00:00",
+	}
+
+	o_proto := o.ToProto()
+
+	if !testutils.AssertEqual(t, o, o_proto) {
+		t.Fatal("Converted values not equal!")
+	}
+
 }
