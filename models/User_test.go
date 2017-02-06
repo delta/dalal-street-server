@@ -1,15 +1,15 @@
 package models
 
 import (
-	"testing"
 	"fmt"
 	"log"
 	"reflect"
+	"testing"
 
-	"github.com/gemnasium/migrate/migrate"
-	_ "github.com/gemnasium/migrate/driver/mysql"
-	"gopkg.in/jarcoal/httpmock.v1"
 	"github.com/Sirupsen/logrus"
+	_ "github.com/gemnasium/migrate/driver/mysql"
+	"github.com/gemnasium/migrate/migrate"
+	"gopkg.in/jarcoal/httpmock.v1"
 
 	"github.com/thakkarparth007/dalal-street-server/utils"
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
@@ -57,11 +57,11 @@ func TestLogin(t *testing.T) {
 	}()
 
 	exU := &User{
-		Id: 2,
-		Email: "test@testmail.com",
-		Name: "TestName",
-		Cash: STARTING_CASH,
-		Total: STARTING_CASH,
+		Id:        2,
+		Email:     "test@testmail.com",
+		Name:      "TestName",
+		Cash:      STARTING_CASH,
+		Total:     STARTING_CASH,
 		CreatedAt: u.CreatedAt,
 	}
 	if reflect.DeepEqual(u, exU) != true {
@@ -78,11 +78,11 @@ func TestLogin(t *testing.T) {
 
 func TestUserToProto(t *testing.T) {
 	o := &User{
-		Id: 2,
-		Email: "test@testmail.com",
-		Name: "test user",
-		Cash: 10000,
-		Total: -200,
+		Id:        2,
+		Email:     "test@testmail.com",
+		Name:      "test user",
+		Cash:      10000,
+		Total:     -200,
 		CreatedAt: "2017-06-08T00:00:00",
 	}
 

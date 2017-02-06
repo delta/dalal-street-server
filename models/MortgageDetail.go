@@ -17,9 +17,9 @@ func (MortgageDetail) TableName() string {
 
 func (md *MortgageDetail) ToProto() *models_proto.MortgageDetail {
 	return &models_proto.MortgageDetail{
-		Id: md.Id,
-		UserId: md.UserId,
-		StockId: md.StockId,
+		Id:           md.Id,
+		UserId:       md.UserId,
+		StockId:      md.StockId,
 		StocksInBank: md.StocksInBank,
 	}
 }

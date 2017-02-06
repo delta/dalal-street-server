@@ -8,11 +8,11 @@ import (
 
 func TestLeaderboardRowToProto(t *testing.T) {
 	lr := &LeaderboardRow{
-		Id: 2,
-		UserId: 5,
-		Rank: 1,
-		Cash: 1000,
-		Debt: 10,
+		Id:         2,
+		UserId:     5,
+		Rank:       1,
+		Cash:       1000,
+		Debt:       10,
 		StockWorth: -50,
 		TotalWorth: -300,
 	}

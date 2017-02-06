@@ -1,18 +1,18 @@
 package models
 
 import (
+	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"encoding/json"
-	"errors"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/utils"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 var (
@@ -33,18 +33,18 @@ type User struct {
 
 func (u *User) ToProto() *models_proto.User {
 	return &models_proto.User{
-		Id: u.Id,
-		Email: u.Email,
-		Name: u.Name,
-		Cash: u.Cash,
-		Total: u.Total,
+		Id:        u.Id,
+		Email:     u.Email,
+		Name:      u.Name,
+		Cash:      u.Cash,
+		Total:     u.Total,
 		CreatedAt: u.CreatedAt,
 	}
 }
 
 // pragyanUser is the structure returned by Pragyan API
 type pragyanUser struct {
-	Id   uint32	`json:"user_id"`
+	Id   uint32 `json:"user_id"`
 	Name string `json:"user_fullname"`
 }
 
@@ -58,8 +58,8 @@ func (User) TableName() string {
 // and the user doesn't exist in our database.
 func Login(email, password string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"_method"       : "Login",
-		"param_email"   : email,
+		"_method":        "Login",
+		"param_email":    email,
 		"param_password": password,
 	})
 
@@ -100,10 +100,10 @@ func Login(email, password string) (*User, error) {
 // createUser() creates a user given his email and name.
 func createUser(pu pragyanUser, email string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"_method": "createUser",
-		"param_id"    : pu.Id,
-		"param_email" : email,
-		"param_name"  : pu.Name,
+		"_method":     "createUser",
+		"param_id":    pu.Id,
+		"param_email": email,
+		"param_name":  pu.Name,
 	})
 
 	db, err := DbOpen()
@@ -114,11 +114,11 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 	defer db.Close()
 
 	u := &User{
-		Id   : pu.Id,
-		Email: email,
-		Name : pu.Name,
-		Cash : STARTING_CASH,
-		Total: STARTING_CASH,
+		Id:        pu.Id,
+		Email:     email,
+		Name:      pu.Name,
+		Cash:      STARTING_CASH,
+		Total:     STARTING_CASH,
 		CreatedAt: time.Now().String(),
 	}
 	l.Debugf("Creating user")
@@ -138,9 +138,9 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 // a pragyanUser struct.
 func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"_method": "postLoginToPragyan",
-		"param_email" : email,
-		"param_name"  : password,
+		"_method":     "postLoginToPragyan",
+		"param_email": email,
+		"param_name":  password,
 	})
 
 	form := url.Values{
@@ -170,8 +170,8 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 		Name string `json:"user_fullname"`
 	}
 	r := struct {
-		StatusCode  int			`json:"status_code"`
-		Message     message_t	`json:"message"`
+		StatusCode int       `json:"status_code"`
+		Message    message_t `json:"message"`
 	}{}
 	json.Unmarshal(body, &r)
 
@@ -179,7 +179,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	case 200:
 		uid, _ := strconv.ParseUint(r.Message.Id, 10, 32)
 		pu := pragyanUser{
-			Id: uint32(uid),
+			Id:   uint32(uid),
 			Name: r.Message.Name,
 		}
 
