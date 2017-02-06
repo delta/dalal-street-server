@@ -41,14 +41,14 @@ func (Transaction) TableName() string {
 
 func (t *Transaction) ToProto() *models_proto.Transaction {
 	pTrans := &models_proto.Transaction{
-		Id: t.Id,
-		UserId: t.UserId,
+		Id:      t.Id,
+		UserId:  t.UserId,
 		StockId: t.StockId,
 		// Type: t.Type,
 		StockQuantity: t.StockQuantity,
-		Price: t.Price,
-		Total: t.Total,
-		CreatedAt: t.CreatedAt,
+		Price:         t.Price,
+		Total:         t.Total,
+		CreatedAt:     t.CreatedAt,
 	}
 
 	if t.Type == FromExchangeTransaction {

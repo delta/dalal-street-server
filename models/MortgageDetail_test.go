@@ -8,9 +8,9 @@ import (
 
 func TestMortgageDetailToProto(t *testing.T) {
 	o := &MortgageDetail{
-		Id: 1,
-		UserId: 20,
-		StockId: 300,
+		Id:           1,
+		UserId:       20,
+		StockId:      300,
 		StocksInBank: 10,
 	}
 

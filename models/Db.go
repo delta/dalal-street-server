@@ -17,4 +17,3 @@ func InitModels() {
 		"module": "models",
 	})
 }
-

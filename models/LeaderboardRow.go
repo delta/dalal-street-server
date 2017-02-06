@@ -20,11 +20,11 @@ func (LeaderboardRow) TableName() string {
 
 func (l *LeaderboardRow) ToProto() *models_proto.LeaderboardRow {
 	return &models_proto.LeaderboardRow{
-		Id: l.Id,
-		UserId: l.UserId,
-		Cash: l.Cash,
-		Rank: l.Rank,
-		Debt: l.Debt,
+		Id:         l.Id,
+		UserId:     l.UserId,
+		Cash:       l.Cash,
+		Rank:       l.Rank,
+		Debt:       l.Debt,
 		StockWorth: l.StockWorth,
 		TotalWorth: l.TotalWorth,
 	}
