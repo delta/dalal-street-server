@@ -73,7 +73,7 @@ func Login(email, password string) (*User, error) {
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
-		return nil, err
+		return nil, InternalError
 	}
 	defer db.Close()
 
@@ -81,14 +81,14 @@ func Login(email, password string) (*User, error) {
 	if result := db.First(u, pu.Id); result.Error != nil {
 		if !result.RecordNotFound() {
 			l.Errorf("Error in loading user info from database: '%s'", result.Error)
-			return nil, result.Error
+			return nil, InternalError
 		}
 
 		l.Infof("User (%d, %s, %s) not found in database. Registering new user", pu.Id, email, pu.Name)
 
 		u, err = createUser(pu, email)
 		if err != nil {
-			return nil, err
+			return nil, InternalError
 		}
 	}
 
