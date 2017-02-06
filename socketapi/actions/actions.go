@@ -5,7 +5,9 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/thakkarparth007/dalal-street-server/models"
 	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/actions"
+	errors_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/errors"
 )
 
 var logger *logrus.Entry
@@ -30,7 +32,45 @@ func CancelBidOrder(sess *session.Session, req *actions_proto.CancelBidOrderRequ
 }
 
 func Login(sess *session.Session, req *actions_proto.LoginRequest) *actions_proto.LoginResponse {
-	return nil
+	resp := &actions_proto.LoginResponse{}
+
+	email := req.GetEmail()
+	password := req.GetPassword()
+
+	user, err := models.Login(email, password)
+
+	switch err {
+	case models.UnauthorizedError:
+		resp.Response = &actions_proto.LoginResponse_InvalidCredentialsError_{
+			InvalidCredentialsError: &actions_proto.LoginResponse_InvalidCredentialsError{
+				Reason: "Invalid Credentials",
+			},
+		}
+	case models.NotRegisteredError:
+		resp.Response = &actions_proto.LoginResponse_InvalidCredentialsError_{
+			InvalidCredentialsError: &actions_proto.LoginResponse_InvalidCredentialsError{
+				Reason: "You have not registered for Dalal Street on the Pragyan site",
+			},
+		}
+	case models.InternalError:
+		resp.Response = &actions_proto.LoginResponse_InternalServerError{
+			InternalServerError: &errors_proto.InternalServerError{
+				Reason: "We are facing some issues on the server. Please try again in some time",
+			},
+		}
+	case nil:
+		sess.Set("userId", string(user.Id))
+
+		resp.Response = &actions_proto.LoginResponse_Result{
+			Result: &actions_proto.LoginResponse_LoginSuccessResponse{
+				SessionId: sess.Id,
+				User: user.ToProto(),
+				// populate other fields :)
+			},
+		}
+	}
+
+	return resp
 }
 
 func Logout(ses *session.Session, req *actions_proto.LogoutRequest) *actions_proto.LogoutResponse {
