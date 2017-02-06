@@ -25,7 +25,7 @@ var validContent = `
 }
 `
 
-func TestInitConfiguration(t *testing.T) {
+func Test_InitConfiguration(t *testing.T) {
 	err := os.Rename("config_test.json", "config_test.json.bkp")
 
 	// It's okay if config.json did not exist before

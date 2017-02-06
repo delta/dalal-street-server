@@ -56,7 +56,7 @@ func InitConfiguration(configFileName string) {
 	err = decoder.Decode(&Configuration)
 
 	if err != nil {
-		log.Fatal("Failed to load configuration. Cannot proceed. Error: ", err)
+		log.Fatalf("Failed to load configuration. Cannot proceed. Error: ", err)
 	}
 
 	log.Printf("Loaded configuration from %s: %+v\n", configFileName, Configuration)
