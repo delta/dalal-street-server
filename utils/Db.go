@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
 // DbOpen() returns a database connection object by opening one based

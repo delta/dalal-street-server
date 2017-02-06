@@ -19,3 +19,4 @@ before_install:
     - go get github.com/gemnasium/migrate
     - migrate -url mysql://root:@/dalalstreet_test -path ./migrations up
 
+script: ./test.sh

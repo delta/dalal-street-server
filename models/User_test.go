@@ -1,41 +1,15 @@
 package models
 
 import (
-	"fmt"
-	"log"
 	"reflect"
 	"testing"
 
-	"github.com/Sirupsen/logrus"
-	_ "github.com/gemnasium/migrate/driver/mysql"
-	"github.com/gemnasium/migrate/migrate"
 	"gopkg.in/jarcoal/httpmock.v1"
 
-	"github.com/thakkarparth007/dalal-street-server/utils"
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
-func init() {
-	utils.InitConfiguration("config_test.json")
-	//utils.InitLogger()
-	utils.Logger = logrus.New()
-	utils.Logger.Level = logrus.DebugLevel
-	InitModels()
-
-	connStr := fmt.Sprintf("mysql://%s:%s@%s/%s",
-		utils.Configuration.DbUser,
-		utils.Configuration.DbPassword,
-		utils.Configuration.DbHost,
-		utils.Configuration.DbName,
-	)
-
-	allErrors, ok := migrate.ResetSync(connStr, "../migrations")
-	if !ok {
-		log.Fatal(allErrors)
-	}
-}
-
-func TestLogin(t *testing.T) {
+func Test_Login(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
