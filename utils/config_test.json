@@ -9,7 +9,7 @@
 
    "DbUser": "root",
    "DbPassword": "",
-   "DbHost": "localhost",
+   "DbHost": "",
    "DbName": "dalalstreet_test",
 
    "HttpPort": 3000

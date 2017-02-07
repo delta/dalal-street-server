@@ -1,13 +1,1 @@
-{
-   "EventId": "22",
-   "EventSecret": "s3kr3t",
-
-   "LogFileName": "./dalalstreet_test.log",
-   "LogMaxSize": 50,
-   "LogLevel": "debug",
-
-   "DbUser": "root",
-   "DbPassword": "",
-   "DbHost": "",
-   "DbName": "dalalstreet_test"
-}
+../utils/config_test.json

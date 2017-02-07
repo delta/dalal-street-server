@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"testing"
-	"os"
-	"github.com/stretchr/testify/assert"
 	"encoding/json"
+	"github.com/stretchr/testify/assert"
+	"os"
+	"testing"
 )
 
 var validContent = `
