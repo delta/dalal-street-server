@@ -40,7 +40,7 @@ func InitLogger() {
 		Formatter: &logrus.JSONFormatter{},
 		Out: &lumberjack.Logger{
 			Filename: fileName,
-			MaxSize: maxSize, // MB
+			MaxSize:  maxSize, // MB
 		},
 		Level: level,
 	}

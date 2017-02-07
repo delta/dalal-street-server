@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/jmoiron/sqlx"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/Sirupsen/logrus"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -22,19 +22,27 @@ var (
 	logger *logrus.Entry
 )
 
-type Session struct {
+type Session interface {
+	GetId() string
+	Get(string) (string, bool)
+	Set(string, string) error
+	Delete(string) error
+	Destroy() error
+}
+
+type session struct {
 	Id string
 	m  map[string]string
 }
 
-func Load(id string) (*Session, error) {
+func Load(id string) (Session, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "Load",
-		"id": id,
+		"id":     id,
 	})
 
 	var (
-		session *Session
+		sess    *session
 		results map[string]string
 	)
 
@@ -62,19 +70,19 @@ func Load(id string) (*Session, error) {
 		results[key] = value
 	}
 
-	session.Id = id
-	session.m = results
+	sess.Id = id
+	sess.m = results
 
-	l.Debugf("Loaded session: %+v", session)
-	return session, nil
+	l.Debugf("Loaded session: %+v", sess)
+	return sess, nil
 }
 
-func New() (*Session, error) {
+func New() (Session, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "New",
 	})
 
-	var session = &Session{}
+	var sess = &session{}
 
 	rb := make([]byte, sidLen)
 	_, err := rand.Read(rb)
@@ -82,20 +90,24 @@ func New() (*Session, error) {
 		return nil, err
 	}
 
-	session.Id = string(rb)
-	session.m = make(map[string]string)
+	sess.Id = string(rb)
+	sess.m = make(map[string]string)
 
-	l.Debugf("Created session: %+v", session)
-	return session, nil
+	l.Debugf("Created session: %+v", sess)
+	return sess, nil
+}
+
+func (sess *session) GetId() string {
+	return sess.Id
 }
 
 // Set a key value pair in the map
-func (session *Session) Set(k string, v string) error {
+func (sess *session) Set(k string, v string) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "Set",
-		"session": fmt.Sprintf("%v", session),
-		"k": k,
-		"v": v,
+		"method":  "Set",
+		"session": fmt.Sprintf("%v", sess),
+		"k":       k,
+		"v":       v,
 	})
 
 	db, err := dbConn()
@@ -105,7 +117,7 @@ func (session *Session) Set(k string, v string) error {
 	defer db.Close()
 
 	sql := "INSERT INTO Sessions VALUES (?,?,?) ON DUPLICATE KEY UPDATE `id`=?, `key`=?, `value`=?"
-	_, err = db.Exec(sql, session.Id, k, v, session.Id, k, v)
+	_, err = db.Exec(sql, sess.Id, k, v, sess.Id, k, v)
 
 	if err != nil {
 		l.Errorf("Error in setting-value query: '%s'", err)
@@ -113,21 +125,21 @@ func (session *Session) Set(k string, v string) error {
 	}
 
 	l.Debugf("Set key in database")
-	session.m[k] = v
+	sess.m[k] = v
 	return nil
 }
 
 // Get the value providing key to the get function
-func (session *Session) Get(str string) (string, bool) {
-	value, ok := session.m[str] // return value if found or ok=false if not found
+func (sess *session) Get(str string) (string, bool) {
+	value, ok := sess.m[str] // return value if found or ok=false if not found
 	return value, ok
 }
 
-func (session *Session) Delete(str string) error {
+func (sess *session) Delete(str string) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "Delete",
-		"session": fmt.Sprintf("%v", session),
-		"str": str,
+		"method":  "Delete",
+		"session": fmt.Sprintf("%v", sess),
+		"str":     str,
 	})
 	l.Debug("Deleting")
 
@@ -138,16 +150,16 @@ func (session *Session) Delete(str string) error {
 	defer db.Close()
 
 	sql := "Delete FROM Sessions WHERE id=? AND `key`=?"
-	_, err = db.Exec(sql, session.Id, str)
+	_, err = db.Exec(sql, sess.Id, str)
 
 	return err
 }
 
 // Delete the entire session from database
-func (session Session) Destroy() error {
+func (sess *session) Destroy() error {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "Delete",
-		"session": fmt.Sprintf("%v", session),
+		"method":  "Delete",
+		"session": fmt.Sprintf("%v", sess),
 	})
 	l.Debug("Destroying")
 
@@ -158,7 +170,7 @@ func (session Session) Destroy() error {
 	defer db.Close()
 
 	sql := "DELETE FROM Sessions WHERE id=?"
-	_, err = db.Exec(sql, session.Id)
+	_, err = db.Exec(sql, sess.Id)
 
 	return err
 }

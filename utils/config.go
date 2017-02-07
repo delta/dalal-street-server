@@ -2,8 +2,8 @@ package utils
 
 import (
 	"encoding/json"
-	"os"
 	"log"
+	"os"
 )
 
 // Configuration contains all the configuration options
@@ -47,7 +47,7 @@ var Configuration = struct {
 func InitConfiguration(configFileName string) {
 	configFile, err := os.Open(configFileName)
 	if err != nil {
-		log.Fatal("Failed to open %s. Cannot proceed", configFileName)
+		log.Fatalf("Failed to open %s. Cannot proceed", configFileName)
 		return
 	}
 	defer configFile.Close()

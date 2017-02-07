@@ -1,8 +1,8 @@
 package socketapi
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/proto"
@@ -62,9 +62,9 @@ func makeResponseExceptSubscribe(c *client, reqwrap *socketapi_proto.RequestWrap
 		rw.Response = &socketapi_proto.ResponseWrapper_UnsubscribeResponse{
 			UnsubscribeResponse: actions.Unsubscribe(c.sess, req),
 		}
-	// The ugly 'GetGet' is unfortunate, but that ugliness remains contained within
-	// this file. The first Get is Protobuf's 'Get'. The second Get is part of the
-	// actual request name
+		// The ugly 'GetGet' is unfortunate, but that ugliness remains contained within
+		// this file. The first Get is Protobuf's 'Get'. The second Get is part of the
+		// actual request name
 	} else if req := reqwrap.GetGetCompanyProfileRequest(); req != nil {
 		rw.Response = &socketapi_proto.ResponseWrapper_GetCompanyProfileResponse{
 			GetCompanyProfileResponse: actions.GetCompanyProfile(c.sess, req),
@@ -147,8 +147,8 @@ func makeDataStreamUpdate(update interface{}) (*socketapi_proto.DalalMessage, er
 // need to stop this when client closes connection
 func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 	var l = socketApiLogger.WithFields(logrus.Fields{
-		"method": "client.handleRequest",
-		"param_c": c,
+		"method":        "client.handleRequest",
+		"param_c":       c,
 		"param_reqwrap": reqwrap,
 	})
 
@@ -158,7 +158,6 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 			l.Errorf("Failed while handling request: '%+v'", r)
 		}
 	}()
-
 
 	if reqwrap == nil {
 		l.Warnf("Got nil instead of RequestWrapper!. Not processing this.")
@@ -237,8 +236,8 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 			}
 
 			select {
-			case c.send <- data:	// don't do anything if c.send <- data worked. 
-			case <- c.done:
+			case c.send <- data: // don't do anything if c.send <- data worked.
+			case <-c.done:
 				return
 			}
 

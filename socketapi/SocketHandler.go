@@ -3,11 +3,11 @@ package socketapi
 import (
 	"net/http"
 
-	"github.com/gorilla/websocket"
 	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/websocket"
 
-	"github.com/thakkarparth007/dalal-street-server/utils"
 	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 var socketApiLogger *logrus.Entry
@@ -19,7 +19,7 @@ func InitSocketApi() {
 	})
 }
 
-func loadSession(r *http.Request) (*session.Session, error) {
+func loadSession(r *http.Request) (session.Session, error) {
 	var l = socketApiLogger.WithFields(logrus.Fields{
 		"method": "loadSession",
 	})
@@ -71,4 +71,3 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	go c.WritePump()
 	c.ReadPump()
 }
-

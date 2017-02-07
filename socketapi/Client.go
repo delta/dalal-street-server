@@ -3,9 +3,9 @@ package socketapi
 import (
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/proto"
+	"github.com/gorilla/websocket"
 
 	"github.com/thakkarparth007/dalal-street-server/session"
 	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
@@ -13,16 +13,16 @@ import (
 
 const (
 	maxMessageSize = 512
-	writeWait = 10 * time.Second
-	pongWait = 60 * time.Second
-	pingPeriod = (pongWait * 9) / 10
+	writeWait      = 10 * time.Second
+	pongWait       = 60 * time.Second
+	pingPeriod     = (pongWait * 9) / 10
 )
 
 type client struct {
 	conn *websocket.Conn
-	sess *session.Session
-	send  chan []byte
-	done  chan struct{}
+	sess session.Session
+	send chan []byte
+	done chan struct{}
 }
 
 type Client interface {
@@ -30,11 +30,11 @@ type Client interface {
 	ReadPump()
 	Send() chan []byte
 	Done() <-chan struct{}
-	GetSession() *session.Session
+	GetSession() session.Session
 }
 
-func NewClient(done chan struct{}, send chan []byte, conn *websocket.Conn, sess *session.Session) Client {
-	return &client {
+func NewClient(done chan struct{}, send chan []byte, conn *websocket.Conn, sess session.Session) Client {
+	return &client{
 		conn: conn,
 		sess: sess,
 		send: send,
@@ -42,7 +42,7 @@ func NewClient(done chan struct{}, send chan []byte, conn *websocket.Conn, sess 
 	}
 }
 
-func (c* client) Done() <-chan struct{} {
+func (c *client) Done() <-chan struct{} {
 	return c.done
 }
 
@@ -50,7 +50,7 @@ func (c *client) Send() chan []byte {
 	return c.send
 }
 
-func (c *client) GetSession() *session.Session {
+func (c *client) GetSession() session.Session {
 	return c.sess
 }
 
@@ -138,4 +138,3 @@ func (c *client) WritePump() {
 		}
 	}
 }
-

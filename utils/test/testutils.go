@@ -13,4 +13,3 @@ func AssertEqual(t *testing.T, o1, o2 interface{}) bool {
 
 	return assert.JSONEq(t, string(json1), string(json2))
 }
-
