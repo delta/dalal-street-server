@@ -11,7 +11,9 @@ import (
 )
 
 var socketApiLogger *logrus.Entry
-var upgrader = websocket.Upgrader{}
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return utils.Configuration.Stage == "test" || utils.Configuration.Stage == "dev" },
+}
 
 func InitSocketApi() {
 	socketApiLogger = utils.Logger.WithFields(logrus.Fields{
@@ -51,6 +53,8 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	var l = socketApiLogger.WithFields(logrus.Fields{
 		"method": "Handle",
 	})
+
+	l.Infof("Connection from %+v", r.RemoteAddr)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

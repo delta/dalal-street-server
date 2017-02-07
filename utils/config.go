@@ -8,6 +8,11 @@ import (
 
 // Configuration contains all the configuration options
 var Configuration = struct {
+	// Environment related options
+
+	// Stage is the current execution environment. Can be one of "prod", "dev" or "test"
+	Stage string
+
 	// Pragyan API related options
 
 	// EventId is the Id of DalalStreet event

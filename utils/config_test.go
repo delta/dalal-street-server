@@ -9,6 +9,8 @@ import (
 
 var validContent = `
 {
+   "Stage": "test",
+
    "EventId": "22",
    "EventSecret": "s3kr3t",
 
