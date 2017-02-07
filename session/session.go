@@ -3,6 +3,7 @@ package session
 import (
 	"fmt"
 	"math/rand"
+	"encoding/base64"
 
 	"github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
@@ -90,7 +91,7 @@ func New() (Session, error) {
 		return nil, err
 	}
 
-	sess.Id = string(rb)
+	sess.Id = base64.URLEncoding.EncodeToString(rb)
 	sess.m = make(map[string]string)
 
 	l.Debugf("Created session: %+v", sess)
