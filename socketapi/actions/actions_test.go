@@ -57,3 +57,77 @@ func TestLogin(t *testing.T) {
 
 	//allErrors, ok = migrate.DownSync(connStr, "../migrations")
 }
+
+func TestBuyStocksFromExchange(t *testing.T) {
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockSession := NewMockSession(mockCtrl)
+
+	req := &actions_proto.BuyStocksFromExchangeRequest {
+	StockId       : 12,
+	StockQuantity : 234,
+	}
+
+	res := BuyStocksFromExchange(mockSession, req)
+	resp := &actions_proto.BuyStocksFromExchangeResponse{}
+	resp.Response = &actions_proto.BuyStocksFromExchangeResponse_Result{
+		&actions_proto.BuyStocksFromExchangeResponse_BuyStocksFromExchangeSuccessResponse {
+			TradingPrice : 123,
+	  },
+	}
+
+	if reflect.DeepEqual(res , resp) != true	{
+		t.Fatalf("Expected BuyStocksFromExchange to return %v, instead of %v", res, resp)
+	}
+
+}
+
+func TestCancelAskOrder(t *testing.T)	{
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockSession := NewMockSession(mockCtrl)
+
+	req := &actions_proto.CancelAskOrderRequest {
+	StockId : 12,
+	AskId   : 234,
+	}
+
+	res := CancelAskOrder(mockSession, req)
+	resp := &actions_proto.CancelAskOrderResponse{}
+	resp.Response = &actions_proto.CancelAskOrderResponse_Result{
+		&actions_proto.CancelAskOrderResponse_CancelAskOrderSuccessResponse {
+			Success : true,
+	  },
+	}
+
+	if reflect.DeepEqual(res , resp) != true	{
+		t.Fatalf("Expected CancelAskOrder to return %v, instead of %v", res, resp)
+	}
+}
+
+func TestCancelBidOrder(t *testing.T)	{
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockSession := NewMockSession(mockCtrl)
+
+	req := &actions_proto.CancelBidOrderRequest {
+	StockId : 12,
+	BidId   : 234,
+	}
+
+	res := CancelBidOrder(mockSession, req)
+	resp := &actions_proto.CancelBidOrderResponse{}
+	resp.Response = &actions_proto.CancelBidOrderResponse_Result{
+		&actions_proto.CancelBidOrderResponse_CancelBidOrderSuccessResponse {
+			Success : true,
+	  },
+	}
+
+	if reflect.DeepEqual(res , resp) != true	{
+		t.Fatalf("Expected CancelBidOrder to return %v, instead of %v", res, resp)
+	}
+}
