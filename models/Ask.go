@@ -1,10 +1,32 @@
 package models
 
 import (
+	"database/sql/driver"
+	"fmt"
+	"sync"
+
+	"github.com/Sirupsen/logrus"
+
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
 type OrderType uint8
+
+func (ot *OrderType) Scan(value interface{}) error {
+	switch string(value.([]byte)) {
+	case "Limit":
+		*ot = Limit
+	case "Market":
+		*ot = Market
+	case "Stoploss":
+		*ot = Stoploss
+	default:
+		return fmt.Errorf("Invalid value for OrderType. Got %s", string(value.([]byte)))
+	}
+	return nil
+}
+
+func (ot OrderType) Value() (driver.Value, error) { return ot.String(), nil }
 
 const (
 	Limit OrderType = iota
@@ -19,7 +41,7 @@ var orderTypes = [...]string{
 }
 
 func (ot OrderType) String() string {
-	return orderTypes[ot-1]
+	return orderTypes[ot]
 }
 
 type Ask struct {
@@ -57,13 +79,171 @@ func (gAsk *Ask) ToProto() *models_proto.Ask {
 		CreatedAt:              gAsk.CreatedAt,
 		UpdatedAt:              gAsk.UpdatedAt,
 	}
-	// if gAsk.OrderType == Limit {
-	// 	pAsk.OrderType = models_proto.OrderType_LIMIT
-	// } else if gAsk.OrderType == Market {
-	// 	pAsk.OrderType = models_proto.OrderType_MARKET
-	// } else if gAsk.OrderType == Stoploss {
-	// 	pAsk.OrderType = models_proto.OrderType_STOPLOSS
-	// }
+	if gAsk.OrderType == Limit {
+		pAsk.OrderType = models_proto.OrderType_LIMIT
+	} else if gAsk.OrderType == Market {
+		pAsk.OrderType = models_proto.OrderType_MARKET
+	} else if gAsk.OrderType == Stoploss {
+		pAsk.OrderType = models_proto.OrderType_STOPLOSS
+	}
 
 	return pAsk
+}
+
+var asksMap = struct {
+	sync.RWMutex
+	m map[uint32]*Ask
+}{
+	sync.RWMutex{},
+	make(map[uint32]*Ask),
+}
+
+func getAsk(id uint32) (*Ask, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":   "getAsk",
+		"param_id": id,
+	})
+
+	l.Debugf("Attempting")
+
+	/* Try to see if the ask is there in the map */
+	asksMap.Lock()
+	defer asksMap.Unlock()
+	ask, ok := asksMap.m[id]
+	if ok {
+		l.Debugf("Found ask in asksMap")
+		return ask, nil
+	}
+
+	/* Otherwise load from database */
+	l.Debugf("Loading ask from database")
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer db.Close()
+
+	asksMap.m[id] = &Ask{}
+	ask = asksMap.m[id]
+	db.First(ask, id)
+
+	if ask == nil {
+		l.Errorf("Attempted to get non-existing Ask")
+		return nil, fmt.Errorf("Ask with id %d does not exist", id)
+	}
+
+	l.Debugf("Loaded ask from db: %+v", ask)
+
+	return ask, nil
+}
+
+/*
+func getAskCopy(id uint32) (chan struct{}, *Ask, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "getAskCopy",
+		"param_id": id,
+	})
+
+	var (
+		a *askAndLock
+		ch = make(chan struct{})
+	)
+
+	l.Debugf("Attempting")
+
+	/* Try to see if the ask is there in the map * /
+	askLocks.RLock()
+	a, ok := askLocks.m[id]
+	askLocks.Unlock()
+	if ok {
+		l.Debugf("Found ask in askLocks map. Locking.")
+		a.Lock()
+		go func() {
+			l.Debugf("Waiting for caller to release lock")
+			<-ch
+			a.Unlock()
+			l.Debugf("Lock released")
+		}()
+		return ch, a.ask, nil
+	}
+
+	/* Otherwise load from database * /
+	l.Debugf("Loading ask from database")
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, nil, err
+	}
+	defer db.Close()
+
+	askLocks.Lock()
+	db.First(a.ask, id)
+	askLocks.Unlock()
+
+	if a.ask == nil {
+		l.Errorf("Attempted to get non-existing Ask")
+		return nil, nil, fmt.Errorf("Ask with id %d does not exist", id)
+	}
+
+	l.Debugf("Loaded ask from db. Locking")
+	a.RLock()
+	go func() {
+		l.Debugf("Waiting for caller to release lock")
+		<-ch
+		askLocks.m[id].Unlock()
+		l.Debugf("Lock released")
+	}()
+
+	l.Debugf("Ask: %+v", a.ask)
+
+	return ch, a.ask, nil
+}
+*/
+func createAsk(ask *Ask) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":    "CreateAsk",
+		"param_ask": fmt.Sprintf("%+v", ask),
+	})
+
+	l.Debugf("Attempting")
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer db.Close()
+
+	if err := db.Create(ask).Error; err != nil {
+		return err
+	}
+
+	l.Debugf("Created ask. Id: %d", ask.Id)
+
+	return nil
+}
+
+func (ask *Ask) Close() error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":    "Ask.Close",
+		"param_ask": fmt.Sprintf("%+v", ask),
+	})
+
+	l.Debugf("Attempting")
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer db.Close()
+	ask.IsClosed = true
+
+	if err := db.Save(ask).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+	l.Debugf("Done")
+	return nil
 }

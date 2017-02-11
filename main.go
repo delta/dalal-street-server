@@ -6,8 +6,8 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/session"
-	"github.com/thakkarparth007/dalal-street-server/utils"
 	"github.com/thakkarparth007/dalal-street-server/socketapi"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 func main() {

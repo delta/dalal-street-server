@@ -1,6 +1,11 @@
 package models
 
 import (
+	"fmt"
+	"sync"
+
+	"github.com/Sirupsen/logrus"
+
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -42,4 +47,163 @@ func (gBid *Bid) ToProto() *models_proto.Bid {
 		pBid.OrderType = models_proto.OrderType_STOPLOSS
 	}
 	return pBid
+}
+
+var bidsMap = struct {
+	sync.RWMutex
+	m map[uint32]*Bid
+}{
+	sync.RWMutex{},
+	make(map[uint32]*Bid),
+}
+
+func getBid(id uint32) (*Bid, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":   "getBid",
+		"param_id": id,
+	})
+
+	l.Debugf("Attempting")
+
+	/* Try to see if the bid is there in the map */
+	bidsMap.Lock()
+	defer bidsMap.Unlock()
+
+	_, ok := bidsMap.m[id]
+	if ok {
+		l.Debugf("Found bid in bidsMap")
+		return bidsMap.m[id], nil
+	}
+
+	/* Otherwise load from database */
+	l.Debugf("Loading bid from database")
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer db.Close()
+
+	bidsMap.m[id] = &Bid{}
+	bid := bidsMap.m[id]
+	db.First(bid, id)
+
+	if bid == nil {
+		l.Errorf("Attempted to get non-existing Bid")
+		return nil, fmt.Errorf("Bid with id %d does not exist", id)
+	}
+
+	l.Debugf("Loaded bid from db: %+v", bid)
+
+	return bid, nil
+}
+
+/*
+func getBidCopy(id uint32) (chan struct{}, *Bid, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "getBidCopy",
+		"param_id": id,
+	})
+
+	var (
+		a *bidAndLock
+		ch = make(chan struct{})
+	)
+
+	l.Debugf("Attempting")
+
+	/* Try to see if the bid is there in the map * /
+	bidLocks.RLock()
+	a, ok := bidLocks.m[id]
+	bidLocks.Unlock()
+	if ok {
+		l.Debugf("Found bid in bidLocks map. Locking.")
+		a.Lock()
+		go func() {
+			l.Debugf("Waiting for caller to release lock")
+			<-ch
+			a.Unlock()
+			l.Debugf("Lock released")
+		}()
+		return ch, a.bid, nil
+	}
+
+	/* Otherwise load from database * /
+	l.Debugf("Loading bid from database")
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, nil, err
+	}
+	defer db.Close()
+
+	bidLocks.Lock()
+	db.First(a.bid, id)
+	bidLocks.Unlock()
+
+	if a.bid == nil {
+		l.Errorf("Attempted to get non-existing Bid")
+		return nil, nil, fmt.Errorf("Bid with id %d does not exist", id)
+	}
+
+	l.Debugf("Loaded bid from db. Locking")
+	a.RLock()
+	go func() {
+		l.Debugf("Waiting for caller to release lock")
+		<-ch
+		bidLocks.m[id].Unlock()
+		l.Debugf("Lock released")
+	}()
+
+	l.Debugf("Bid: %+v", a.bid)
+
+	return ch, a.bid, nil
+}
+*/
+func createBid(bid *Bid) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":    "CreateBid",
+		"param_bid": fmt.Sprintf("%+v", bid),
+	})
+
+	l.Debugf("Attempting")
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer db.Close()
+
+	if err := db.Create(bid).Error; err != nil {
+		return err
+	}
+
+	l.Debugf("Created bid. Id: %d", bid.Id)
+
+	return nil
+}
+
+func (bid *Bid) Close() error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":    "Bid.Close",
+		"param_bid": fmt.Sprintf("%+v", bid),
+	})
+
+	l.Debugf("Attempting")
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer db.Close()
+	bid.IsClosed = true
+
+	if err := db.Save(bid).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+	l.Debugf("Done")
+	return nil
 }

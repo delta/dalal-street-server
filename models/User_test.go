@@ -2,6 +2,7 @@ package models
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 
 	"gopkg.in/jarcoal/httpmock.v1"
@@ -65,5 +66,335 @@ func TestUserToProto(t *testing.T) {
 	if !testutils.AssertEqual(t, o, o_proto) {
 		t.Fatal("Converted values not equal!")
 	}
+
+}
+
+func Test_PlaceAskOrder(t *testing.T) {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+		return &Transaction{
+			UserId:        userId,
+			StockId:       stockId,
+			Type:          transType,
+			StockQuantity: stockQty,
+			Price:         price,
+			Total:         total,
+		}
+	}
+
+	var makeAsk = func(userId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Ask {
+		return &Ask{
+			UserId:        userId,
+			StockId:       stockId,
+			OrderType:     ot,
+			StockQuantity: stockQty,
+			Price:         price,
+		}
+	}
+
+	var user = &User{Id: 2}
+	var stock = &Stock{Id: 1}
+
+	transactions := []*Transaction{
+		makeTrans(2, 1, FromExchangeTransaction, 10, 200, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
+	}
+
+	testcases := []struct {
+		ask  *Ask
+		pass bool
+	}{
+		{makeAsk(2, 1, Limit, 5, 200), true},
+		{makeAsk(2, 1, Limit, 2, 200), true},
+		{makeAsk(2, 1, Limit, 3, 200), true},
+		{makeAsk(2, 1, Limit, 11, 200), false},
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+	defer func() {
+		for _, tr := range transactions {
+			db.Delete(tr)
+		}
+		for _, tc := range testcases {
+			db.Delete(tc.ask)
+		}
+		db.Delete(stock)
+		db.Delete(user)
+		db.Close()
+
+		delete(userLocks.m, 2)
+	}()
+
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tr := range transactions {
+		if err := db.Create(tr).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	wg := sync.WaitGroup{}
+	fm := sync.Mutex{}
+
+	for _, tc := range testcases {
+		if tc.pass != true {
+			continue
+		}
+		tc := tc
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := PlaceAskOrder(2, tc.ask)
+
+			if err != nil {
+				fm.Lock()
+				defer fm.Unlock()
+				t.Fatalf("Did not expect error. Got %+v", err)
+			}
+
+			a := &Ask{}
+			db.First(a, tc.ask.Id)
+			fm.Lock()
+			defer fm.Unlock()
+			if !testutils.AssertEqual(t, a, tc.ask) {
+				t.Fatalf("Got %+v; Want %+v;", a, tc.ask)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	id, err := PlaceAskOrder(2, testcases[len(testcases)-1].ask)
+	if err == nil {
+		t.Fatalf("Did not expect success. Failing %+v %+v", id, err)
+	}
+}
+
+func Test_PlaceBidOrder(t *testing.T) {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+		return &Transaction{
+			UserId:        userId,
+			StockId:       stockId,
+			Type:          transType,
+			StockQuantity: stockQty,
+			Price:         price,
+			Total:         total,
+		}
+	}
+
+	var makeBid = func(userId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Bid {
+		return &Bid{
+			UserId:        userId,
+			StockId:       stockId,
+			OrderType:     ot,
+			StockQuantity: stockQty,
+			Price:         price,
+		}
+	}
+
+	var user = &User{Id: 2, Cash: 2000}
+	var stock = &Stock{Id: 1}
+
+	transactions := []*Transaction{
+		makeTrans(2, 1, FromExchangeTransaction, 10, 200, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
+	}
+
+	testcases := []struct {
+		bid  *Bid
+		pass bool
+	}{
+		{makeBid(2, 1, Limit, 5, 200), true},
+		{makeBid(2, 1, Limit, 2, 200), true},
+		{makeBid(2, 1, Limit, 3, 200), true},
+		{makeBid(2, 1, Limit, 11, 200), false},
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+	defer func() {
+		for _, tr := range transactions {
+			db.Delete(tr)
+		}
+		for _, tc := range testcases {
+			db.Delete(tc.bid)
+		}
+		db.Delete(stock)
+		db.Delete(user)
+		db.Close()
+
+		delete(userLocks.m, 2)
+	}()
+
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tr := range transactions {
+		if err := db.Create(tr).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	wg := sync.WaitGroup{}
+	fm := sync.Mutex{}
+
+	for _, tc := range testcases {
+		if tc.pass != true {
+			continue
+		}
+		tc := tc
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := PlaceBidOrder(2, tc.bid)
+			if err != nil {
+				fm.Lock()
+				defer fm.Unlock()
+				t.Fatalf("Did not expect error. Got %+v", err)
+			}
+
+			b := &Bid{}
+			db.First(b, tc.bid.Id)
+			fm.Lock()
+			defer fm.Unlock()
+			if !testutils.AssertEqual(t, b, tc.bid) {
+				t.Fatalf("Got %+v; Want %+v;", b, tc.bid)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	id, err := PlaceBidOrder(2, testcases[len(testcases)-1].bid)
+	if err == nil {
+		t.Fatalf("Did not expect success. Failing %+v %+v", id, err)
+	}
+}
+
+func Test_CancelOrder(t *testing.T) {
+	var makeAsk = func(userId uint32, askId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Ask {
+		return &Ask{
+			Id:            askId,
+			UserId:        userId,
+			StockId:       stockId,
+			OrderType:     ot,
+			StockQuantity: stockQty,
+			Price:         price,
+		}
+	}
+
+	var makeBid = func(userId uint32, bidId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Bid {
+		return &Bid{
+			Id:            bidId,
+			UserId:        userId,
+			StockId:       stockId,
+			OrderType:     ot,
+			StockQuantity: stockQty,
+			Price:         price,
+		}
+	}
+
+	var user = &User{Id: 2}
+	var stock = &Stock{Id: 1}
+
+	var bids = []*Bid{
+		makeBid(2, 150, 1, Limit, 5, 200),
+		makeBid(2, 160, 1, Limit, 2, 200),
+	}
+	var asks = []*Ask{
+		makeAsk(2, 150, 1, Limit, 5, 200),
+		makeAsk(2, 160, 1, Limit, 2, 200),
+	}
+
+	testcases := []struct {
+		userId  uint32
+		orderId uint32
+		isAsk   bool
+		pass    bool
+	}{
+		{2, 150, false, true},
+		{2, 160, false, true},
+		{3, 150, false, false},
+		{2, 250, false, false},
+		{2, 150, true, true},
+		{2, 160, true, true},
+		{1, 150, false, false},
+		{2, 260, false, false},
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+	defer func() {
+		for _, a := range asks {
+			db.Delete(a)
+		}
+		for _, b := range bids {
+			db.Delete(b)
+		}
+		db.Delete(stock)
+		db.Delete(user)
+		db.Close()
+
+		delete(userLocks.m, 2)
+	}()
+
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	for _, a := range asks {
+		if err := db.Create(a).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, b := range bids {
+		if err := db.Create(b).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	wg := sync.WaitGroup{}
+	fm := sync.Mutex{}
+
+	for _, tc := range testcases {
+		tc := tc
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := CancelOrder(tc.userId, tc.orderId, tc.isAsk)
+			if tc.pass == true && err != nil {
+				fm.Lock()
+				defer fm.Unlock()
+				t.Fatalf("Did not expect error. Got %+v", err)
+			} else if tc.pass == false && err == nil {
+				fm.Lock()
+				defer fm.Unlock()
+				t.Fatalf("Expected error. Didn't get it. Failing.")
+			}
+		}()
+	}
+
+	wg.Wait()
 
 }
