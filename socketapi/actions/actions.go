@@ -116,12 +116,12 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 
 	user, err := models.Login(email, password)
 
-	switch err {
-	case models.UnauthorizedError:
+	switch {
+	case err == models.UnauthorizedError:
 		return invalidCredentialsError("Incorrect username/password combination. Please use your Pragyan credentials.")
-	case models.NotRegisteredError:
+	case err == models.NotRegisteredError:
 		return invalidCredentialsError("You have not registered for Dalal Street on the Pragyan website")
-	case models.InternalError:
+	case err != nil:
 		return internalServerError(err)
 	}
 
@@ -133,12 +133,23 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 
 	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetId())
 
+	stocksOwned, err := models.GetStocksOwned(user.Id)
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	stockList := models.GetAllStocks()
+	stockListProto := make(map[uint32]*models_proto.Stock)
+	for stockId, stock := range stockList {
+		stockListProto[stockId] = stock.ToProto()
+	}
+
 	resp.Response = &actions_proto.LoginResponse_Result{
 		&actions_proto.LoginResponse_LoginSuccessResponse{
-			SessionId: sess.GetId(),
-			User:      user.ToProto(),
-			// populate other fields :)
-			// StocksOwned and StockList
+			SessionId:   sess.GetId(),
+			User:        user.ToProto(),
+			StocksOwned: stocksOwned,
+			StockList:   stockListProto,
 		},
 	}
 
