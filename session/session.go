@@ -1,9 +1,9 @@
 package session
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math/rand"
-	"encoding/base64"
 
 	"github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"

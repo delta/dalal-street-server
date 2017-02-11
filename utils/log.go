@@ -9,8 +9,6 @@ import (
 // Logger is to be used for all logging
 var Logger *logrus.Logger
 
-type Fields logrus.Fields
-
 // InitLogger initializes the logger with apropriate configuration options
 func InitLogger() {
 	var (

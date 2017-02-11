@@ -1,10 +1,31 @@
 package models
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
 type TransactionType uint8
+
+func (tt *TransactionType) Scan(value interface{}) error {
+	switch string(value.([]byte)) {
+	case "FromExchangeTransaction":
+		*tt = 0
+	case "OrderFillTransaction":
+		*tt = 1
+	case "MortgageTransaction":
+		*tt = 2
+	case "DividendTransaction":
+		*tt = 3
+	default:
+		return fmt.Errorf("Invalid value for TransactionType. Got %s", string(value.([]byte)))
+	}
+	return nil
+}
+
+func (tt TransactionType) Value() (driver.Value, error) { return tt.String(), nil }
 
 const (
 	FromExchangeTransaction TransactionType = iota
@@ -21,7 +42,7 @@ var transactionTypes = [...]string{
 }
 
 func (trType TransactionType) String() string {
-	return transactionTypes[trType-1]
+	return transactionTypes[trType]
 }
 
 type Transaction struct {
