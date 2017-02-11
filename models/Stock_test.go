@@ -19,6 +19,7 @@ func TestStockToProto(t *testing.T) {
 		StocksInExchange: 123,
 		StocksInMarket:   234,
 		UpOrDown:         true,
+		PreviousDayClose: 1000,
 		CreatedAt:        "2017-02-09T00:00:00",
 		UpdatedAt:        "2017-02-09T00:00:00",
 	}
