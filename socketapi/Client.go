@@ -6,6 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
+	"github.com/satori/go.uuid"
 
 	"github.com/thakkarparth007/dalal-street-server/session"
 	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
@@ -23,6 +24,7 @@ type client struct {
 	sess session.Session
 	send chan []byte
 	done chan struct{}
+	id   uuid.UUID
 }
 
 type Client interface {
@@ -39,6 +41,7 @@ func NewClient(done chan struct{}, send chan []byte, conn *websocket.Conn, sess 
 		sess: sess,
 		send: send,
 		done: done,
+		id:   uuid.NewV4(),
 	}
 }
 
@@ -55,14 +58,14 @@ func (c *client) GetSession() session.Session {
 }
 
 func (c *client) ReadPump() {
-	defer func() {
-		c.conn.Close()
-		close(c.done)
-	}()
-
 	var l = socketApiLogger.WithFields(logrus.Fields{
 		"method": "client.ReadPump",
 	})
+
+	defer func() {
+		c.conn.Close()
+		//close(c.done)
+	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -98,11 +101,11 @@ func (c *client) ReadPump() {
 }
 
 func (c *client) WritePump() {
-	pingTicker := time.NewTicker(pingPeriod)
-
 	var l = socketApiLogger.WithFields(logrus.Fields{
 		"method": "client.WritePump",
 	})
+
+	pingTicker := time.NewTicker(pingPeriod)
 
 	defer func() {
 		pingTicker.Stop()
@@ -129,11 +132,13 @@ func (c *client) WritePump() {
 			}
 			if err := w.Close(); err != nil {
 				l.Errorf("Error closing the Writer. Stopping. '%+v'", err)
+				return
 			}
 		case <-pingTicker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				l.Errorf("Error sending ping message. Stopping. '%v'", err)
+				return
 			}
 		}
 	}

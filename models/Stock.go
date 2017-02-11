@@ -62,14 +62,14 @@ var allStocks = struct{
 	make(map[uint32]*stockAndLock),
 }
 
-func GetAllStocks() (map[uint32]Stock) {
+func GetAllStocks() (map[uint32]*Stock) {
 	allStocks.RLock()
 	defer allStocks.RUnlock()
 
-	var allStocksCopy = make(map[uint32]Stock)
+	var allStocksCopy = make(map[uint32]*Stock)
 	for stockId, stockNLock := range allStocks.m {
 		stockNLock.RLock()
-		allStocksCopy[stockId] = *stockNLock.stock
+		*allStocksCopy[stockId] = *stockNLock.stock
 		stockNLock.RUnlock()
 	}
 

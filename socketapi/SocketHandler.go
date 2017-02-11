@@ -7,18 +7,22 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/actions"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 var socketApiLogger *logrus.Entry
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return utils.Configuration.Stage == "test" || utils.Configuration.Stage == "dev" },
+	CheckOrigin: func(r *http.Request) bool {
+		return utils.Configuration.Stage == "test" || utils.Configuration.Stage == "dev"
+	},
 }
 
 func InitSocketApi() {
 	socketApiLogger = utils.Logger.WithFields(logrus.Fields{
 		"module": "socketapi/SocketHandler",
 	})
+	actions.InitActions()
 }
 
 func loadSession(r *http.Request) (session.Session, error) {
@@ -33,6 +37,7 @@ func loadSession(r *http.Request) (session.Session, error) {
 
 		if err != nil {
 			l.Errorf("Error loading session data: '%s'", err)
+			return nil, err
 		} else {
 			l.Debugf("Loaded session")
 			return s, nil
