@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS Stocks (
 	stocksInExchange int(11) UNSIGNED NOT NULL,
 	stocksInMarket int(11) UNSIGNED NOT NULL,
 	upOrDown tinyint(1) NOT NULL,
+    previousDayClose int(11) UNSIGNED NOT NULL,
 	createdAt varchar(255) NOT NULL DEFAULT "0000-00-00T00:00:00+05:30",
 	updatedAt varchar(255) NOT NULL DEFAULT "0000-00-00T00:00:00+05:30",
 	PRIMARY KEY (id)
