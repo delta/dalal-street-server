@@ -116,27 +116,27 @@ func makeDataStreamUpdate(update interface{}) (*socketapi_proto.DalalMessage, er
 	switch update.(type) {
 	case *datastreams_proto.MarketDepthUpdate:
 		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_MarketDepthUpdate{
-			MarketDepthUpdate: update.(*datastreams_proto.MarketDepthUpdate),
+			update.(*datastreams_proto.MarketDepthUpdate),
 		}
 	case *datastreams_proto.MarketEventUpdate:
-		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_MarketDepthUpdate{
-			MarketDepthUpdate: update.(*datastreams_proto.MarketDepthUpdate),
+		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_MarketEventsUpdate{
+			update.(*datastreams_proto.MarketEventUpdate),
 		}
 	case *datastreams_proto.NotificationUpdate:
 		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_NotificationUpdate{
-			NotificationUpdate: update.(*datastreams_proto.NotificationUpdate),
+			update.(*datastreams_proto.NotificationUpdate),
 		}
 	case *datastreams_proto.StockExchangeUpdate:
 		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_StockExchangeUpdate{
-			StockExchangeUpdate: update.(*datastreams_proto.StockExchangeUpdate),
+			update.(*datastreams_proto.StockExchangeUpdate),
 		}
 	case *datastreams_proto.StockPricesUpdate:
 		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_StockPricesUpdate{
-			StockPricesUpdate: update.(*datastreams_proto.StockPricesUpdate),
+			update.(*datastreams_proto.StockPricesUpdate),
 		}
 	case *datastreams_proto.TransactionUpdate:
 		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_TransactionUpdate{
-			TransactionUpdate: update.(*datastreams_proto.TransactionUpdate),
+			update.(*datastreams_proto.TransactionUpdate),
 		}
 	default:
 		return nil, errors.New(fmt.Sprintf("Unexpected type '%T'", update))
@@ -216,6 +216,21 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 	}
 
 	rw.Response = resp
+
+	data, err := proto.Marshal(dm)
+	if err != nil {
+		l.Errorf("Unable to marshal response. Response: '%+v'", dm)
+		return
+	}
+
+	// Two cases are possible:
+	// The client doesn't want any more data (he's disconnected). In which case we should return
+	// Or, the client has received our data.
+	select {
+	case <-c.done:
+		return
+	case c.send <- data:
+	}
 
 	for {
 		select {
