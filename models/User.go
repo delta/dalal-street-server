@@ -658,16 +658,15 @@ func (u *User) PerformDividendTransaction() {
 
 }
 
-
 type StockOwned struct {
-	StockId uint32
+	StockId       uint32
 	StockQuantity int32
 }
 
 func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":  "GetStocksOwned",
-		"userId":  userId,
+		"method": "GetStocksOwned",
+		"userId": userId,
 	})
 
 	l.Info("GetStocksOwned requested")

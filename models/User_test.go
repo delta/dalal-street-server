@@ -424,15 +424,15 @@ func Test_GetStocksOwned(t *testing.T) {
 	}
 
 	transactions := []*Transaction{
-		makeTrans(2, 1, FromExchangeTransaction, 10,  1, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 10, 1, 2000),
 		makeTrans(2, 1, FromExchangeTransaction, 10, 2, 2000),
 		makeTrans(2, 2, FromExchangeTransaction, -10, 1, 2000),
 
-		makeTrans(3, 1, FromExchangeTransaction, 10,  1, 2000),
+		makeTrans(3, 1, FromExchangeTransaction, 10, 1, 2000),
 		makeTrans(3, 3, FromExchangeTransaction, -10, 2, 2000),
 
 		makeTrans(4, 2, FromExchangeTransaction, -10, 2, 2000),
-		makeTrans(4, 2, FromExchangeTransaction, 10,  1, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 10, 1, 2000),
 		makeTrans(4, 2, FromExchangeTransaction, -10, 1, 2000),
 		makeTrans(4, 3, FromExchangeTransaction, 10, 1, 2000),
 	}
@@ -441,9 +441,9 @@ func Test_GetStocksOwned(t *testing.T) {
 		userId   uint32
 		expected map[uint32]int32
 	}{
-		{userId: 2, expected: map[uint32]int32{ 1:  20, 2: -10 }},
-		{userId: 3, expected: map[uint32]int32{ 1:  10, 3: -10 }},
-		{userId: 4, expected: map[uint32]int32{ 2: -10, 3:  10 }},
+		{userId: 2, expected: map[uint32]int32{1: 20, 2: -10}},
+		{userId: 3, expected: map[uint32]int32{1: 10, 3: -10}},
+		{userId: 4, expected: map[uint32]int32{2: -10, 3: 10}},
 	}
 
 	db, err := DbOpen()

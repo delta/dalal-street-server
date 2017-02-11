@@ -1,8 +1,8 @@
 package models
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
@@ -54,7 +54,7 @@ type stockAndLock struct {
 	stock *Stock
 }
 
-var allStocks = struct{
+var allStocks = struct {
 	sync.RWMutex
 	m map[uint32]*stockAndLock
 }{
@@ -62,7 +62,7 @@ var allStocks = struct{
 	make(map[uint32]*stockAndLock),
 }
 
-func GetAllStocks() (map[uint32]*Stock) {
+func GetAllStocks() map[uint32]*Stock {
 	allStocks.RLock()
 	defer allStocks.RUnlock()
 

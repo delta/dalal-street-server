@@ -7,9 +7,9 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/session"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/actions"
 	errors_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/errors"
+	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
@@ -31,9 +31,9 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 
 	resp := &actions_proto.BuyStocksFromExchangeResponse{}
 	resp.Response = &actions_proto.BuyStocksFromExchangeResponse_Result{
-		&actions_proto.BuyStocksFromExchangeResponse_BuyStocksFromExchangeSuccessResponse {
-			TradingPrice : 123,
-	  },
+		&actions_proto.BuyStocksFromExchangeResponse_BuyStocksFromExchangeSuccessResponse{
+			TradingPrice: 123,
+		},
 	}
 
 	l.Infof("Request completed successfully")
@@ -51,9 +51,9 @@ func CancelAskOrder(sess session.Session, req *actions_proto.CancelAskOrderReque
 
 	resp := &actions_proto.CancelAskOrderResponse{}
 	resp.Response = &actions_proto.CancelAskOrderResponse_Result{
-		&actions_proto.CancelAskOrderResponse_CancelAskOrderSuccessResponse {
-			Success : true,
-	  },
+		&actions_proto.CancelAskOrderResponse_CancelAskOrderSuccessResponse{
+			Success: true,
+		},
 	}
 
 	l.Infof("Request completed successfully")
@@ -71,8 +71,8 @@ func CancelBidOrder(sess session.Session, req *actions_proto.CancelBidOrderReque
 
 	resp := &actions_proto.CancelBidOrderResponse{}
 	resp.Response = &actions_proto.CancelBidOrderResponse_Result{
-		&actions_proto.CancelBidOrderResponse_CancelBidOrderSuccessResponse {
-			Success : true,
+		&actions_proto.CancelBidOrderResponse_CancelBidOrderSuccessResponse{
+			Success: true,
 		},
 	}
 
@@ -168,8 +168,8 @@ func Logout(sess session.Session, req *actions_proto.LogoutRequest) *actions_pro
 
 	resp := &actions_proto.LogoutResponse{}
 	resp.Response = &actions_proto.LogoutResponse_Result{
-		&actions_proto.LogoutResponse_LogoutSuccessResponse {
-			Success	: true,
+		&actions_proto.LogoutResponse_LogoutSuccessResponse{
+			Success: true,
 		},
 	}
 
@@ -188,9 +188,9 @@ func MortgageStocks(sess session.Session, req *actions_proto.MortgageStocksReque
 
 	resp := &actions_proto.MortgageStocksResponse{}
 	resp.Response = &actions_proto.MortgageStocksResponse_Result{
-		&actions_proto.MortgageStocksResponse_MortgageStocksSuccessResponse {
-			Success 		 : true,
-			TradingPrice : 123,
+		&actions_proto.MortgageStocksResponse_MortgageStocksSuccessResponse{
+			Success:      true,
+			TradingPrice: 123,
 		},
 	}
 
@@ -209,8 +209,8 @@ func PlaceAskOrder(sess session.Session, req *actions_proto.PlaceAskOrderRequest
 
 	resp := &actions_proto.PlaceAskOrderResponse{}
 	resp.Response = &actions_proto.PlaceAskOrderResponse_Result{
-		&actions_proto.PlaceAskOrderResponse_PlaceAskOrderSuccessResponse {
-			AskId : 123,
+		&actions_proto.PlaceAskOrderResponse_PlaceAskOrderSuccessResponse{
+			AskId: 123,
 		},
 	}
 
@@ -229,8 +229,8 @@ func PlaceBidOrder(sess session.Session, req *actions_proto.PlaceBidOrderRequest
 
 	resp := &actions_proto.PlaceBidOrderResponse{}
 	resp.Response = &actions_proto.PlaceBidOrderResponse_Result{
-		&actions_proto.PlaceBidOrderResponse_PlaceBidOrderSuccessResponse {
-			BidId : 123,
+		&actions_proto.PlaceBidOrderResponse_PlaceBidOrderSuccessResponse{
+			BidId: 123,
 		},
 	}
 
@@ -249,9 +249,9 @@ func RetrieveMortgageStocks(sess session.Session, req *actions_proto.RetrieveMor
 
 	resp := &actions_proto.RetrieveMortgageStocksResponse{}
 	resp.Response = &actions_proto.RetrieveMortgageStocksResponse_Result{
-		&actions_proto.RetrieveMortgageStocksResponse_RetrieveMortgageStocksSuccessResponse {
-			Success 		 : true,
-			TradingPrice : 123,
+		&actions_proto.RetrieveMortgageStocksResponse_RetrieveMortgageStocksSuccessResponse{
+			Success:      true,
+			TradingPrice: 123,
 		},
 	}
 
@@ -270,8 +270,8 @@ func Unsubscribe(sess session.Session, req *actions_proto.UnsubscribeRequest) *a
 
 	resp := &actions_proto.UnsubscribeResponse{}
 	resp.Response = &actions_proto.UnsubscribeResponse_Result{
-		&actions_proto.UnsubscribeResponse_UnsubscribeSuccessResponse {
-			Success 		 : true,
+		&actions_proto.UnsubscribeResponse_UnsubscribeSuccessResponse{
+			Success: true,
 		},
 	}
 
@@ -290,8 +290,8 @@ func Subscribe(done <-chan struct{}, updates chan interface{}, sess session.Sess
 
 	resp := &actions_proto.SubscribeResponse{}
 	resp.Response = &actions_proto.SubscribeResponse_Result{
-		&actions_proto.SubscribeResponse_SubscribeSuccessResponse {
-			Success 		 : true,
+		&actions_proto.SubscribeResponse_SubscribeSuccessResponse{
+			Success: true,
 		},
 	}
 
@@ -307,7 +307,7 @@ func GetCompanyProfile(sess session.Session, req *actions_proto.GetCompanyProfil
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 	l.Infof("GetCompanyProfile requested")
-	stockDetails := &models.Stock {
+	stockDetails := &models.Stock{
 		Id:               23,
 		ShortName:        "zold",
 		FullName:         "PastCry",
@@ -331,9 +331,9 @@ func GetCompanyProfile(sess session.Session, req *actions_proto.GetCompanyProfil
 	}).ToProto()
 	resp := &actions_proto.GetCompanyProfileResponse{}
 	resp.Response = &actions_proto.GetCompanyProfileResponse_Result{
-		&actions_proto.GetCompanyProfileResponse_GetCompanyProfileSuccessResponse {
-			StockDetails 		: stockDetails.ToProto(),
-			StockHistoryMap : stockHistoryMap,
+		&actions_proto.GetCompanyProfileResponse_GetCompanyProfileSuccessResponse{
+			StockDetails:    stockDetails.ToProto(),
+			StockHistoryMap: stockHistoryMap,
 		},
 	}
 
@@ -360,9 +360,9 @@ func GetMarketEvents(sess session.Session, req *actions_proto.GetMarketEventsReq
 	}).ToProto()
 	resp := &actions_proto.GetMarketEventsResponse{}
 	resp.Response = &actions_proto.GetMarketEventsResponse_Result{
-		&actions_proto.GetMarketEventsResponse_GetMarketEventsSuccessResponse {
-			MarketEvents	: marketEventsMap,
-			MoreExists 		: false,
+		&actions_proto.GetMarketEventsResponse_GetMarketEventsSuccessResponse{
+			MarketEvents: marketEventsMap,
+			MoreExists:   false,
 		},
 	}
 
@@ -394,9 +394,9 @@ func GetMyAsks(sess session.Session, req *actions_proto.GetMyAsksRequest) *actio
 	}).ToProto()
 	resp := &actions_proto.GetMyAsksResponse{}
 	resp.Response = &actions_proto.GetMyAsksResponse_Result{
-		&actions_proto.GetMyAsksResponse_GetMyAsksSuccessResponse {
-			AskOrders		: asksMap,
-			MoreExists	: false,
+		&actions_proto.GetMyAsksResponse_GetMyAsksSuccessResponse{
+			AskOrders:  asksMap,
+			MoreExists: false,
 		},
 	}
 
@@ -428,9 +428,9 @@ func GetMyBids(sess session.Session, req *actions_proto.GetMyBidsRequest) *actio
 	}).ToProto()
 	resp := &actions_proto.GetMyBidsResponse{}
 	resp.Response = &actions_proto.GetMyBidsResponse_Result{
-		&actions_proto.GetMyBidsResponse_GetMyBidsSuccessResponse {
-			BidOrders		: bidsMap,
-			MoreExists	: false,
+		&actions_proto.GetMyBidsResponse_GetMyBidsSuccessResponse{
+			BidOrders:  bidsMap,
+			MoreExists: false,
 		},
 	}
 
@@ -456,9 +456,9 @@ func GetNotifications(sess session.Session, req *actions_proto.GetNotificationsR
 	}).ToProto()
 	resp := &actions_proto.GetNotificationsResponse{}
 	resp.Response = &actions_proto.GetNotificationsResponse_Result{
-		&actions_proto.GetNotificationsResponse_GetNotificationsSuccessResponse {
-			Notifications	: notificationsMap,
-			MoreExists		: false,
+		&actions_proto.GetNotificationsResponse_GetNotificationsSuccessResponse{
+			Notifications: notificationsMap,
+			MoreExists:    false,
 		},
 	}
 
@@ -488,9 +488,9 @@ func GetTransactions(sess session.Session, req *actions_proto.GetTransactionsReq
 	}).ToProto()
 	resp := &actions_proto.GetTransactionsResponse{}
 	resp.Response = &actions_proto.GetTransactionsResponse_Result{
-		&actions_proto.GetTransactionsResponse_GetTransactionsSuccessResponse {
-			TransactionsMap	: transactionsMap,
-			MoreExists			: false,
+		&actions_proto.GetTransactionsResponse_GetTransactionsSuccessResponse{
+			TransactionsMap: transactionsMap,
+			MoreExists:      false,
 		},
 	}
 
@@ -508,14 +508,14 @@ func GetMortgageDetails(sess session.Session, req *actions_proto.GetMortgageDeta
 	l.Infof("GetMortgageDetails requested")
 
 	mortgageMap := make(map[uint32]*actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails)
-	mortgageMap[1] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails {
-		StockId				  : 1,
-		NumStocksInBank	:	12,
+	mortgageMap[1] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails{
+		StockId:         1,
+		NumStocksInBank: 12,
 	}
 	resp := &actions_proto.GetMortgageDetailsResponse{}
 	resp.Response = &actions_proto.GetMortgageDetailsResponse_Result{
-		&actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse {
-			MortgageMap		: mortgageMap,
+		&actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse{
+			MortgageMap: mortgageMap,
 		},
 	}
 
@@ -544,13 +544,13 @@ func GetLeaderboard(sess session.Session, req *actions_proto.GetLeaderboardReque
 	}).ToProto()
 	resp := &actions_proto.GetLeaderboardResponse{}
 	resp.Response = &actions_proto.GetLeaderboardResponse_Result{
-		&actions_proto.GetLeaderboardResponse_GetLeaderboardSuccessResponse {
-		MyRank          :	2,
-		TotalUsers      :	4,
-		TotalPages      :	2,
-		RankList        : rankList,
-		UpdatedBefore   :	3,
-		NextUpdateAfter :	5,
+		&actions_proto.GetLeaderboardResponse_GetLeaderboardSuccessResponse{
+			MyRank:          2,
+			TotalUsers:      4,
+			TotalPages:      2,
+			RankList:        rankList,
+			UpdatedBefore:   3,
+			NextUpdateAfter: 5,
 		},
 	}
 
