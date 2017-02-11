@@ -658,6 +658,60 @@ func (u *User) PerformDividendTransaction() {
 
 }
 
+
+type StockOwned struct {
+	StockId uint32
+	StockQuantity int32
+}
+
+func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "GetStocksOwned",
+		"userId":  userId,
+	})
+
+	l.Info("GetStocksOwned requested")
+
+	l.Debugf("Acquiring lock on user")
+
+	ch, _, err := getUser(userId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return nil, err
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debug("Released lock on user")
+	}()
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, InternalError
+	}
+	defer db.Close()
+
+	sql := "Select stockId, sum(stockQuantity) as stockQuantity from Transactions where userId=? group by stockId"
+	rows, err := db.Raw(sql, userId).Rows()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	stocksOwned := make(map[uint32]int32)
+	for rows.Next() {
+		var stockId uint32
+		var stockQty int32
+		rows.Scan(&stockId, &stockQty)
+
+		stocksOwned[stockId] = stockQty
+	}
+
+	return stocksOwned, nil
+}
+
 // Call User.Unload() when a user logs out. This will remove him from RAM
 func (u *User) Unload() {
 

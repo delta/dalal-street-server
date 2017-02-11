@@ -398,3 +398,115 @@ func Test_CancelOrder(t *testing.T) {
 	wg.Wait()
 
 }
+
+func Test_GetStocksOwned(t *testing.T) {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+		return &Transaction{
+			UserId:        userId,
+			StockId:       stockId,
+			Type:          transType,
+			StockQuantity: stockQty,
+			Price:         price,
+			Total:         total,
+		}
+	}
+
+	users := []*User{
+		{Id: 2, Email: "a@b.com", Cash: 2000},
+		{Id: 3, Email: "c@d.com", Cash: 1000},
+		{Id: 4, Email: "e@f.com", Cash: 5000},
+	}
+
+	stocks := []*Stock{
+		{Id: 1},
+		{Id: 2},
+		{Id: 3},
+	}
+
+	transactions := []*Transaction{
+		makeTrans(2, 1, FromExchangeTransaction, 10,  1, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 10, 2, 2000),
+		makeTrans(2, 2, FromExchangeTransaction, -10, 1, 2000),
+
+		makeTrans(3, 1, FromExchangeTransaction, 10,  1, 2000),
+		makeTrans(3, 3, FromExchangeTransaction, -10, 2, 2000),
+
+		makeTrans(4, 2, FromExchangeTransaction, -10, 2, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 10,  1, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, -10, 1, 2000),
+		makeTrans(4, 3, FromExchangeTransaction, 10, 1, 2000),
+	}
+
+	testcases := []struct {
+		userId   uint32
+		expected map[uint32]int32
+	}{
+		{userId: 2, expected: map[uint32]int32{ 1:  20, 2: -10 }},
+		{userId: 3, expected: map[uint32]int32{ 1:  10, 3: -10 }},
+		{userId: 4, expected: map[uint32]int32{ 2: -10, 3:  10 }},
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+	defer func() {
+		for _, tr := range transactions {
+			if err := db.Delete(tr).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, stock := range stocks {
+			if err := db.Delete(stock).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, user := range users {
+			if err := db.Delete(user).Error; err != nil {
+				t.Fatal(err)
+			}
+			delete(userLocks.m, user.Id)
+		}
+
+		db.Close()
+	}()
+
+	for _, user := range users {
+		if err := db.Create(user).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tr := range transactions {
+		if err := db.Create(tr).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	wg := sync.WaitGroup{}
+	fm := sync.Mutex{}
+
+	for _, tc := range testcases {
+		tc := tc
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ret, err := GetStocksOwned(tc.userId)
+			fm.Lock()
+			defer fm.Unlock()
+
+			if err != nil {
+				t.Fatalf("Did not expect error. Got %+v", err)
+			}
+			if !testutils.AssertEqual(t, tc.expected, ret) {
+				t.Fatalf("Got %+v; want %+v", ret, tc.expected)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
