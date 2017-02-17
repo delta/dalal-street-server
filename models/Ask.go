@@ -45,6 +45,7 @@ func (ot OrderType) String() string {
 }
 
 type Ask struct {
+	sync.RWMutex
 	Id                     uint32    `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId                 uint32    `gorm:"column:userId;not null" json:"user_id"`
 	StockId                uint32    `gorm:"column:stockId;not null" json:"stock_id"`

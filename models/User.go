@@ -509,6 +509,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
 
+	/*
+		AddAskOrder(ask, PerformOrderFillTransacction)
+	*/
+
 	return ask.Id, nil
 }
 
@@ -730,9 +734,11 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	return transaction, nil
 }
 
-func (u *User) PerformOrderFillTransaction() {
-
-}
+// func PerformOrderFillTransaction(askinguser, biddinguser, matchingask, mawtchingbid) (askfaulty, bidfaulty, error) {
+// 	// both users are locked
+// 	// sanity conditions
+	
+// }
 
 func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
