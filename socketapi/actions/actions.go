@@ -16,6 +16,12 @@ import (
 
 var logger *logrus.Entry
 
+func getUserId(sess session.Session) uint32 {
+	userId, _ := sess.Get("userId")
+	userIdInt, _ := strconv.ParseUint(userId, 10, 32)
+	return uint32(userIdInt)
+}
+
 func InitActions() {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "socketapi.actions",
@@ -51,6 +57,41 @@ func CancelAskOrder(sess session.Session, req *actions_proto.CancelAskOrderReque
 	l.Infof("CancelAskOrder requested")
 
 	resp := &actions_proto.CancelAskOrderResponse{}
+
+	// Helpers
+	var invalidAskIdError = func(reason string) *actions_proto.CancelAskOrderResponse {
+		l.Infof("Invalid credentials: '%s'", reason)
+		resp.Response = &actions_proto.CancelAskOrderResponse_InvalidAskIdError_{
+			&actions_proto.CancelAskOrderResponse_InvalidAskIdError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var internalServerError = func(err error) *actions_proto.CancelAskOrderResponse {
+		l.Infof("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.CancelAskOrderResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	askId := req.AskId
+
+	err := models.CancelOrder(userId, askId, true)
+
+	switch e := err.(type) {
+	case models.InvalidAskIdError:
+		return invalidAskIdError(e.Error())
+	}
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
 	resp.Response = &actions_proto.CancelAskOrderResponse_Result{
 		&actions_proto.CancelAskOrderResponse_CancelAskOrderSuccessResponse{
 			Success: true,
@@ -71,6 +112,41 @@ func CancelBidOrder(sess session.Session, req *actions_proto.CancelBidOrderReque
 	l.Infof("CancelBidOrder requested")
 
 	resp := &actions_proto.CancelBidOrderResponse{}
+
+	// Helpers
+	var invalidBidIdError = func(reason string) *actions_proto.CancelBidOrderResponse {
+		l.Infof("Invalid credentials: '%s'", reason)
+		resp.Response = &actions_proto.CancelBidOrderResponse_InvalidBidIdError_{
+			&actions_proto.CancelBidOrderResponse_InvalidBidIdError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var internalServerError = func(err error) *actions_proto.CancelBidOrderResponse {
+		l.Infof("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.CancelBidOrderResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	bidId := req.BidId
+
+	err := models.CancelOrder(userId, bidId, false)
+
+	switch e := err.(type) {
+	case models.InvalidBidIdError:
+		return invalidBidIdError(e.Error())
+	}
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
 	resp.Response = &actions_proto.CancelBidOrderResponse_Result{
 		&actions_proto.CancelBidOrderResponse_CancelBidOrderSuccessResponse{
 			Success: true,
@@ -225,9 +301,59 @@ func PlaceAskOrder(sess session.Session, req *actions_proto.PlaceAskOrderRequest
 	l.Infof("PlaceAskOrder requested")
 
 	resp := &actions_proto.PlaceAskOrderResponse{}
+
+	// Helpers
+	var askLimitExceedeedError = func(reason string) *actions_proto.PlaceAskOrderResponse {
+		resp.Response = &actions_proto.PlaceAskOrderResponse_AskLimitExceededError_{
+			&actions_proto.PlaceAskOrderResponse_AskLimitExceededError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var notEnoughStocksError = func(reason string) *actions_proto.PlaceAskOrderResponse {
+		resp.Response = &actions_proto.PlaceAskOrderResponse_NotEnoughStocksError_{
+			&actions_proto.PlaceAskOrderResponse_NotEnoughStocksError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var internalServerError = func(err error) *actions_proto.PlaceAskOrderResponse {
+		l.Infof("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.PlaceAskOrderResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	ask := &models.Ask{
+		UserId:        userId,
+		StockId:       req.StockId,
+		OrderType:     models.OrderTypeFromProto(req.OrderType),
+		Price:         req.Price,
+		StockQuantity: req.StockQuantity,
+	}
+
+	askId, err := models.PlaceAskOrder(userId, ask)
+
+	switch e := err.(type) {
+	case models.AskLimitExceededError:
+		return askLimitExceedeedError(e.Error())
+	case models.NotEnoughStocksError:
+		return notEnoughStocksError(e.Error())
+	}
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
 	resp.Response = &actions_proto.PlaceAskOrderResponse_Result{
 		&actions_proto.PlaceAskOrderResponse_PlaceAskOrderSuccessResponse{
-			AskId: 123,
+			AskId: askId,
 		},
 	}
 
@@ -245,9 +371,59 @@ func PlaceBidOrder(sess session.Session, req *actions_proto.PlaceBidOrderRequest
 	l.Infof("PlaceBidOrder requested")
 
 	resp := &actions_proto.PlaceBidOrderResponse{}
+
+	// Helpers
+	var bidLimitExceedeedError = func(reason string) *actions_proto.PlaceBidOrderResponse {
+		resp.Response = &actions_proto.PlaceBidOrderResponse_BidLimitExceededError_{
+			&actions_proto.PlaceBidOrderResponse_BidLimitExceededError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var notEnoughCashError = func(reason string) *actions_proto.PlaceBidOrderResponse {
+		resp.Response = &actions_proto.PlaceBidOrderResponse_NotEnoughCashError_{
+			&actions_proto.PlaceBidOrderResponse_NotEnoughCashError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var internalServerError = func(err error) *actions_proto.PlaceBidOrderResponse {
+		l.Infof("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.PlaceBidOrderResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	bid := &models.Bid{
+		UserId:        userId,
+		StockId:       req.StockId,
+		OrderType:     models.OrderTypeFromProto(req.OrderType),
+		Price:         req.Price,
+		StockQuantity: req.StockQuantity,
+	}
+
+	bidId, err := models.PlaceBidOrder(userId, bid)
+
+	switch e := err.(type) {
+	case models.BidLimitExceededError:
+		return bidLimitExceedeedError(e.Error())
+	case models.NotEnoughCashError:
+		return notEnoughCashError(e.Error())
+	}
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
 	resp.Response = &actions_proto.PlaceBidOrderResponse_Result{
 		&actions_proto.PlaceBidOrderResponse_PlaceBidOrderSuccessResponse{
-			BidId: 123,
+			BidId: bidId,
 		},
 	}
 
