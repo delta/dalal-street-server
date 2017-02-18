@@ -112,10 +112,24 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 		return resp
 	}
 
-	email := req.GetEmail()
-	password := req.GetPassword()
+	var (
+		user            models.User
+		err             error
+		alreadyLoggedIn bool
+	)
 
-	user, err := models.Login(email, password)
+	if userId, ok := sess.Get("userId"); !ok {
+		email := req.GetEmail()
+		password := req.GetPassword()
+
+		user, err = models.Login(email, password)
+	} else {
+		alreadyLoggedIn = true
+		userIdInt, err := strconv.ParseUint(userId, 10, 32)
+		if err == nil {
+			user, err = models.GetUserCopy(uint32(userIdInt))
+		}
+	}
 
 	switch {
 	case err == models.UnauthorizedError:
@@ -128,8 +142,10 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 
 	l.Debugf("models.Login returned without error %+v", user)
 
-	if err := sess.Set("userId", strconv.Itoa(int(user.Id))); err != nil {
-		return internalServerError(err)
+	if !alreadyLoggedIn {
+		if err := sess.Set("userId", strconv.Itoa(int(user.Id))); err != nil {
+			return internalServerError(err)
+		}
 	}
 
 	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetId())

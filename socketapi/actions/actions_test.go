@@ -28,6 +28,7 @@ func Test_Login(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mockSession := NewMockSession(mockCtrl)
+	mockSession.EXPECT().Get("userId")
 	mockSession.EXPECT().Set("userId", gomock.Any())
 	mockSession.EXPECT().GetId().AnyTimes()
 
