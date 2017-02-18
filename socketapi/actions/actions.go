@@ -37,9 +37,54 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 	l.Infof("BuyStocksFromExchange requested")
 
 	resp := &actions_proto.BuyStocksFromExchangeResponse{}
+
+	// Helpers
+	var buyLimitExceedeedError = func(reason string) *actions_proto.BuyStocksFromExchangeResponse {
+		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_BuyLimitExceededError_{
+			&actions_proto.BuyStocksFromExchangeResponse_BuyLimitExceededError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var notEnoughCashError = func(reason string) *actions_proto.BuyStocksFromExchangeResponse {
+		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_NotEnoughCashError_{
+			&actions_proto.BuyStocksFromExchangeResponse_NotEnoughCashError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var internalServerError = func(err error) *actions_proto.BuyStocksFromExchangeResponse {
+		l.Infof("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	stockId := req.StockId
+	stockQty := req.StockQuantity
+
+	transaction, err := models.PerformBuyFromExchangeTransaction(userId, stockId, stockQty)
+
+	switch e := err.(type) {
+	case models.BuyLimitExceededError:
+		return buyLimitExceedeedError(e.Error())
+	case models.NotEnoughCashError:
+		return notEnoughCashError(e.Error())
+	}
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
 	resp.Response = &actions_proto.BuyStocksFromExchangeResponse_Result{
 		&actions_proto.BuyStocksFromExchangeResponse_BuyStocksFromExchangeSuccessResponse{
-			TradingPrice: 123,
+			TradingPrice: transaction.Price,
 		},
 	}
 
