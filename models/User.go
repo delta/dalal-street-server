@@ -243,7 +243,11 @@ func getSingleStockCount(u *User, stockId uint32) (int32, error) {
 	defer db.Close()
 
 	var stockCount = struct{ Sc int32 }{0}
-	db.Raw("Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=?", u.Id, stockId).Scan(&stockCount)
+	sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=?"
+	if err := db.Raw(sql, u.Id, stockId).Scan(&stockCount).Error; err != nil {
+		l.Error(err)
+		return 0, err
+	}
 
 	l.Debugf("Got %d", stockCount.Sc)
 
@@ -377,75 +381,58 @@ func getUser(id uint32) (chan struct{}, *User, error) {
 	return ch, u.user, nil
 }
 
-/*
-// getUserCopy() gets a copy of user by his id.
+// GetUserCopy() gets a copy of user by his id.
 // The method returns a channel and a copy of the user object. The callee
 // is guaranteed to get read access to the user object. Once the callee
 // is done using the object, he must close the channel.
-func getUserCopy(id uint32) (chan struct{}, User, error) {
+func GetUserCopy(id uint32) (User, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "getUserCopy",
+		"method":   "GetUserCopy",
 		"param_id": id,
 	})
 
-	var (
-		u = &userAndLock{sync.RWMutex{}, &User{}}
-		ch = make(chan struct{})
-	)
+	var u = &userAndLock{sync.RWMutex{}, &User{}}
 
 	l.Debug("Attempting")
 
-	/* Try to see if the user is there in the map * /
-	userLocks.RLock()
+	/* Try to see if the user is there in the map */
+	userLocks.Lock()
+	defer userLocks.Unlock()
+
 	u, ok := userLocks.m[id]
-	userLocks.RUnlock()
 	if ok {
 		l.Debugf("Found user in userLocks map. Locking.")
-		u.Lock()
-		go func() {
-			l.Debugf("Waiting for caller to release lock")
-			<-ch
-			u.Unlock()
-			l.Debugf("Lock released")
-		}()
-		return ch, *u.user, nil
+		u.RLock()
+		defer u.RUnlock()
+		return *u.user, nil
 	}
 
-	/* Otherwise load from database * /
+	/* Otherwise load from database */
 	l.Debugf("Loading user from database")
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
-		return nil, User{}, err
+		return User{}, err
 	}
 	defer db.Close()
 
-	l.Debugf("Locking userLocks for write\n")
-	userLocks.Lock()
-	l.Debugf("Running db.First(u.user)\n")
-	db.First(u.user, id)
-	userLocks.Unlock()
-
-	if u.user == nil {
-		l.Errorf("Attempted to get non-existing user")
-		return nil, User{}, fmt.Errorf("User with id %d does not exist", id)
+	userLocks.m[id] = u
+	if errDb := db.First(u.user, id); errDb.Error != nil {
+		if errDb.RecordNotFound() {
+			l.Errorf("Attempted to get non-existing user")
+			return User{}, fmt.Errorf("User with Id %d does not exist", id)
+		} else {
+			return User{}, errDb.Error
+		}
 	}
 
-
-	l.Debugf("Loaded user from db. Locking")
+	l.Debugf("Loaded user from db. Locking.")
 	u.RLock()
-	go func() {
-		l.Debugf("Waiting for caller to release lock")
-		<-ch
-		userLocks.m[id].Unlock()
-		l.Debugf("Lock released")
-	}()
-
+	defer u.RUnlock()
 	l.Debugf("User: %+v", u.user)
 
-	return ch, *u.user, nil
+	return *u.user, nil
 }
-*/
 
 // User.PlaceAskOrder() places an Ask order for the user.
 //
