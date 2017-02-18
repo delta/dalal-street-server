@@ -59,6 +59,7 @@ func Test_Login(t *testing.T) {
 	//allErrors, ok = migrate.DownSync(connStr, "../migrations")
 }
 
+/*
 func TestBuyStocksFromExchange(t *testing.T) {
 
 	mockCtrl := gomock.NewController(t)
@@ -132,3 +133,4 @@ func TestCancelBidOrder(t *testing.T) {
 		t.Fatalf("Expected CancelBidOrder to return %v, instead of %v", res, resp)
 	}
 }
+*/
