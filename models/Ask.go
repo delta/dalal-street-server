@@ -44,8 +44,17 @@ func (ot OrderType) String() string {
 	return orderTypes[ot]
 }
 
+func OrderTypeFromProto(pOt models_proto.OrderType) OrderType {
+	if pOt == models_proto.OrderType_LIMIT {
+		return Limit
+	} else if pOt == models_proto.OrderType_MARKET {
+		return Market
+	} else {
+		return Stoploss
+	}
+}
+
 type Ask struct {
-	sync.RWMutex
 	Id                     uint32    `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId                 uint32    `gorm:"column:userId;not null" json:"user_id"`
 	StockId                uint32    `gorm:"column:stockId;not null" json:"stock_id"`
