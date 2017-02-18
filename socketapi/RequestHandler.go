@@ -156,7 +156,7 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 	// Ensure that whatever happens in this request doesn't take down the whole server!
 	defer func() {
 		if r := recover(); r != nil {
-			l.Errorf("Failed while handling request: '%+v'\nStack trace: %+v", r, debug.Stack())
+			l.Errorf("Failed while handling request: '%+v'\nStack trace: %+v", r, string(debug.Stack()))
 		}
 	}()
 

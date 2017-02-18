@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Sirupsen/logrus"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -69,6 +70,7 @@ func GetAllStocks() map[uint32]*Stock {
 	var allStocksCopy = make(map[uint32]*Stock)
 	for stockId, stockNLock := range allStocks.m {
 		stockNLock.RLock()
+		allStocksCopy[stockId] = &Stock{}
 		*allStocksCopy[stockId] = *stockNLock.stock
 		stockNLock.RUnlock()
 	}
@@ -104,6 +106,36 @@ func updateStockPrice(stockId, price uint32) error {
 	} else {
 		stock.UpOrDown = false
 	}
+
+	return nil
+}
+
+func loadStocks() error {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "loadStocks",
+	})
+
+	l.Infof("Attempting")
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer db.Close()
+
+	var stocks []*Stock
+	if err := db.Find(&stocks).Error; err != nil {
+		return err
+	}
+
+	allStocks.Lock()
+	for _, stock := range stocks {
+		allStocks.m[stock.Id] = &stockAndLock{stock: stock}
+	}
+	allStocks.Unlock()
+
+	l.Infof("Loaded %+v", allStocks)
 
 	return nil
 }

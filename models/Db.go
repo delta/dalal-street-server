@@ -16,4 +16,5 @@ func InitModels() {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "models",
 	})
+	loadStocks()
 }

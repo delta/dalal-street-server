@@ -2,6 +2,7 @@ package actions
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/Sirupsen/logrus"
 
@@ -125,9 +126,9 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 		return internalServerError(err)
 	}
 
-	l.Debugf("models.Login returned without error")
+	l.Debugf("models.Login returned without error %+v", user)
 
-	if err := sess.Set("userId", string(user.Id)); err != nil {
+	if err := sess.Set("userId", strconv.Itoa(int(user.Id))); err != nil {
 		return internalServerError(err)
 	}
 
