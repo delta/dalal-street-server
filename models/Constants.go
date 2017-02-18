@@ -3,6 +3,7 @@ package models
 const SHORT_SELL_BORROW_LIMIT = 20
 const BID_LIMIT = 20
 const ASK_LIMIT = 20
+const BUY_LIMIT = 20
 const MINIMUM_CASH_LIMIT = 0
 const BUY_FROM_EXCHANGE_LIMIT = 20
 
