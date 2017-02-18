@@ -1,103 +1,287 @@
 package models
 
 import (
-	_ "github.com/Sirupsen/logrus"
+	"errors"
+	"github.com/Sirupsen/logrus"
 )
 
-//type of channel where ask orders will be streamed
-type askChanStruct struct {
-	order   *Ask
-	matcher func(*Ask, *Bid) (bool, bool)
-}
-
-//type of channel where bid orders will be streamed
-type bidChanStruct struct {
-	order   *Bid
-	matcher func(*Ask, *Bid) (bool, bool)
-}
-
 type StockDetails struct {
-	askChan chan askChanStruct
-	bidChan chan bidChanStruct
+	askChan chan *Ask
+	bidChan chan *Bid
 	asks    *AskPQueue
 	bids    *BidPQueue
 }
 
-//map to store details of the placed orders. Maps stockId to the PlacedOrderDetails for that stockId
+/*
+*	map to store details of the placed orders. Maps stockId to the PlacedOrderDetails for that stockId
+*/
 var stocks map[uint32]StockDetails
 
-func AddAskOrder(askOrder *Ask, matcher func(*Ask, *Bid) (bool, bool)) {
-	stocks[askOrder.StockId].askChan <- askChanStruct{askOrder, matcher}
+/*
+*	method to add the placed ask order to the ask channel. Called from method PlaceAskOrder
+*/
+func AddAskOrder(askOrder *Ask) {
+	stocks[askOrder.StockId].askChan <- askOrder
 }
 
-func AddBidOrder(bidOrder *Bid, matcher func(*Ask, *Bid) (bool, bool)) {
-	stocks[bidOrder.StockId].bidChan <- bidChanStruct{bidOrder, matcher}
+/*
+*	method to add the placed bid order to the bid channel. Called from method PlaceBidOrder
+*/
+func AddBidOrder(bidOrder *Bid) {
+	stocks[bidOrder.StockId].bidChan <- bidOrder
 }
 
-//primary function to perform matching and transaction(through callback)
-func StartStockMatching(stock StockDetails) {
+/*
+*	primary function to perform matching and transaction
+*/
+func StartStockMatching(stock StockDetails, stockId uint32) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "StartStockMatching",
+		"stockId": stockId,
+	})
+
+	/*
+	*	processAsk is guaranteed exclusive access to stocks[]
+	*
+	*	processAsk performs the following functions
+	*		- get the top bid order. If there are no bids for the current stock, store the ask and return
+	*		- acquire lock on askingUser and biddingUser in order of user ids
+	*		- check if price of ask is less than that of the top bid. If no, and the ask is still not satisfied,
+	*		  store the ask and return
+	*		- call PerformOrderFillTransaction to carry out the transaction
+	*
+	*	Possible return values
+	*		- if donefornow is true, no more iterations are required. Either the ask has been completely satisfied or there
+	*		  are no matching bids for now or PerformOrderFillTransaction has failed
+	*		- if donefornow is false, continue iterations. Either some error has occured, or the topBid has been popped
+	*/
+	var processAsk = func(askOrder *Ask) (donefornow bool, err error) {
+		topBidOrder := stocks[askOrder.StockId].bids.Head()
+
+		if topBidOrder == nil {
+			stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
+			return true, nil
+		}
+
+		l.Infof("Acquiring lock in order of User Ids")
+
+		var firstUserId uint32
+		var secondUserId uint32
+		var isAskFirst bool
+
+		//look out for error!!!
+		if askOrder.UserId < topBidOrder.UserId {
+			firstUserId = askOrder.UserId
+			secondUserId = topBidOrder.UserId
+			isAskFirst = true
+		} else {
+			firstUserId = topBidOrder.UserId
+			secondUserId = askOrder.UserId
+			isAskFirst = false
+		}
+
+		firstLockChan, firstUser, err := getUser(firstUserId)
+		if err != nil {
+			l.Errorf("Errored: %+v", err)
+			return false, err
+		}
+		defer close(firstLockChan)
+
+		secondLockChan, secondUser, err := getUser(secondUserId)
+		if err != nil {
+			l.Errorf("Errored: %+v", err)
+			return false, err
+		}
+		defer close(secondLockChan)
+
+		if !isAskOrderMatching(askOrder) {
+			stockQuantityYetToBeFulfilled := askOrder.StockQuantity - askOrder.StockQuantityFulfilled
+			if !askOrder.IsClosed {
+				stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, stockQuantityYetToBeFulfilled)
+			}
+			return true, nil
+		}
+
+		var (
+			askDone bool
+			bidDone bool
+		)
+		//PerformOrderFillTransaction should update StockQuantityFulfilled and IsClosed
+		if isAskFirst {
+			askDone, bidDone, err = PerformOrderFillTransaction(firstUser, secondUser, askOrder, topBidOrder)
+		} else {
+			askDone, bidDone, err = PerformOrderFillTransaction(secondUser, firstUser, askOrder, topBidOrder)
+		}
+
+		if err != nil {
+			stockQuantityYetToBeFulfilled := askOrder.StockQuantity - askOrder.StockQuantityFulfilled
+			stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, stockQuantityYetToBeFulfilled)
+			return true, err
+		}
+
+		// if askDone {
+		// 	return true, nil
+		// } else if bidDone {
+		// 	stocks[askOrder.StockId].bids.Pop()
+		// 	return false, nil
+		// }
+		if bidDone {
+			stocks[askOrder.StockId].bids.Pop()
+		}
+		if askDone {
+			return true, nil
+		} else {
+			return false, nil
+		}
+
+		return true, errors.New("PerformOrderFillTransaction returned both askDone, bidDone false")
+	}
+
+	/*
+	*	processBid is guaranteed exclusive access to stocks[]
+	*
+	*	processBid performs the following functions
+	*		- get the top ask order. If there are no asks for the current stock, store the bid and return
+	*		- acquire lock on askingUser and biddingUser in order of user ids
+	*		- check if price of bid is greater than that of the top ask. If no, and the bid is still not satisfied,
+	*		  store the bid and return
+	*		- call PerformOrderFillTransaction to carry out the transaction
+	*
+	*	Possible return values
+	*		- if donefornow is true, no more iterations are required. Either the bid has been completely satisfied or there
+	*		  are no matching asks for now or PerformOrderFillTransaction has failed
+	*		- if donefornow is false, continue iterations. Either some error has occured, or the topAsk has been popped
+	*/
+	var processBid = func(bidOrder *Bid) (donefornow bool, err error) {
+		topAskOrder := stocks[bidOrder.StockId].asks.Head()
+
+		if topAskOrder == nil {
+			stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
+			return true, nil
+		}
+
+		l.Infof("Acquiring lock in order of User Ids")
+
+		var firstUserId uint32
+		var secondUserId uint32
+		var isAskFirst bool
+
+		//look out for error!!!
+		if bidOrder.UserId < topAskOrder.UserId {
+			firstUserId = bidOrder.UserId
+			secondUserId = topAskOrder.UserId
+			isAskFirst = false
+		} else {
+			firstUserId = topAskOrder.UserId
+			secondUserId = bidOrder.UserId
+			isAskFirst = true
+		}
+
+		firstLockChan, firstUser, err := getUser(firstUserId)
+		if err != nil {
+			l.Errorf("Errored: %+v", err)
+			return false, err
+		}
+		defer close(firstLockChan)
+
+		secondLockChan, secondUser, err := getUser(secondUserId)
+		if err != nil {
+			l.Errorf("Errored: %+v", err)
+			return false, err
+		}
+		defer close(secondLockChan)
+
+		if !isBidOrderMatching(bidOrder) {
+			stockQuantityYetToBeFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
+			if !bidOrder.IsClosed {
+				stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, stockQuantityYetToBeFulfilled)
+			}
+			return true, nil
+		}
+
+		var (
+			askDone bool
+			bidDone bool
+		)
+		//PerformOrderFillTransaction should update StockQuantityFulfilled and IsClosed
+		if isAskFirst {
+			askDone, bidDone, err = PerformOrderFillTransaction(firstUser, secondUser, topAskOrder, bidOrder)
+		} else {
+			askDone, bidDone, err = PerformOrderFillTransaction(secondUser, firstUser, topAskOrder, bidOrder)
+		}
+
+		if err != nil {
+			stockQuantityYetToBeFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
+			stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, stockQuantityYetToBeFulfilled)
+			return true, err
+		}
+
+		// if bidDone {
+		// 	return true, nil
+		// } else if askDone {
+		// 	stocks[bidOrder.StockId].asks.Pop()
+		// 	return false, nil
+		// }
+		if askDone {
+			stocks[bidOrder.StockId].asks.Pop()
+		}
+		if bidDone {
+			return true, nil
+		} else {
+			return false, nil
+		}
+
+		return true, errors.New("PerformOrderFillTransaction returned both askDone, bidDone false")
+	}
+	var (
+		askDoneForNow bool
+		askErr error
+		bidDoneForNow bool
+		bidErr error
+	)
 	//run infinite loop
 	for {
 		select {
 		case askOrder := <-stock.askChan:
-			go func() {
-				for {
-					//askUserLock := getUser(askOrder.order.UserId)
-					//if askOrder.order.IsClosed || !isAskOrderMatching(askOrder.order) then break
-					//
-					//bidUserLock := getUser(bid...)
-					//// userid order.
-					//
-					topBidOrder := stocks[askOrder.order.StockId].bids.Head()
-					//matcher should update StockQuantityFulfilled and IsClosed
-					askFaulty, bidFaulty := askOrder.matcher(askOrder.order, topBidOrder)
-					if askFaulty {
-						break
-					} else if bidFaulty || topBidOrder.IsClosed {
-						stocks[askOrder.order.StockId].bids.Pop()
+			for {
+				askDoneForNow, askErr  = processAsk(askOrder)
+				if askDoneForNow {
+					if askErr != nil {
+						l.Errorf("Errored : %+v", askErr)
 					}
-
-					//unlock
+					break
 				}
+				// processAsk returns true when it's done with this ask.
+			}
 
-				stockQuantityYetToBeFulfilled := askOrder.order.StockQuantity - askOrder.order.StockQuantityFulfilled
-				if !askOrder.order.IsClosed {
-					stocks[askOrder.order.StockId].asks.Push(askOrder.order, askOrder.order.Price, stockQuantityYetToBeFulfilled)
-				}
-			}()
 		case bidOrder := <-stock.bidChan:
-			go func() {
-				bidOrder.order.Lock()
-				defer bidOrder.order.Unlock()
-				for !bidOrder.order.IsClosed && isBidOrderMatching(bidOrder.order) {
-					topAskOrder := stocks[bidOrder.order.StockId].asks.Head()
-					//matcher should update StockQuantityFulfilled and isClosed
-					askFaulty, bidFaulty := bidOrder.matcher(topAskOrder, bidOrder.order)
-					if bidFaulty {
-						break
-					} else if askFaulty || topAskOrder.IsClosed {
-						stocks[bidOrder.order.StockId].asks.Pop()
+			for {
+				bidDoneForNow, bidErr = processBid(bidOrder)
+				if bidDoneForNow {
+					if bidErr != nil {
+						l.Errorf("Errored : %+v", bidErr)
 					}
+					break
 				}
-
-				stockQuantityYetToBeFulfilled := bidOrder.order.StockQuantity - bidOrder.order.StockQuantityFulfilled
-				if !bidOrder.order.IsClosed {
-					stocks[bidOrder.order.StockId].bids.Push(bidOrder.order, bidOrder.order.Price, stockQuantityYetToBeFulfilled)
-				}
-			}()
+				// processBid returns true when it's done with this bid.
+			}
 		}
 	}
 }
 
+/*
+*	Init will be run once when server is started
+*	It calls StartStockmatching for all the stocks in concurrent goroutines
+*/
 func Init(stockIds []uint32) {
 	for _, stockId := range stockIds {
 		stocks[stockId] = StockDetails{
-			askChan: make(chan askChanStruct),
-			bidChan: make(chan bidChanStruct),
+			askChan: make(chan *Ask),
+			bidChan: make(chan *Bid),
 			asks:    NewAskPQueue(MINPQ), //lower price has higher priority
 			bids:    NewBidPQueue(MAXPQ), //higher price has higher priority
 		}
-		go StartStockMatching(stocks[stockId])
+		go StartStockMatching(stocks[stockId], stockId)
 	}
 }
 
@@ -109,64 +293,32 @@ func min(i, j uint32) uint32 {
 	}
 }
 
+/*
+*	function to check if the placed askorder price is less than that of the highest bidder for that stock
+*/
 func isAskOrderMatching(askOrder *Ask) bool {
 	stockId := askOrder.StockId
 	maxBid := stocks[stockId].bids.Head()
 	if maxBid == nil {
 		return false
 	}
+	if askOrder.OrderType == Market {
+		return true
+	}
 	return maxBid.Price > askOrder.Price
 }
 
+/*
+*	function to check if the placed bidorder price is greater than that of the lowest askorder for that stock
+*/
 func isBidOrderMatching(bidOrder *Bid) bool {
 	stockId := bidOrder.StockId
 	minAsk := stocks[stockId].asks.Head()
 	if minAsk == nil {
 		return false
 	}
+	if bidOrder.OrderType == Market {
+		return true
+	}
 	return minAsk.Price < bidOrder.Price
 }
-
-/*
-
-
-Stocks[
-    askChan chan struct{ Ask, func(Ask, Bid) (AskFaulty, BidFaulty) }
-    bidChan chan Bid
-
-    Asks[]
-    Bids[]
-]
-
-func AddAskOrder(a *Ask, notifyChan chan chan Bid) {
-    stocks[a.StockId].askChan <- { ask, notify }
-}
-
-func AddBidOrder(b *Bid) {
-    stocks[a.StockId].bidChan <- bid
-}
-
-func startStock(stock) {
-    for {
-        select {
-        case x := <-stock.askChan:
-            go func() {
-                while( x.StocksFulFilled < x.StockQuantity && stock.Bids.top.matches ):
-                    x.StocksFulfilled += min(x.StockQuantity, stock.Bids.StockQuantity)
-                    askFaulty, bidFaulty := x.Match(x.Ask, stock.Bids.Top)
-                    if askFaulty:
-                        continue
-                    else if bidFaulty or stock.Bids.Top.FulFilled:
-                        stock.Bids.Pop()
-
-                if x.unfulfilled:
-                    stock.Asks.insert(x)
-            }()
-        case y := <-stock.BidChan:
-            //blah
-        }
-    }
-}
-
-
-*/
