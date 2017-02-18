@@ -734,13 +734,221 @@ func (u *User) PerformOrderFillTransaction() {
 
 }
 
-func (u *User) PerformMortgageTransaction() {
+func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":              "PerformMortgageTransaction",
+		"param_userId":        userId,
+		"param_stockId":       stockId,
+		"param_stockQuantity": stockQuantity,
+	})
+
+	l.Infof("PerformMortgageTransaction requested")
+
+	l.Debugf("Acquiring exclusive write on user")
+	ch, user, err := getUser(userId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return nil, err
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	allStocks.m[stockId].RLock()
+	currentStockPrice := allStocks.m[stockId].stock.CurrentPrice
+	allStocks.m[stockId].RUnlock()
+
+	l.Debugf("Taking current price of stock as %d", currentStockPrice)
+
+	var rate int32
+
+	if stockQuantity >= 0 {
+		rate = MORTGAGE_RETRIEVE_RATE
+		l.Debugf("stockQuantity positive. Retrieving stocks from mortgage @ %d%%", rate)
+
+		db, err := DbOpen()
+		if err != nil {
+			l.Error(err)
+			return nil, err
+		}
+		defer db.Close()
+
+		stockCount := struct{ Sc int32 }{0}
+		sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=? and Type=?"
+		err = db.Raw(sql, user.Id, stockId, MortgageTransaction.String()).Scan(&stockCount).Error
+		if err != nil {
+			l.Error(err)
+			return nil, err
+		}
+
+		// Sc will be negative if stocks are there in mortgage.
+		// Change sign to mean number of stocks in mortgage
+		stockCount.Sc *= -1
+
+		l.Debugf("%d stocks mortgaged currently", stockCount.Sc)
+
+		if stockQuantity > stockCount.Sc {
+			l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stockCount.Sc, stockQuantity)
+			return nil, NotEnoughStocksError{}
+		}
+
+	} else {
+		rate = MORTGAGE_DEPOSIT_RATE
+		l.Debugf("stockQuantity negative. Depositing stocks to mortgage @ %d%%", rate)
+
+		stockOwned, err := getSingleStockCount(user, stockId)
+		if err != nil {
+			l.Error(err)
+			return nil, err
+		}
+
+		if stockOwned < -stockQuantity {
+			l.Errorf("Insufficient stocks in ownership. Have %d, want %d", stockOwned, stockQuantity)
+			return nil, NotEnoughStocksError{}
+		}
+	}
+
+	trTotal := -int32(currentStockPrice) * stockQuantity * rate / 100
+	if int32(user.Cash)+trTotal < 0 {
+		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", trTotal, user.Cash)
+		return nil, NotEnoughCashError{}
+	}
+
+	transaction := &Transaction{
+		UserId:        userId,
+		StockId:       stockId,
+		Type:          MortgageTransaction,
+		StockQuantity: stockQuantity,
+		Price:         0,
+		Total:         trTotal,
+	}
+
+	// A lock on user and stock has been acquired.
+	// Safe to make changes to this user and this stock
+
+	user.Cash = uint32(int32(user.Cash) + trTotal)
+
+	/* Committing to database */
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer db.Close()
+
+	tx := db.Begin()
+
+	if err := tx.Save(transaction).Error; err != nil {
+		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return nil, err
+	}
+
+	l.Debugf("Added transaction to Transactions table")
+
+	if err := tx.Save(user).Error; err != nil {
+		l.Errorf("Error updating user's cash. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return nil, err
+	}
+
+	l.Debugf("Updated user's cash. New balance: %d", user.Cash)
+
+	if err := tx.Commit().Error; err != nil {
+		l.Errorf("Error committing the transaction. Failing. %+v", err)
+		return nil, err
+	}
+
+	l.Debugf("Committed transaction. Success.")
+
+	return transaction, nil
 
 }
 
-func (u *User) PerformDividendTransaction() {
+/*
+func PerformDividendTransaction(stockId, dividendPercent uint32) (err error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":    "PerformDividendTransaction",
+		"param_stockId": stockId,
+		"param_dividendPercent": dividendPercent,
+	})
 
+	l.Info("PerformDividendTransaction requested")
+
+	l.Debug("Acquiring exclusive write on user")
+	ch, user, err := getUser(userId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return err
+	}
+	l.Debug("Acquired")
+	defer func() {
+		close(ch)
+		l.Debug("Released exclusive write on user")
+	}()
+
+	// A lock on user has been acquired.
+	// Safe to make changes to this user
+
+	stockQuantityOwned, err := getSingleStockCount(user, stockId)
+	price = stock.CurrentPrice
+
+	if price * stockQuantityRemoved > user.Cash {
+		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", price * stockQuantityRemoved, user.Cash)
+		return NotEnoughCashError{}, 0, 0
+	}
+
+	l.Debugf("%d stocks will be removed at %d per stock", stockQuantityRemoved, price)
+
+	transaction := &Transaction{
+		UserId: userId,
+		StockId: stockId,
+		Type: FromExchangeTransaction,
+		StockQuantity: int32(stockQuantityRemoved),
+		Price: price,
+		Total: -int32(price * stockQuantityRemoved),
+	}
+
+	user.Cash = uint32(int32(user.Cash) + transaction.Total)
+
+	/* Committing to database * /
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err, 0, 0
+	}
+	defer db.Close()
+
+	tx := db.Begin()
+
+	if err := tx.Save(transaction).Error; err != nil {
+		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return err, 0, 0
+	}
+
+	l.Debugf("Added transaction to Transactions table")
+
+	if err := tx.Save(user).Error; err != nil {
+		l.Errorf("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return err, 0, 0
+	}
+
+	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
+
+	if err := tx.Commit().Error; err != nil {
+		l.Errorf("Error committing the transaction. Failing. %+v", err)
+		return err, 0, 0
+	}
+
+	l.Debugf("Committed transaction. Success.")
+
+	return nil, stockQuantityRemoved, price
 }
+*/
 
 type StockOwned struct {
 	StockId       uint32

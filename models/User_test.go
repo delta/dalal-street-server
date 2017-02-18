@@ -682,3 +682,286 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 		}
 	}
 }
+
+func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+		return &Transaction{
+			UserId:        userId,
+			StockId:       stockId,
+			Type:          transType,
+			StockQuantity: stockQty,
+			Price:         price,
+			Total:         total,
+		}
+	}
+
+	users := []*User{
+		{Id: 2, Email: "a@b.com", Cash: 2000},
+		{Id: 3, Email: "c@d.com", Cash: 2000},
+		{Id: 4, Email: "e@f.com", Cash: 1000},
+	}
+
+	stocks := []*Stock{
+		{Id: 1, CurrentPrice: 100},
+		{Id: 2, CurrentPrice: 500},
+		{Id: 3, CurrentPrice: 200},
+	}
+
+	transactions := []*Transaction{
+		makeTrans(2, 1, MortgageTransaction, -20, 100, 2000),
+		makeTrans(2, 1, MortgageTransaction, 10, 100, 2000),
+		makeTrans(2, 2, MortgageTransaction, -10, 100, 2000),
+		makeTrans(2, 3, MortgageTransaction, -20, 200, 2000),
+
+		makeTrans(4, 1, MortgageTransaction, -5, 100, 2000),
+	}
+
+	testcases := []struct {
+		userId        uint32
+		stockId       uint32
+		stockQuantity int32
+		cashLost      uint32
+		stockLeft     int32
+		enoughStock   bool
+	}{
+		{2, 1, 7, 7 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 3, true},
+		{2, 1, 2, 2 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 1, true},
+		{2, 1, 5, 0, 1, false},
+
+		{2, 2, 7, 0, -10, false},
+
+		{2, 3, 15, 15 * 200 * MORTGAGE_RETRIEVE_RATE / 100, 5, true},
+		{2, 3, 5, 5 * 200 * MORTGAGE_RETRIEVE_RATE / 100, 0, true},
+
+		{3, 1, 10, 0, 0, false},
+
+		{4, 1, 6, 0, 5, false},
+		{4, 1, 5, 5 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 0, true},
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+	defer func() {
+		for _, tr := range transactions {
+			if err := db.Delete(tr).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, stock := range stocks {
+			if err := db.Delete(stock).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, user := range users {
+			if err := db.Delete(user).Error; err != nil {
+				t.Fatal(err)
+			}
+			delete(userLocks.m, user.Id)
+		}
+
+		db.Close()
+	}()
+
+	for _, user := range users {
+		if err := db.Create(user).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tr := range transactions {
+		if err := db.Create(tr).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := loadStocks(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range testcases {
+		u, err := GetUserCopy(tc.userId)
+		if err != nil {
+			t.Fatalf("Error loading user data %+v", err)
+		}
+		originalCash := int32(u.Cash)
+
+		tr, err := PerformMortgageTransaction(tc.userId, tc.stockId, tc.stockQuantity)
+
+		wasCashEnough := originalCash-int32(stocks[tc.stockId-1].CurrentPrice)*tc.stockQuantity*MORTGAGE_RETRIEVE_RATE/100 > 0
+		if _, ok := err.(NotEnoughStocksError); ok && !tc.enoughStock {
+			continue
+		} else if _, ok = err.(NotEnoughCashError); ok && !wasCashEnough {
+			continue
+		} else if err != nil {
+			t.Fatalf("Did not expect error. Got %+v", err)
+		}
+
+		// append the transaction to the user's list of transactions
+		transactions = append(transactions, tr)
+
+		if tr.StockQuantity < 0 {
+			t.Fatalf("Got %+v; positive! Wut.", tr.StockQuantity)
+		}
+
+		u, err = GetUserCopy(tc.userId)
+		if err != nil {
+			t.Fatalf("Error loading user data %+v", err)
+		}
+		cashLost := uint32(originalCash) - u.Cash
+		if cashLost != tc.cashLost {
+			t.Fatalf("Cash didn't change as expected. Want new cash %d; Got %+v; tc: %+v", uint32(originalCash)-tc.cashLost, u.Cash, tc)
+		}
+	}
+
+}
+
+func Test_PerformMortgageDepositTransaction(t *testing.T) {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+		return &Transaction{
+			UserId:        userId,
+			StockId:       stockId,
+			Type:          transType,
+			StockQuantity: stockQty,
+			Price:         price,
+			Total:         total,
+		}
+	}
+
+	users := []*User{
+		{Id: 2, Email: "a@b.com", Cash: 2000},
+		{Id: 3, Email: "c@d.com", Cash: 3000},
+		{Id: 4, Email: "e@f.com", Cash: 4000},
+	}
+
+	stocks := []*Stock{
+		{Id: 1, CurrentPrice: 100},
+		{Id: 2, CurrentPrice: 500},
+		{Id: 3, CurrentPrice: 200},
+	}
+
+	transactions := []*Transaction{
+		makeTrans(2, 1, FromExchangeTransaction, 20, 100, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, -10, 100, 2000),
+		makeTrans(2, 2, FromExchangeTransaction, -10, 100, 2000),
+		makeTrans(2, 3, FromExchangeTransaction, 20, 200, 2000),
+
+		makeTrans(4, 1, FromExchangeTransaction, 5, 100, 2000),
+	}
+
+	testcases := []struct {
+		userId        uint32
+		stockId       uint32
+		stockQuantity int32
+		cashGained    uint32
+		stockLeft     int32
+		enoughStock   bool
+	}{
+		{2, 1, -7, 7 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 3, true},
+		{2, 1, -2, 2 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 1, true},
+		{2, 1, -5, 0, 1, false},
+
+		{2, 2, -7, 0, -10, false},
+
+		{2, 3, -15, 15 * 200 * MORTGAGE_DEPOSIT_RATE / 100, 5, true},
+		{2, 3, -5, 5 * 200 * MORTGAGE_DEPOSIT_RATE / 100, 0, true},
+
+		{3, 1, -10, 0, 0, false},
+
+		{4, 1, -6, 0, 5, false},
+		{4, 1, -5, 5 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 0, true},
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+	defer func() {
+		for _, tr := range transactions {
+			if err := db.Delete(tr).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, stock := range stocks {
+			if err := db.Delete(stock).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, user := range users {
+			if err := db.Delete(user).Error; err != nil {
+				t.Fatal(err)
+			}
+			delete(userLocks.m, user.Id)
+		}
+
+		db.Close()
+	}()
+
+	for _, user := range users {
+		if err := db.Create(user).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tr := range transactions {
+		if err := db.Create(tr).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := loadStocks(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range testcases {
+		u, err := GetUserCopy(tc.userId)
+		if err != nil {
+			t.Fatalf("Error loading user data %+v", err)
+		}
+		originalCash := u.Cash
+
+		tr, err := PerformMortgageTransaction(tc.userId, tc.stockId, tc.stockQuantity)
+
+		if err != nil {
+			if _, ok := err.(NotEnoughStocksError); !ok {
+				t.Fatalf("Did not expect error. Got %+v", err)
+			} else if tc.enoughStock {
+				t.Fatalf("Did not expect, but got NotEnoughStockError: %+v. TC: %+v", err, tc)
+			}
+			continue
+		}
+
+		// append the transaction to the user's list of transactions
+		transactions = append(transactions, tr)
+
+		if tr.StockQuantity > 0 {
+			t.Fatalf("Got %+v; positive! Wut.", tr.StockQuantity)
+		}
+
+		stockLeft, err := getSingleStockCount(&u, tc.stockId)
+		if err != nil {
+			t.Fatalf("Error loading current stock count %+v", err)
+		}
+		if stockLeft != tc.stockLeft {
+			t.Fatalf("StockLeft mismatch. Got %d, want %d; tc: %+v", stockLeft, tc.stockLeft, tc)
+		}
+
+		u, err = GetUserCopy(tc.userId)
+		if err != nil {
+			t.Fatalf("Error loading user data %+v; tc %+v", err, tc)
+		}
+
+		if originalCash+tc.cashGained != u.Cash {
+			t.Fatalf("Cash didn't change as expected. Want new cash %d; Got %+v; tc: %+v", originalCash+tc.cashGained, u.Cash, tc)
+		}
+	}
+}
