@@ -544,18 +544,19 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 		stockId       uint32
 		stockQuantity uint32
 		maxStkQtyGot  uint32
+		buyLimitExceeded bool
 	}{
-		{2, 1, 10, 10},
-		{3, 1, 5, 5},
-		{4, 1, 30, 30},
+		{2, 1, 10, 10, false},
+		{3, 1, 5, 5, false},
+		{4, 1, 30, 30, true},
 
-		{2, 2, 15, 4},
-		{3, 2, 10, 2},
-		{4, 2, 20, 10},
+		{2, 2, 15, 4, false},
+		{3, 2, 10, 2, false},
+		{4, 2, 20, 10, false},
 
-		{2, 3, 7, 10},
-		{3, 3, 8, 5},
-		{4, 3, 10, 25},
+		{2, 3, 7, 10, false},
+		{3, 3, 8, 5, false},
+		{4, 3, 10, 25, false},
 	}
 
 	type lockedTrList struct {
@@ -632,6 +633,10 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 						t.Fatalf("Error getting latest user data %+v", err1)
 					}
 					t.Logf("Got not enough cash error, current cash %d, tc: %+v. err: %+v", u.Cash, tc, err)
+					return
+				}
+				if _, ok := err.(BuyLimitExceededError); ok {
+					t.Logf("Got buy limit exceeded error, current buy limit : %d, orderQuantity : %d, didExceed : %v", BUY_LIMIT, tc.stockQuantity, tc.buyLimitExceeded)
 					return
 				}
 				t.Fatalf("Did not expect error. Got %+v", err)
