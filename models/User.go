@@ -332,7 +332,12 @@ func getUser(id uint32) (chan struct{}, *User, error) {
 
 	/* Try to see if the user is there in the map */
 	userLocks.Lock()
-	defer userLocks.Unlock()
+	defer func() {
+		userLocks.Unlock()
+		l.Debugf("Unlocked userLocks map")
+	}()
+
+	l.Debugf("Locked userLocks map")
 
 	_, ok := userLocks.m[id]
 	if ok {
@@ -501,7 +506,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return 0, err
 	}
 
-	l.Info("Created Ask order. AskId: ", ask.Id)
+	l.Infof("Created Ask order. AskId: ", ask.Id)
 
 	return ask.Id, nil
 }
@@ -521,18 +526,18 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		"param_bid": fmt.Sprintf("%+v", bid),
 	})
 
-	l.Info("PlaceBidOrder requested")
+	l.Infof("PlaceBidOrder requested")
 
-	l.Debug("Acquiring exclusive write on user")
+	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUser(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return 0, err
 	}
-	l.Debug("Acquired")
+	l.Debugf("Acquired")
 	defer func() {
 		close(ch)
-		l.Debug("Released exclusive write on user")
+		l.Debugf("Released exclusive write on user")
 	}()
 
 	// A lock on user has been acquired.
@@ -541,10 +546,10 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	// First check: Order size should be less than BID_LIMIT
 	l.Debug("Check1: Order size vs BID_LIMIT (%d)", BID_LIMIT)
 	if bid.StockQuantity > BID_LIMIT {
-		l.Debug("Check1: Failed.")
+		l.Debugf("Check1: Failed.")
 		return 0, BidLimitExceededError{}
 	}
-	l.Debug("Check1: Passed.")
+	l.Debugf("Check1: Passed.")
 
 	// Second Check: User should have enough cash
 	var cashLeft = int32(user.Cash) - int32(bid.StockQuantity*bid.Price)
@@ -552,7 +557,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debug("Check2: Failed. Not enough cash.")
+		l.Debugf("Check2: Failed. Not enough cash.")
 		return 0, NotEnoughStocksError{}
 	}
 
@@ -563,7 +568,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		return 0, err
 	}
 
-	l.Info("Created Bid order. BidId: %d", bid.Id)
+	l.Infof("Created Bid order. BidId: %d", bid.Id)
 
 	return bid.Id, nil
 
@@ -577,7 +582,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 		"isAsk":   isAsk,
 	})
 
-	l.Info("CancelOrder requested")
+	l.Infof("CancelOrder requested")
 
 	l.Debugf("Acquiring exclusive write on user")
 
@@ -589,11 +594,11 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 	l.Debugf("Acquired")
 	defer func() {
 		close(ch)
-		l.Debug("Released exclusive write on user")
+		l.Debugf("Released exclusive write on user")
 	}()
 
 	if isAsk {
-		l.Debug("Acquiring lock on ask order")
+		l.Debugf("Acquiring lock on ask order")
 		askOrder, err := getAsk(orderId)
 		if askOrder == nil || askOrder.UserId != userId {
 			l.Errorf("Invalid ask id provided")
@@ -624,7 +629,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 		}
 	}
 
-	l.Info("Cancelled order")
+	l.Infof("Cancelled order")
 
 	return nil
 }
