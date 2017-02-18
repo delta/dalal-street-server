@@ -270,6 +270,14 @@ func (e AskLimitExceededError) Error() string {
 	return fmt.Sprintf("Ask orders must not exceed %d stocks per order", ASK_LIMIT)
 }
 
+// BuyLimitExceededError is generated when an Bid's StockQuantity is greater
+// than BUY_LIMIT (for BuyFromExchange orders)
+type BuyLimitExceededError struct{}
+
+func (e BuyLimitExceededError) Error() string {
+	return fmt.Sprintf("BuyFromExchange orders must not exceed %d stocks per order", BUY_LIMIT)
+}
+
 // NotEnoughCashError is generated when an Ask's StockQuantity is such that
 // deducting those many stocks will leave the user with less than
 // SHORT_SELL_BORROW_LIMIT
@@ -649,6 +657,11 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 
 	l.Infof("PerformBuyFromExchangeTransaction requested")
 
+	if stockQuantity > BUY_LIMIT {
+		l.Debugf("Exceeded buy limit. PerformBuyFromExchange failing")
+		return nil, BuyLimitExceededError{}
+	}
+
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUser(userId)
 	if err != nil {
@@ -752,57 +765,57 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 *	Returns askDone, bidDone, Error
 *		- if askDone is true, ask can be removed
 *		- if bidDone is true, bid can be removed
-*/
+ */
 func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, bid *Bid) (bool, bool, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":  "PerformOrderFillTransaction",
+		"method":        "PerformOrderFillTransaction",
 		"askingUserId":  ask.UserId,
 		"biddingUserId": bid.UserId,
-		"stockId":   ask.StockId,
+		"stockId":       ask.StockId,
 	})
 
 	l.Infof("PerformOrderFillTransaction requested for stock id %v", ask.StockId)
 
-/*
-	if ask.isclosed() return askDone, bidNotDone
-	if bid.isClosed() return askNotDone, bidDone
+	/*
+		if ask.isclosed() return askDone, bidNotDone
+		if bid.isClosed() return askNotDone, bidDone
 
-	stkTradeQty = min(ask.StQtyUnf.., bid.StkQtyUNfi)
-	stkTradePrice = min(ask.Price, bid.price)
-	if both marketorder:
-		allstocks.m[stkid].RLock()
-		stkTradePrice = allStocks.m[stkid].stock.CurrentPrice
-		allstks.msdfsd.Runlock()
+		stkTradeQty = min(ask.StQtyUnf.., bid.StkQtyUNfi)
+		stkTradePrice = min(ask.Price, bid.price)
+		if both marketorder:
+			allstocks.m[stkid].RLock()
+			stkTradePrice = allStocks.m[stkid].stock.CurrentPrice
+			allstks.msdfsd.Runlock()
 
-	condition1: bidder has enough money
-		no: return (bidDone, askNotDone)
+		condition1: bidder has enough money
+			no: return (bidDone, askNotDone)
 
-	condition2: asker has enough stocks
-		no: return (bidNotDone, askDone)
+		condition2: asker has enough stocks
+			no: return (bidNotDone, askDone)
 
-	IN DB:
-		transact( askingUser, -stkTradeQty, stkTradePrice, +stkTradeQty*stkTradePrice )
-		transact( biddingUser, +stkTradeQty, stkTradePrice, -stkTradeQty*stkTradePrice ) 
+		IN DB:
+			transact( askingUser, -stkTradeQty, stkTradePrice, +stkTradeQty*stkTradePrice )
+			transact( biddingUser, +stkTradeQty, stkTradePrice, -stkTradeQty*stkTradePrice )
 
-		askingUser.Cash += tr1.total
-		biddingUser.Cash += tr2.total
+			askingUser.Cash += tr1.total
+			biddingUser.Cash += tr2.total
 
-		asker.stkQtyFulfilled += stkTradeQty
-		bidder.stkQtyFulfilled += stkTradeQty
-		
-		if askfulfilled:
-			askdone = true
-		if bidfulfilled:
-			biddone = true
+			asker.stkQtyFulfilled += stkTradeQty
+			bidder.stkQtyFulfilled += stkTradeQty
 
-	if errored:
-		return askNotDone, bidNotDone, error! 
+			if askfulfilled:
+				askdone = true
+			if bidfulfilled:
+				biddone = true
+
+		if errored:
+			return askNotDone, bidNotDone, error!
 
 
-	updateStockPrice(stkid, stkTradePrice)
+		updateStockPrice(stkid, stkTradePrice)
 
-	return askdone,  biddone
-*/
+		return askdone,  biddone
+	*/
 	if ask.IsClosed {
 		return true, false, nil
 	}
@@ -812,7 +825,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 
 	var bidUnfulfilledStockQuantity = bid.StockQuantity - bid.StockQuantityFulfilled
 	var askUnfulfilledStockQuantity = ask.StockQuantity - ask.StockQuantityFulfilled
-	
+
 	stockTradeQty := int32(min(askUnfulfilledStockQuantity, bidUnfulfilledStockQuantity))
 	var stockTradePrice uint32
 
@@ -867,7 +880,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 		}
 	}
 
-	total := int32(stockTradePrice)*stockTradeQty
+	total := int32(stockTradePrice) * stockTradeQty
 
 	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -stockTradeQty, stockTradePrice, total)
 	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, stockTradeQty, stockTradePrice, -total)
@@ -879,7 +892,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
 	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
 	bidStockQuantityFulfilled := bid.StockQuantityFulfilled - uint32(stockTradeQty)
-	
+
 	var askIsClosed bool
 	var bidIsClosed bool
 	if ask.StockQuantity == askStockQuantityFulfilled {
@@ -895,7 +908,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 		l.Error(err)
 		return false, false, err
 	}
-	defer db.Close()	
+	defer db.Close()
 
 	//Begin transaction
 	tx := db.Begin()
@@ -933,14 +946,14 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	}
 
 	//update StockQuantityFulfilled and IsClosed for ask order
-	if err := tx.Model(ask).Updates(Ask{StockQuantityFulfilled:askStockQuantityFulfilled, IsClosed: askIsClosed}).Error; err != nil {
+	if err := tx.Model(ask).Updates(Ask{StockQuantityFulfilled: askStockQuantityFulfilled, IsClosed: askIsClosed}).Error; err != nil {
 		l.Errorf("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 		tx.Rollback()
 		return false, false, err
 	}
 
 	//update StockQuantityFulfilled and IsClosed for bid order
-	if err := tx.Model(bid).Updates(Bid{StockQuantityFulfilled:bidStockQuantityFulfilled, IsClosed: bidIsClosed}).Error; err != nil {
+	if err := tx.Model(bid).Updates(Bid{StockQuantityFulfilled: bidStockQuantityFulfilled, IsClosed: bidIsClosed}).Error; err != nil {
 		l.Errorf("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 		tx.Rollback()
 		return false, false, err
