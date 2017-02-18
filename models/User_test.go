@@ -31,7 +31,7 @@ func Test_Login(t *testing.T) {
 		db.Delete(u)
 	}()
 
-	exU := &User{
+	exU := User{
 		Id:        2,
 		Email:     "test@testmail.com",
 		Name:      "TestName",
