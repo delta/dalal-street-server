@@ -562,8 +562,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debugf("Check2: Failed. Not enough cash.")
-		return 0, NotEnoughStocksError{}
+		l.Debug("Check2: Failed. Not enough cash.")
+		return 0, NotEnoughCashError{}
 	}
 
 	l.Debug("Check2: Passed. Creating Bid")
@@ -734,11 +734,240 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	return transaction, nil
 }
 
-// func PerformOrderFillTransaction(askinguser, biddinguser, matchingask, mawtchingbid) (askfaulty, bidfaulty, error) {
-// 	// both users are locked
-// 	// sanity conditions
+/*
+*	NOTE: THIS FUNCTION ASSUMES BOTH THE USERS HAVE BEEN LOCKED BY THE CALLEE
+*
+*	PerformOrderFillTransaction performs the following function
+*		- Check if bidder has enough cash. If not, return NotEnoughcashError
+*		- Check if asker has enough stocks. If not, return NotEnoughStocksError
+*		- Set transaction price based on order type(Limit, Market). StopLoss needs to be handled separately
+*		- Calculate updated cash for biddingUser and askingUser
+*		- Calculate StockQuantityFulfilled and IsClosed for askOrder and bidOrder
+*		- Create database transaction. Transaction performs the following database manipulations
+*				- save askTransaction, bidTransaction
+*				- update biddingUser and askingUser cash
+*				- update StockQuantityFulfilled and IsClosed for askOrder and bidOrder
+*
+*
+*	Returns askDone, bidDone, Error
+*		- if askDone is true, ask can be removed
+*		- if bidDone is true, bid can be removed
+*/
+func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, bid *Bid) (bool, bool, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "PerformOrderFillTransaction",
+		"askingUserId":  ask.UserId,
+		"biddingUserId": bid.UserId,
+		"stockId":   ask.StockId,
+	})
+
+	l.Infof("PerformOrderFillTransaction requested for stock id %v", ask.StockId)
+
+/*
+	if ask.isclosed() return askDone, bidNotDone
+	if bid.isClosed() return askNotDone, bidDone
+
+	stkTradeQty = min(ask.StQtyUnf.., bid.StkQtyUNfi)
+	stkTradePrice = min(ask.Price, bid.price)
+	if both marketorder:
+		allstocks.m[stkid].RLock()
+		stkTradePrice = allStocks.m[stkid].stock.CurrentPrice
+		allstks.msdfsd.Runlock()
+
+	condition1: bidder has enough money
+		no: return (bidDone, askNotDone)
+
+	condition2: asker has enough stocks
+		no: return (bidNotDone, askDone)
+
+	IN DB:
+		transact( askingUser, -stkTradeQty, stkTradePrice, +stkTradeQty*stkTradePrice )
+		transact( biddingUser, +stkTradeQty, stkTradePrice, -stkTradeQty*stkTradePrice ) 
+
+		askingUser.Cash += tr1.total
+		biddingUser.Cash += tr2.total
+
+		asker.stkQtyFulfilled += stkTradeQty
+		bidder.stkQtyFulfilled += stkTradeQty
+		
+		if askfulfilled:
+			askdone = true
+		if bidfulfilled:
+			biddone = true
+
+	if errored:
+		return askNotDone, bidNotDone, error! 
+
+
+	updateStockPrice(stkid, stkTradePrice)
+
+	return askdone,  biddone
+*/
+	if ask.IsClosed {
+		return true, false, nil
+	}
+	if bid.IsClosed {
+		return false, true, nil
+	}
+
+	var bidUnfulfilledStockQuantity = bid.StockQuantity - bid.StockQuantityFulfilled
+	var askUnfulfilledStockQuantity = ask.StockQuantity - ask.StockQuantityFulfilled
 	
-// }
+	stockTradeQty := int32(min(askUnfulfilledStockQuantity, bidUnfulfilledStockQuantity))
+	var stockTradePrice uint32
+
+	//set transaction price based on order type
+	if ask.OrderType == Market && bid.OrderType == Market {
+		allStocks.m[ask.StockId].RLock()
+		stock, _ := allStocks.m[ask.StockId]
+		stockTradePrice = stock.stock.CurrentPrice
+		allStocks.m[ask.StockId].RUnlock()
+	} else if ask.OrderType == Market {
+		stockTradePrice = bid.Price
+	} else if bid.OrderType == Market {
+		stockTradePrice = ask.Price
+	} else {
+		stockTradePrice = min(ask.Price, bid.Price)
+	}
+
+	//Check if bidder has enough cash
+	var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice)*stockTradeQty
+
+	if cashLeft < MINIMUM_CASH_LIMIT {
+		l.Debug("Check1: Failed. Not enough cash.")
+		return false, true, nil
+	}
+
+	//Check if askingUser has enough stocks
+	numStocks, err := getSingleStockCount(askingUser, ask.StockId)
+	if err != nil {
+		return false, false, err
+	}
+
+	var numStocksLeft = numStocks - int32(stockTradeQty)
+
+	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
+		l.Debugf("Check2: Failed. Not enough stocks.")
+		currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
+		if currentAllowedQty > ASK_LIMIT {
+			currentAllowedQty = ASK_LIMIT
+		}
+		return true, false, nil
+	}
+
+	//helper function to return a transaction object
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+		return &Transaction{
+			UserId:        userId,
+			StockId:       stockId,
+			Type:          transType,
+			StockQuantity: stockQty,
+			Price:         price,
+			Total:         total,
+		}
+	}
+
+	total := int32(stockTradePrice)*stockTradeQty
+
+	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -stockTradeQty, stockTradePrice, total)
+	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, stockTradeQty, stockTradePrice, -total)
+
+	//calculate user's updated cash
+	askingUserCash := askingUser.Cash + uint32(stockTradeQty)*stockTradePrice
+	biddingUserCash := biddingUser.Cash - uint32(stockTradeQty)*stockTradePrice
+
+	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
+	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
+	bidStockQuantityFulfilled := bid.StockQuantityFulfilled - uint32(stockTradeQty)
+	
+	var askIsClosed bool
+	var bidIsClosed bool
+	if ask.StockQuantity == askStockQuantityFulfilled {
+		askIsClosed = true
+	}
+	if bid.StockQuantity == bidStockQuantityFulfilled {
+		bidIsClosed = true
+	}
+
+	//Committing to database
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return false, false, err
+	}
+	defer db.Close()	
+
+	//Begin transaction
+	tx := db.Begin()
+
+	//save askTransaction
+	if err := tx.Save(askTransaction).Error; err != nil {
+		l.Errorf("Error creating the askTransaction. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return false, false, err
+	}
+
+	l.Debugf("Added askTransaction to Transactions table")
+
+	//save bidTransaction
+	if err := tx.Save(bidTransaction).Error; err != nil {
+		l.Errorf("Error creating the bidTransaction. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return false, false, err
+	}
+
+	l.Debugf("Added bidTransaction to Transactions table")
+
+	//update askingUser
+	if err := tx.Model(askingUser).Update("cash", askingUserCash).Error; err != nil {
+		l.Errorf("Error updating askingUser.Cash Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return false, false, err
+	}
+
+	//update biddingUserCash
+	if err := tx.Model(biddingUser).Update("cash", biddingUserCash).Error; err != nil {
+		l.Errorf("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return false, false, err
+	}
+
+	//update StockQuantityFulfilled and IsClosed for ask order
+	if err := tx.Model(ask).Updates(Ask{StockQuantityFulfilled:askStockQuantityFulfilled, IsClosed: askIsClosed}).Error; err != nil {
+		l.Errorf("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return false, false, err
+	}
+
+	//update StockQuantityFulfilled and IsClosed for bid order
+	if err := tx.Model(bid).Updates(Bid{StockQuantityFulfilled:bidStockQuantityFulfilled, IsClosed: bidIsClosed}).Error; err != nil {
+		l.Errorf("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return false, false, err
+	}
+
+	//Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		l.Errorf("Error committing the transaction. Failing. %+v", err)
+		return false, false, err
+	}
+
+	askingUser.Cash = askingUserCash
+	biddingUser.Cash = biddingUserCash
+	ask.IsClosed = askIsClosed
+	ask.StockQuantityFulfilled = askStockQuantityFulfilled
+	bid.IsClosed = bidIsClosed
+	bid.StockQuantityFulfilled = bidStockQuantityFulfilled
+
+	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
+
+	if err := updateStockPrice(ask.StockId, stockTradePrice); err != nil {
+		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
+		return false, false, nil // supress this error!
+	}
+
+	return ask.IsClosed, bid.IsClosed, nil
+}
 
 func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
