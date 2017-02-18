@@ -510,3 +510,175 @@ func Test_GetStocksOwned(t *testing.T) {
 
 	wg.Wait()
 }
+
+func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
+	origCash := map[uint32]uint32{2: 2000, 3: 1000, 4: 5000}
+
+	users := []*User{
+		{Id: 2, Email: "a@b.com", Cash: origCash[2]},
+		{Id: 3, Email: "c@d.com", Cash: origCash[3]},
+		{Id: 4, Email: "e@f.com", Cash: origCash[4]},
+	}
+
+	stocks := []*Stock{
+		{Id: 1, StocksInExchange: 30, CurrentPrice: 100},
+		{Id: 2, StocksInExchange: 40, CurrentPrice: 500},
+		{Id: 3, StocksInExchange: 20, CurrentPrice: 200},
+	}
+
+	stockPrices := []struct {
+		stockId uint32
+		price   uint32
+	}{
+		{1, 101},
+		{2, 498},
+		{2, 499},
+		{3, 201},
+		{1, 102},
+		{2, 500},
+		{3, 200},
+	}
+
+	testcases := []struct {
+		userId        uint32
+		stockId       uint32
+		stockQuantity uint32
+		maxStkQtyGot  uint32
+	}{
+		{2, 1, 10, 10},
+		{3, 1, 5, 5},
+		{4, 1, 30, 30},
+
+		{2, 2, 15, 4},
+		{3, 2, 10, 2},
+		{4, 2, 20, 10},
+
+		{2, 3, 7, 10},
+		{3, 3, 8, 5},
+		{4, 3, 10, 25},
+	}
+
+	type lockedTrList struct {
+		sync.Mutex
+		trlist []*Transaction
+	}
+	transactions := struct {
+		sync.Mutex
+		m map[uint32]*lockedTrList
+	}{m: make(map[uint32]*lockedTrList)}
+	transactions.m[2] = &lockedTrList{}
+	transactions.m[3] = &lockedTrList{}
+	transactions.m[4] = &lockedTrList{}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+	defer func() {
+		for _, ltrlist := range transactions.m {
+			for _, tr := range ltrlist.trlist {
+				if err := db.Delete(tr).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		for _, stock := range stocks {
+			if err := db.Delete(stock).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, user := range users {
+			if err := db.Delete(user).Error; err != nil {
+				t.Fatal(err)
+			}
+			delete(userLocks.m, user.Id)
+		}
+
+		db.Close()
+	}()
+
+	for _, user := range users {
+		if err := db.Create(user).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := loadStocks(); err != nil {
+		t.Fatal(err)
+	}
+
+	wg := sync.WaitGroup{}
+	fm := sync.Mutex{}
+
+	for _, tc := range testcases {
+		tc := tc
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tr, err := PerformBuyFromExchangeTransaction(tc.userId, tc.stockId, tc.stockQuantity)
+
+			fm.Lock()
+			defer fm.Unlock()
+
+			if err != nil {
+				if _, ok := err.(NotEnoughCashError); ok {
+					u, err1 := GetUserCopy(tc.userId)
+					if err1 != nil {
+						t.Fatalf("Error getting latest user data %+v", err1)
+					}
+					t.Logf("Got not enough cash error, current cash %d, tc: %+v. err: %+v", u.Cash, tc, err)
+					return
+				}
+				t.Fatalf("Did not expect error. Got %+v", err)
+			}
+
+			// append the transaction to the user's list of transactions
+			ltrList := transactions.m[tc.userId]
+			ltrList.Lock()
+			ltrList.trlist = append(ltrList.trlist, tr)
+			ltrList.Unlock()
+
+			if tr.StockQuantity < 0 {
+				t.Fatalf("Got negative! Wut. Got %+v", tr.StockQuantity)
+			}
+			if tc.maxStkQtyGot < uint32(tr.StockQuantity) {
+				t.Fatalf("Got more than possible. Allowed %+v; Got %+v", tc.maxStkQtyGot, tr.StockQuantity)
+			}
+		}()
+	}
+
+	for _, sp := range stockPrices {
+		wg.Add(1)
+		sid := sp.stockId
+		sprice := sp.price
+		go func() {
+			defer wg.Done()
+
+			allStocks.m[sid].Lock()
+			allStocks.m[sid].stock.CurrentPrice = sprice
+			allStocks.m[sid].Unlock()
+		}()
+	}
+
+	wg.Wait()
+
+	// verify the cash for each user
+	for uid, oc := range origCash {
+		newCash := int32(oc)
+		for _, tr := range transactions.m[uid].trlist {
+			newCash += tr.Total
+		}
+		u, err := GetUserCopy(uid)
+		if err != nil {
+			t.Fatalf("Error getting latest user data %+v", err)
+		}
+		if uint32(newCash) != u.Cash {
+			t.Fatalf("User %d's cash not consistent. Got %d; want %d", uid, u.Cash, newCash)
+		}
+	}
+}

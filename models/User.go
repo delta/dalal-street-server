@@ -404,8 +404,9 @@ func GetUserCopy(id uint32) (User, error) {
 	userLocks.Lock()
 	defer userLocks.Unlock()
 
-	u, ok := userLocks.m[id]
+	_, ok := userLocks.m[id]
 	if ok {
+		u = userLocks.m[id]
 		l.Debugf("Found user in userLocks map. Locking.")
 		u.RLock()
 		defer u.RUnlock()
@@ -634,8 +635,99 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 	return nil
 }
 
-func (u *User) PerformBuyFromExchangeTransaction() {
+func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*Transaction, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":              "PerformBuyFromExchangeTransaction",
+		"param_userId":        userId,
+		"param_stockId":       stockId,
+		"param_stockQuantity": stockQuantity,
+	})
 
+	l.Infof("PerformBuyFromExchangeTransaction requested")
+
+	l.Debugf("Acquiring exclusive write on user")
+	ch, user, err := getUser(userId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return nil, err
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debug("Released exclusive write on user")
+	}()
+
+	l.Debugf("Acquiring exclusive write on stock")
+
+	allStocks.m[stockId].Lock()
+	stock := allStocks.m[stockId].stock
+	defer func() {
+		l.Debugf("Released exclusive write on stock")
+		allStocks.m[stockId].Unlock()
+	}()
+
+	// A lock on user and stock has been acquired.
+	// Safe to make changes to this user and this stock
+
+	stockQuantityRemoved := stockQuantity
+	if stockQuantityRemoved > stock.StocksInExchange {
+		stockQuantityRemoved = stock.StocksInExchange
+	}
+
+	price := stock.CurrentPrice
+
+	if price*stockQuantityRemoved > user.Cash {
+		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", price*stockQuantityRemoved, user.Cash)
+		return nil, NotEnoughCashError{}
+	}
+
+	l.Debugf("%d stocks will be removed at %d per stock", stockQuantityRemoved, price)
+
+	transaction := &Transaction{
+		UserId:        userId,
+		StockId:       stockId,
+		Type:          FromExchangeTransaction,
+		StockQuantity: int32(stockQuantityRemoved),
+		Price:         price,
+		Total:         -int32(price * stockQuantityRemoved),
+	}
+
+	user.Cash = uint32(int32(user.Cash) + transaction.Total)
+
+	/* Committing to database */
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer db.Close()
+
+	tx := db.Begin()
+
+	if err := tx.Save(transaction).Error; err != nil {
+		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return nil, err
+	}
+
+	l.Debugf("Added transaction to Transactions table")
+
+	if err := tx.Save(user).Error; err != nil {
+		l.Errorf("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return nil, err
+	}
+
+	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
+
+	if err := tx.Commit().Error; err != nil {
+		l.Errorf("Error committing the transaction. Failing. %+v", err)
+		return nil, err
+	}
+
+	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
+
+	return transaction, nil
 }
 
 func (u *User) PerformOrderFillTransaction() {
