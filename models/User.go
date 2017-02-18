@@ -58,7 +58,7 @@ func (User) TableName() string {
 // Login() is used to login an existing user or register a new user
 // Registration happens provided Pragyan API verifies the credentials
 // and the user doesn't exist in our database.
-func Login(email, password string) (*User, error) {
+func Login(email, password string) (User, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "Login",
 		"param_email":    email,
@@ -72,7 +72,7 @@ func Login(email, password string) (*User, error) {
 	pu, err := postLoginToPragyan(email, password)
 	if err != nil {
 		l.Debugf("Pragyan API call failed")
-		return nil, err
+		return User{}, err
 	}
 
 	l.Debugf("Trying to get user from database. UserId: %d, Name: %s", pu.Id, pu.Name)
@@ -80,7 +80,7 @@ func Login(email, password string) (*User, error) {
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
-		return nil, InternalError
+		return User{}, InternalError
 	}
 	defer db.Close()
 
@@ -88,20 +88,20 @@ func Login(email, password string) (*User, error) {
 	if result := db.First(u, pu.Id); result.Error != nil {
 		if !result.RecordNotFound() {
 			l.Errorf("Error in loading user info from database: '%s'", result.Error)
-			return nil, InternalError
+			return User{}, InternalError
 		}
 
 		l.Infof("User (%d, %s, %s) not found in database. Registering new user", pu.Id, email, pu.Name)
 
 		u, err = createUser(pu, email)
 		if err != nil {
-			return nil, InternalError
+			return User{}, InternalError
 		}
 	}
 
 	l.Infof("Found user (%d, %s, %s). Logging him in.", u.Id, u.Email, u.Name)
 
-	return u, nil
+	return *u, nil
 }
 
 // createUser() creates a user given his email and name.
