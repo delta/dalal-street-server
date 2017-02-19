@@ -23,6 +23,8 @@ var (
 	InternalError      = errors.New("Internal server error")
 )
 
+var TotalUserCount uint32
+
 // User models the User object.
 type User struct {
 	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
@@ -137,6 +139,9 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 		l.Errorf("Failed: %+v", err)
 		return nil, err
 	}
+
+	//update total user count
+	TotalUserCount += 1
 
 	l.Infof("Created user")
 	return u, nil
