@@ -195,10 +195,10 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 
 		return pu, nil
 	case 401:
-		l.Debug("Bad credentials")
+		l.Debugf("Bad credentials")
 		return pragyanUser{}, UnauthorizedError
 	case 412:
-		l.Debug("Not registered on main site")
+		l.Debugf("Not registered on main site")
 		return pragyanUser{}, NotRegisteredError
 	default:
 		l.Errorf("Pragyan rejected API call with (%d, %s)", r.StatusCode, r.Message)
@@ -406,7 +406,7 @@ func GetUserCopy(id uint32) (User, error) {
 
 	var u = &userAndLock{sync.RWMutex{}, &User{}}
 
-	l.Debug("Attempting")
+	l.Debugf("Attempting")
 
 	/* Try to see if the user is there in the map */
 	userLocks.Lock()
@@ -476,7 +476,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	l.Debugf("Acquired")
 	defer func() {
 		close(ch)
-		l.Debug("Released exclusive write on user")
+		l.Debugf("Released exclusive write on user")
 	}()
 
 	// A lock on user has been acquired.
@@ -557,7 +557,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	// Safe to make changes to this user.
 
 	// First check: Order size should be less than BID_LIMIT
-	l.Debug("Check1: Order size vs BID_LIMIT (%d)", BID_LIMIT)
+	l.Debugf("Check1: Order size vs BID_LIMIT (%d)", BID_LIMIT)
 	if bid.StockQuantity > BID_LIMIT {
 		l.Debugf("Check1: Failed.")
 		return 0, BidLimitExceededError{}
@@ -570,11 +570,11 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debug("Check2: Failed. Not enough cash.")
+		l.Debugf("Check2: Failed. Not enough cash.")
 		return 0, NotEnoughCashError{}
 	}
 
-	l.Debug("Check2: Passed. Creating Bid")
+	l.Debugf("Check2: Passed. Creating Bid")
 
 	if err := createBid(bid); err != nil {
 		l.Errorf("Error creating the bid %+v", err)
@@ -626,7 +626,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 			return err
 		}
 	} else {
-		l.Debug("Acquiring lock on bid order")
+		l.Debugf("Acquiring lock on bid order")
 		bidOrder, err := getBid(orderId)
 		if bidOrder == nil || bidOrder.UserId != userId {
 			l.Errorf("Invalid bid id provided")
@@ -671,7 +671,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	l.Debugf("Acquired")
 	defer func() {
 		close(ch)
-		l.Debug("Released exclusive write on user")
+		l.Debugf("Released exclusive write on user")
 	}()
 
 	l.Debugf("Acquiring exclusive write on stock")
@@ -847,7 +847,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice)*stockTradeQty
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debug("Check1: Failed. Not enough cash.")
+		l.Debugf("Check1: Failed. Not enough cash.")
 		return false, true, nil
 	}
 
@@ -1221,7 +1221,7 @@ func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 	l.Debugf("Acquired")
 	defer func() {
 		close(ch)
-		l.Debug("Released lock on user")
+		l.Debugf("Released lock on user")
 	}()
 
 	db, err := DbOpen()
