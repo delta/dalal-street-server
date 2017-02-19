@@ -1,6 +1,7 @@
 package models
 
 import (
+	"time"
 	"github.com/Sirupsen/logrus"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
@@ -72,4 +73,84 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 	l.Infof("Successfully fetched leaderboard for userId : %v", userId)
 
 	return leaderboardDetails, currentUserDetails, TotalUserCount, nil
+}
+
+type leaderboardQueryData struct {
+	UserId     uint32
+	Cash       uint32
+	StockWorth int32
+	Total      int32
+}
+
+//function to update leaderboard. Must be called periodically
+func UpdateLeaderboard() {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "UpdateLeaderboard",
+	})
+
+	l.Infof("Attempting to update leaderboard")
+
+	var results []leaderboardQueryData
+	var leaderboardEntries []*LeaderboardRow
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Errorf("Error opening database. %+v", err)
+		return
+	}
+	defer db.Close()
+
+	db.Raw("SELECT U.id as user_id, U.cash as cash, SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) AS stock_worth, (U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))) AS total from Users U, Transactions T, Stocks S WHERE U.id = T.userId and T.stockId = S.id GROUP BY U.id ORDER BY Total DESC").Scan(&results)
+
+	var rank = 1
+	var counter = 1
+
+	for index, result := range results {
+		leaderboardEntries = append(leaderboardEntries, &LeaderboardRow{
+			Id:         uint32(index + 1),
+			UserId:     result.UserId,
+			Cash:       result.Cash,
+			Rank:       uint32(rank),
+			Debt:       0,
+			StockWorth: result.StockWorth,
+			TotalWorth: result.Total,
+		})
+
+		counter += 1
+		if index+1 < len(results) && results[index+1].Total < result.Total {
+			rank = counter
+		}
+	}
+
+	db.Exec("LOCK TABLES Leaderboard WRITE")
+	defer db.Exec("UNLOCK TABLES")
+
+	db.Exec("TRUNCATE TABLE Leaderboard")
+
+	//begin transaction
+	tx := db.Begin()
+
+	for _, leaderboardEntry := range leaderboardEntries {
+		if err := db.Save(leaderboardEntry).Error; err != nil {
+			l.Errorf("Error updating leaderboard. Failing. %+v", err)
+			tx.Rollback()
+			return
+		}
+	}
+
+	//commit transaction
+	if err := tx.Commit().Error; err != nil {
+		l.Errorf("Error committing leaderboardUpdate transaction. Failing. %+v", err)
+		return
+	}
+
+	l.Infof("Successfully updated leaderboard")
+}
+
+//helper function to update leaderboard every two minutes
+func UpdateLeaderboardTicker() {
+	for {
+		UpdateLeaderboard()
+		time.Sleep(2*time.Minute)
+	}
 }
