@@ -139,3 +139,41 @@ func loadStocks() error {
 
 	return nil
 }
+
+func GetCompanyDetails(stockId uint32) (*Stock, map[string]*StockHistory, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "GetCompanyDetails",
+		"stockId": stockId,
+	})
+
+	l.Infof("Attempting to get company profile for stockId : %v", stockId)
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, nil, err
+	}
+	defer db.Close()
+
+	var stock *Stock
+	if err := db.Where("id = ?", stockId).First(&stock).Error; err != nil {
+		l.Errorf("Errored : %+v", err)
+		return nil, nil, err
+	}
+
+	//FETCHING ENTIRE STOCK HISTORY!! MUST BE CHANGED LATER
+	var stockHistory []*StockHistory
+	if err := db.Where("stockId = ", stockId).Find(&stockHistory).Error; err != nil {
+		l.Errorf("Errored : %+v", err)
+		return nil, nil, err
+	}
+
+	stockHistoryMap := make(map[string]*StockHistory)
+
+	for _, stockData := range stockHistory {
+		stockHistoryMap[stockData.CreatedAt] = stockData
+	}
+
+	l.Infof("Successfully fetched company profile for stock id : %v", stockId)
+	return stock, stockHistoryMap, nil
+}
