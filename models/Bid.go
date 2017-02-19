@@ -207,3 +207,57 @@ func (bid *Bid) Close() error {
 	l.Debugf("Done")
 	return nil
 }
+
+func GetMyBids(userId, lastId, count uint32) (bool, map[uint32]*Bid, map[uint32]*Bid, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetMyBids",
+		"userId": userId,
+		"lastId": lastId,
+		"count":  count,
+	})
+
+	l.Infof("Attempting to get bid orders for userId : %v", userId)
+
+	db, err := DbOpen()
+	if err != nil {
+		return true, nil, nil, err
+	}
+	defer db.Close()
+
+	var myOpenBids []*Bid
+	var myClosedBids []*Bid
+
+	//get all open bids
+	if err := db.Where("userId = ? and isClosed = ?", userId, 0).Find(&myOpenBids).Error; err != nil {
+		return true, nil, nil, err
+	}
+
+	//set default value of count if it is zero
+	if count == 0 {
+		count = MY_BID_COUNT
+	}
+
+	//get latest events if lastId is zero
+	if lastId != 0 {
+		db = db.Where("id <= ?", lastId)
+	}
+	if err := db.Where("userId = ?", userId).Order("desc id").Limit(count).Find(&myClosedBids).Error; err != nil {
+		return true, nil, nil, err
+	}
+
+	myOpenBidsMap := make(map[uint32]*Bid)
+
+	for _, bid := range myOpenBids {
+		myOpenBidsMap[bid.Id] = bid
+	}
+
+	myClosedBidsMap := make(map[uint32]*Bid)
+
+	for _, bid := range myClosedBids {
+		myClosedBidsMap[bid.Id] = bid
+	}
+
+	var moreExists = len(myClosedBids) < int(count)
+	l.Infof("Successfully fetched bid orders for userId : %v", userId)
+	return moreExists, myOpenBidsMap, myClosedBidsMap, nil
+}
