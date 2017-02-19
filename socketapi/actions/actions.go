@@ -627,29 +627,33 @@ func GetCompanyProfile(sess session.Session, req *actions_proto.GetCompanyProfil
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 	l.Infof("GetCompanyProfile requested")
-	stockDetails := &models.Stock{
-		Id:               23,
-		ShortName:        "zold",
-		FullName:         "PastCry",
-		Description:      "This Stock is a stock :P",
-		CurrentPrice:     200,
-		DayHigh:          300,
-		DayLow:           100,
-		AllTimeHigh:      400,
-		AllTimeLow:       90,
-		StocksInExchange: 123,
-		StocksInMarket:   234,
-		UpOrDown:         true,
-		CreatedAt:        "2017-02-09T00:00:00",
-		UpdatedAt:        "2017-02-09T00:00:00",
-	}
-	stockHistoryMap := make(map[string]*models_proto.StockHistory)
-	stockHistoryMap["2017-02-09T00:00:00"] = (&models.StockHistory{
-		StockId:    3,
-		StockPrice: 23,
-		CreatedAt:  "2017-02-09T00:00:00",
-	}).ToProto()
+
 	resp := &actions_proto.GetCompanyProfileResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetCompanyProfileResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetCompanyProfileResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	stockId := req.StockId
+	stockDetails, stockHistory, err := models.GetCompanyDetails(stockId)
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	//Convert to proto
+	stockHistoryMap := make(map[string]*models_proto.StockHistory)
+	for timestamp, stockData := range stockHistory {
+		stockHistoryMap[timestamp] = stockData.ToProto()
+	}
+
 	resp.Response = &actions_proto.GetCompanyProfileResponse_Result{
 		&actions_proto.GetCompanyProfileResponse_GetCompanyProfileSuccessResponse{
 			StockDetails:    stockDetails.ToProto(),
@@ -670,19 +674,39 @@ func GetMarketEvents(sess session.Session, req *actions_proto.GetMarketEventsReq
 	})
 	l.Infof("GetMarketEvents requested")
 
-	marketEventsMap := make(map[uint32]*models_proto.MarketEvent)
-	marketEventsMap[1] = (&models.MarketEvent{
-		Id:           2,
-		StockId:      3,
-		Text:         "Hello World",
-		EmotionScore: -54,
-		CreatedAt:    "2017-02-09T00:00:00",
-	}).ToProto()
 	resp := &actions_proto.GetMarketEventsResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetMarketEventsResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetMarketEventsResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	lastId := req.LastEventId
+	count := req.Count
+
+	moreExists, marketEvents, err := models.GetMarketEvents(lastId, count)
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	//Convert to proto
+	marketEventsMap := make(map[uint32]*models_proto.MarketEvent)
+
+	for id, stockEvent := range marketEvents {
+		marketEventsMap[id] = stockEvent.ToProto()
+	}
+
 	resp.Response = &actions_proto.GetMarketEventsResponse_Result{
 		&actions_proto.GetMarketEventsResponse_GetMarketEventsSuccessResponse{
 			MarketEvents: marketEventsMap,
-			MoreExists:   false,
+			MoreExists:   moreExists,
 		},
 	}
 
@@ -699,24 +723,47 @@ func GetMyAsks(sess session.Session, req *actions_proto.GetMyAsksRequest) *actio
 	})
 	l.Infof("GetMyAsks requested")
 
-	asksMap := make(map[uint32]*models_proto.Ask)
-	asksMap[1] = (&models.Ask{
-		Id:                     2,
-		UserId:                 2,
-		StockId:                3,
-		Price:                  5,
-		OrderType:              models.Market,
-		StockQuantity:          20,
-		StockQuantityFulfilled: 20,
-		IsClosed:               true,
-		CreatedAt:              "2017-02-09T00:00:00",
-		UpdatedAt:              "2017-02-09T00:00:00",
-	}).ToProto()
 	resp := &actions_proto.GetMyAsksResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetMyAsksResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetMyAsksResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	lastId := req.LastAskId
+	count := req.Count
+
+	moreExists, myOpenAskOrders, myClosedAskOrders, err := models.GetMyAsks(userId, lastId, count)
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	//Convert to proto
+	myOpenAskOrdersMap := make(map[uint32]*models_proto.Ask)
+
+	for id, ask := range myOpenAskOrders {
+		myOpenAskOrdersMap[id] = ask.ToProto()
+	}
+
+	myClosedAskOrdersMap := make(map[uint32]*models_proto.Ask)
+
+	for id, ask := range myClosedAskOrders {
+		myClosedAskOrdersMap[id] = ask.ToProto()
+	}
+
 	resp.Response = &actions_proto.GetMyAsksResponse_Result{
 		&actions_proto.GetMyAsksResponse_GetMyAsksSuccessResponse{
-			AskOrders:  asksMap,
-			MoreExists: false,
+			OpenAskOrders:   myOpenAskOrdersMap,
+			ClosedAskOrders: myClosedAskOrdersMap,
+			MoreExists:      moreExists,
 		},
 	}
 
@@ -733,24 +780,47 @@ func GetMyBids(sess session.Session, req *actions_proto.GetMyBidsRequest) *actio
 	})
 	l.Infof("GetMyBids requested")
 
-	bidsMap := make(map[uint32]*models_proto.Bid)
-	bidsMap[1] = (&models.Bid{
-		Id:                     2,
-		UserId:                 2,
-		StockId:                3,
-		Price:                  5,
-		OrderType:              models.Market,
-		StockQuantity:          20,
-		StockQuantityFulfilled: 20,
-		IsClosed:               true,
-		CreatedAt:              "2017-02-09T00:00:00",
-		UpdatedAt:              "2017-02-09T00:00:00",
-	}).ToProto()
 	resp := &actions_proto.GetMyBidsResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetMyBidsResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetMyBidsResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	lastId := req.LastBidId
+	count := req.Count
+
+	moreExists, myOpenBidOrders, myClosedBidOrders, err := models.GetMyBids(userId, lastId, count)
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	//Convert to proto
+	myOpenBidOrdersMap := make(map[uint32]*models_proto.Bid)
+
+	for id, bid := range myOpenBidOrders {
+		myOpenBidOrdersMap[id] = bid.ToProto()
+	}
+
+	myClosedBidOrdersMap := make(map[uint32]*models_proto.Bid)
+
+	for id, bid := range myClosedBidOrders {
+		myClosedBidOrdersMap[id] = bid.ToProto()
+	}
+
 	resp.Response = &actions_proto.GetMyBidsResponse_Result{
 		&actions_proto.GetMyBidsResponse_GetMyBidsSuccessResponse{
-			BidOrders:  bidsMap,
-			MoreExists: false,
+			OpenBidOrders:   myOpenBidOrdersMap,
+			ClosedBidOrders: myClosedBidOrdersMap,
+			MoreExists:      moreExists,
 		},
 	}
 
@@ -767,18 +837,39 @@ func GetNotifications(sess session.Session, req *actions_proto.GetNotificationsR
 	})
 	l.Infof("GetNotifications requested")
 
-	notificationsMap := make(map[uint32]*models_proto.Notification)
-	notificationsMap[1] = (&models.Notification{
-		Id:        2,
-		UserId:    3,
-		Text:      "Hello World",
-		CreatedAt: "2017-02-09T00:00:00",
-	}).ToProto()
 	resp := &actions_proto.GetNotificationsResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetNotificationsResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetNotificationsResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	lastId := req.LastNotificationId
+	count := req.Count
+
+	moreExists, notifications, err := models.GetNotifications(lastId, count)
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	//Convert to proto
+	notificationsMap := make(map[uint32]*models_proto.Notification)
+
+	for id, notification := range notifications {
+		notificationsMap[id] = notification.ToProto()
+	}
+
 	resp.Response = &actions_proto.GetNotificationsResponse_Result{
 		&actions_proto.GetNotificationsResponse_GetNotificationsSuccessResponse{
 			Notifications: notificationsMap,
-			MoreExists:    false,
+			MoreExists:    moreExists,
 		},
 	}
 
@@ -795,22 +886,40 @@ func GetTransactions(sess session.Session, req *actions_proto.GetTransactionsReq
 	})
 	l.Infof("GetTransactions requested")
 
-	transactionsMap := make(map[uint32]*models_proto.Transaction)
-	transactionsMap[1] = (&models.Transaction{
-		Id:            2,
-		UserId:        20,
-		StockId:       12,
-		Type:          models.OrderFillTransaction,
-		StockQuantity: -20,
-		Price:         300,
-		Total:         -300,
-		CreatedAt:     "2017-02-09T00:00:00",
-	}).ToProto()
 	resp := &actions_proto.GetTransactionsResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetTransactionsResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetTransactionsResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	lastId := req.LastTransactionId
+	count := req.Count
+
+	moreExists, transactions, err := models.GetTransactions(userId, lastId, count)
+
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	//Convert to proto
+	transactionsMap := make(map[uint32]*models_proto.Transaction)
+
+	for id, transaction := range transactions {
+		transactionsMap[id] = transaction.ToProto()
+	}
+
 	resp.Response = &actions_proto.GetTransactionsResponse_Result{
 		&actions_proto.GetTransactionsResponse_GetTransactionsSuccessResponse{
 			TransactionsMap: transactionsMap,
-			MoreExists:      false,
+			MoreExists:      moreExists,
 		},
 	}
 
@@ -827,12 +936,38 @@ func GetMortgageDetails(sess session.Session, req *actions_proto.GetMortgageDeta
 	})
 	l.Infof("GetMortgageDetails requested")
 
-	mortgageMap := make(map[uint32]*actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails)
-	mortgageMap[1] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails{
-		StockId:         1,
-		NumStocksInBank: 12,
-	}
+	// mortgageMap[1] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails{
+	// 	StockId:         1,
+	// 	NumStocksInBank: 12,
+	// }
 	resp := &actions_proto.GetMortgageDetailsResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetMortgageDetailsResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetMortgageDetailsResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+
+	mortgageMap := make(map[uint32]*actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails)
+	mortgages, err := models.GetMortgageDetails(userId)
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	for stockId, mortgageDetails := range mortgages {
+		mortgageMap[stockId] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails{
+			StockId:         stockId,
+			NumStocksInBank: mortgageDetails.StocksInBank,
+		}
+	}
+
 	resp.Response = &actions_proto.GetMortgageDetailsResponse_Result{
 		&actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse{
 			MortgageMap: mortgageMap,
@@ -852,25 +987,38 @@ func GetLeaderboard(sess session.Session, req *actions_proto.GetLeaderboardReque
 	})
 	l.Infof("GetLeaderboard requested")
 
-	rankList := make(map[uint32]*models_proto.LeaderboardRow)
-	rankList[1] = (&models.LeaderboardRow{
-		Id:         2,
-		UserId:     5,
-		Rank:       1,
-		Cash:       1000,
-		Debt:       10,
-		StockWorth: -50,
-		TotalWorth: -300,
-	}).ToProto()
 	resp := &actions_proto.GetLeaderboardResponse{}
+
+	//Helpers
+	var internalServerError = func(err error) *actions_proto.GetLeaderboardResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.GetLeaderboardResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	startingId := req.StartingId
+	count := req.Count
+
+	leaderboard, currentUserLeaderboardId, totalUsers, err := models.GetLeaderboard(userId, startingId, count)
+	if err != nil {
+		return internalServerError(err)
+	}
+
+	rankList := make(map[uint32]*models_proto.LeaderboardRow)
+	for id, leaderboardEntry := range leaderboard {
+		rankList[id] = leaderboardEntry.ToProto()
+	}
+
 	resp.Response = &actions_proto.GetLeaderboardResponse_Result{
 		&actions_proto.GetLeaderboardResponse_GetLeaderboardSuccessResponse{
-			MyRank:          2,
-			TotalUsers:      4,
-			TotalPages:      2,
-			RankList:        rankList,
-			UpdatedBefore:   3,
-			NextUpdateAfter: 5,
+			MyRank:     leaderboard[currentUserLeaderboardId].Rank,
+			TotalUsers: totalUsers,
+			RankList:   rankList,
 		},
 	}
 
