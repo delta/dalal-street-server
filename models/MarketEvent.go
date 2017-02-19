@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/Sirupsen/logrus"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -25,4 +26,45 @@ func (gMarketEvent *MarketEvent) ToProto() *models_proto.MarketEvent {
 		CreatedAt:    gMarketEvent.CreatedAt,
 	}
 	return pMarketEvent
+}
+
+func GetMarketEvents(lastId, count uint32) (bool, map[uint32]*MarketEvent, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetMarketEvents",
+		"lastId": lastId,
+		"count":  count,
+	})
+
+	l.Infof("Attempting to get market events")
+
+	db, err := DbOpen()
+	if err != nil {
+		return true, nil, err
+	}
+	defer db.Close()
+
+	var marketEvents []*MarketEvent
+
+	//set default value of count if it is zero
+	if count == 0 {
+		count = MARKET_EVENT_COUNT
+	}
+
+	//get latest events if lastId is zero
+	if lastId != 0 {
+		db = db.Where("id <= ?", lastId)
+	}
+	if err := db.Order("desc id").Limit(count).Find(&marketEvents).Error; err != nil {
+		return true, nil, err
+	}
+
+	marketEventsMap := make(map[uint32]*MarketEvent)
+
+	for _, marketEvent := range marketEvents {
+		marketEventsMap[marketEvent.Id] = marketEvent
+	}
+
+	var moreExists = len(marketEvents) < int(count)
+	l.Infof("Successfully fetched market events")
+	return moreExists, marketEventsMap, nil
 }
