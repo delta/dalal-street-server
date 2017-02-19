@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/Sirupsen/logrus"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -83,4 +84,46 @@ func (t *Transaction) ToProto() *models_proto.Transaction {
 	}
 
 	return pTrans
+}
+
+func GetTransactions(userId, lastId, count uint32) (bool, map[uint32]*Transaction, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetTransactions",
+		"userId": userId,
+		"lastId": lastId,
+		"count":  count,
+	})
+
+	l.Infof("Attempting to get transactions")
+
+	db, err := DbOpen()
+	if err != nil {
+		return true, nil, err
+	}
+	defer db.Close()
+
+	var transactions []*Transaction
+
+	//set default value of count if it is zero
+	if count == 0 {
+		count = GET_TRANSACTION_COUNT
+	}
+
+	//get latest events if lastId is zero
+	if lastId != 0 {
+		db = db.Where("id <= ?", lastId)
+	}
+	if err := db.Where("userId = ?", userId).Order("desc id").Limit(count).Find(&transactions).Error; err != nil {
+		return true, nil, err
+	}
+
+	transactionsMap := make(map[uint32]*Transaction)
+
+	for _, transaction := range transactions {
+		transactionsMap[transaction.Id] = transaction
+	}
+
+	var moreExists = len(transactions) < int(count)
+	l.Infof("Successfully fetched transactions")
+	return moreExists, transactionsMap, nil
 }
