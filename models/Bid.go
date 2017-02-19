@@ -208,7 +208,7 @@ func (bid *Bid) Close() error {
 	return nil
 }
 
-func GetMyBids(userId, lastId, count uint32) (bool, map[uint32]*Bid, map[uint32]*Bid, error) {
+func GetMyBids(userId, lastId, count uint32) (bool, []*Bid, []*Bid, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetMyBids",
 		"userId": userId,
@@ -247,19 +247,7 @@ func GetMyBids(userId, lastId, count uint32) (bool, map[uint32]*Bid, map[uint32]
 		return true, nil, nil, err
 	}
 
-	myOpenBidsMap := make(map[uint32]*Bid)
-
-	for _, bid := range myOpenBids {
-		myOpenBidsMap[bid.Id] = bid
-	}
-
-	myClosedBidsMap := make(map[uint32]*Bid)
-
-	for _, bid := range myClosedBids {
-		myClosedBidsMap[bid.Id] = bid
-	}
-
 	var moreExists = len(myClosedBids) >= int(count)
 	l.Infof("Successfully fetched bid orders for userId : %v", userId)
-	return moreExists, myOpenBidsMap, myClosedBidsMap, nil
+	return moreExists, myOpenBids, myClosedBids, nil
 }

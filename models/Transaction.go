@@ -86,7 +86,7 @@ func (t *Transaction) ToProto() *models_proto.Transaction {
 	return pTrans
 }
 
-func GetTransactions(userId, lastId, count uint32) (bool, map[uint32]*Transaction, error) {
+func GetTransactions(userId, lastId, count uint32) (bool, []*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetTransactions",
 		"userId": userId,
@@ -119,13 +119,7 @@ func GetTransactions(userId, lastId, count uint32) (bool, map[uint32]*Transactio
 		return true, nil, err
 	}
 
-	transactionsMap := make(map[uint32]*Transaction)
-
-	for _, transaction := range transactions {
-		transactionsMap[transaction.Id] = transaction
-	}
-
 	var moreExists = len(transactions) >= int(count)
 	l.Infof("Successfully fetched transactions")
-	return moreExists, transactionsMap, nil
+	return moreExists, transactions, nil
 }
