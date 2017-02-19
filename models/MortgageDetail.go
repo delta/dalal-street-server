@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/Sirupsen/logrus"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -22,4 +23,34 @@ func (md *MortgageDetail) ToProto() *models_proto.MortgageDetail {
 		StockId:      md.StockId,
 		StocksInBank: md.StocksInBank,
 	}
+}
+
+func GetMortgageDetails(userId uint32) (map[uint32]*MortgageDetail, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetMortgageDetails",
+		"userId": userId,
+	})
+
+	l.Infof("Attempting to get mortgageDetails for userId : %v", userId)
+
+	db, err := DbOpen()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var mortgageDetails []*MortgageDetail
+
+	if err := db.Where("userId = ?", userId).Find(&mortgageDetails).Error; err != nil {
+		return nil, err
+	}
+
+	mortgageDetailsMap := make(map[uint32]*MortgageDetail)
+
+	for _, mortgageDetail := range mortgageDetails {
+		mortgageDetailsMap[mortgageDetail.StockId] = mortgageDetail
+	}
+
+	l.Infof("Successfully fetched mortgageDetails for userId : %v", userId)
+	return mortgageDetailsMap, nil
 }
