@@ -48,6 +48,8 @@ func GetMarketEvents(lastId, count uint32) (bool, map[uint32]*MarketEvent, error
 	//set default value of count if it is zero
 	if count == 0 {
 		count = MARKET_EVENT_COUNT
+	} else {
+		count = min(count, MARKET_EVENT_COUNT)
 	}
 
 	//get latest events if lastId is zero

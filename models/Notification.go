@@ -45,6 +45,8 @@ func GetNotifications(lastId, count uint32) (bool, map[uint32]*Notification, err
 	//set default value of count if it is zero
 	if count == 0 {
 		count = GET_NOTIFICATION_COUNT
+	} else {
+		count = min(count, GET_NOTIFICATION_COUNT)
 	}
 
 	//get latest events if lastId is zero

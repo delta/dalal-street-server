@@ -46,6 +46,8 @@ func GetLeaderboard(userId, startingId, count uint32) (map[uint32]*LeaderboardRo
 	}
 	if count == 0 {
 		count = LEADERBOARD_COUNT
+	} else {
+		count = min(count, LEADERBOARD_COUNT)
 	}
 
 	db, err := DbOpen()
