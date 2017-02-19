@@ -235,6 +235,8 @@ func GetMyBids(userId, lastId, count uint32) (bool, map[uint32]*Bid, map[uint32]
 	//set default value of count if it is zero
 	if count == 0 {
 		count = MY_BID_COUNT
+	} else {
+		count = min(count, MY_BID_COUNT)
 	}
 
 	//get latest events if lastId is zero
@@ -257,7 +259,7 @@ func GetMyBids(userId, lastId, count uint32) (bool, map[uint32]*Bid, map[uint32]
 		myClosedBidsMap[bid.Id] = bid
 	}
 
-	var moreExists = len(myClosedBids) < int(count)
+	var moreExists = len(myClosedBids) >= int(count)
 	l.Infof("Successfully fetched bid orders for userId : %v", userId)
 	return moreExists, myOpenBidsMap, myClosedBidsMap, nil
 }

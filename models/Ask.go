@@ -285,7 +285,10 @@ func GetMyAsks(userId, lastId, count uint32) (bool, map[uint32]*Ask, map[uint32]
 	//set default value of count if it is zero
 	if count == 0 {
 		count = MY_ASK_COUNT
+	} else {
+		count = min(count, MY_ASK_COUNT)
 	}
+
 	//get latest events if lastId is zero
 	if lastId != 0 {
 		db = db.Where("id <= ?", lastId)
@@ -307,7 +310,7 @@ func GetMyAsks(userId, lastId, count uint32) (bool, map[uint32]*Ask, map[uint32]
 		myClosedAsksMap[ask.Id] = ask
 	}
 
-	var moreExists = len(myClosedAsks) < int(count)
+	var moreExists = len(myClosedAsks) >= int(count)
 	l.Infof("Successfully fetched ask orders for userId : %v", userId)
 	return moreExists, myOpenAsksMap, myClosedAsksMap, nil
 }

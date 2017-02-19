@@ -107,6 +107,8 @@ func GetTransactions(userId, lastId, count uint32) (bool, map[uint32]*Transactio
 	//set default value of count if it is zero
 	if count == 0 {
 		count = GET_TRANSACTION_COUNT
+	} else {
+		count = min(count, GET_TRANSACTION_COUNT)
 	}
 
 	//get latest events if lastId is zero
