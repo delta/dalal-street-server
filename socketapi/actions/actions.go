@@ -56,7 +56,7 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 		return resp
 	}
 	var internalServerError = func(err error) *actions_proto.BuyStocksFromExchangeResponse {
-		l.Infof("Internal server error: '%+v'", err)
+		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_InternalServerError{
 			&errors_proto.InternalServerError{
 				"We are facing some issues on the server. Please try again in some time.",
@@ -84,7 +84,8 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 
 	resp.Response = &actions_proto.BuyStocksFromExchangeResponse_Result{
 		&actions_proto.BuyStocksFromExchangeResponse_BuyStocksFromExchangeSuccessResponse{
-			TradingPrice: transaction.Price,
+			TradingPrice:  transaction.Price,
+			StockQuantity: transaction.StockQuantity,
 		},
 	}
 
@@ -114,7 +115,7 @@ func CancelAskOrder(sess session.Session, req *actions_proto.CancelAskOrderReque
 		return resp
 	}
 	var internalServerError = func(err error) *actions_proto.CancelAskOrderResponse {
-		l.Infof("Internal server error: '%+v'", err)
+		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.CancelAskOrderResponse_InternalServerError{
 			&errors_proto.InternalServerError{
 				"We are facing some issues on the server. Please try again in some time.",
@@ -169,7 +170,7 @@ func CancelBidOrder(sess session.Session, req *actions_proto.CancelBidOrderReque
 		return resp
 	}
 	var internalServerError = func(err error) *actions_proto.CancelBidOrderResponse {
-		l.Infof("Internal server error: '%+v'", err)
+		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.CancelBidOrderResponse_InternalServerError{
 			&errors_proto.InternalServerError{
 				"We are facing some issues on the server. Please try again in some time.",
@@ -224,7 +225,7 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 		return resp
 	}
 	var internalServerError = func(err error) *actions_proto.LoginResponse {
-		l.Infof("Internal server error: '%+v'", err)
+		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.LoginResponse_InternalServerError{
 			&errors_proto.InternalServerError{
 				"We are facing some issues on the server. Please try again in some time.",
@@ -305,6 +306,9 @@ func Logout(sess session.Session, req *actions_proto.LogoutRequest) *actions_pro
 	l.Infof("Logout requested")
 
 	resp := &actions_proto.LogoutResponse{}
+
+	sess.Destroy()
+
 	resp.Response = &actions_proto.LogoutResponse_Result{
 		&actions_proto.LogoutResponse_LogoutSuccessResponse{
 			Success: true,
@@ -325,10 +329,44 @@ func MortgageStocks(sess session.Session, req *actions_proto.MortgageStocksReque
 	l.Infof("MortgageStocks requested")
 
 	resp := &actions_proto.MortgageStocksResponse{}
+
+	//Helpers
+	var notEnoughStocksError = func(reason string) *actions_proto.MortgageStocksResponse {
+		resp.Response = &actions_proto.MortgageStocksResponse_NotEnoughStocksError_{
+			&actions_proto.MortgageStocksResponse_NotEnoughStocksError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var internalServerError = func(err error) *actions_proto.MortgageStocksResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.MortgageStocksResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	stockId := req.StockId
+	stockQty := -int32(req.StockQuantity)
+
+	transaction, err := models.PerformMortgageTransaction(userId, stockId, stockQty)
+
+	switch e := err.(type) {
+	case models.NotEnoughStocksError:
+		return notEnoughStocksError(e.Error())
+	}
+	if err != nil {
+		return internalServerError(err)
+	}
+
 	resp.Response = &actions_proto.MortgageStocksResponse_Result{
 		&actions_proto.MortgageStocksResponse_MortgageStocksSuccessResponse{
 			Success:      true,
-			TradingPrice: 123,
+			TradingPrice: transaction.Price,
 		},
 	}
 
@@ -365,7 +403,7 @@ func PlaceAskOrder(sess session.Session, req *actions_proto.PlaceAskOrderRequest
 		return resp
 	}
 	var internalServerError = func(err error) *actions_proto.PlaceAskOrderResponse {
-		l.Infof("Internal server error: '%+v'", err)
+		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.PlaceAskOrderResponse_InternalServerError{
 			&errors_proto.InternalServerError{
 				"We are facing some issues on the server. Please try again in some time.",
@@ -435,7 +473,7 @@ func PlaceBidOrder(sess session.Session, req *actions_proto.PlaceBidOrderRequest
 		return resp
 	}
 	var internalServerError = func(err error) *actions_proto.PlaceBidOrderResponse {
-		l.Infof("Internal server error: '%+v'", err)
+		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.PlaceBidOrderResponse_InternalServerError{
 			&errors_proto.InternalServerError{
 				"We are facing some issues on the server. Please try again in some time.",
@@ -486,10 +524,54 @@ func RetrieveMortgageStocks(sess session.Session, req *actions_proto.RetrieveMor
 	l.Infof("RetrieveMortgageStocks requested")
 
 	resp := &actions_proto.RetrieveMortgageStocksResponse{}
+
+	//Helpers
+	var notEnoughStocksError = func(reason string) *actions_proto.RetrieveMortgageStocksResponse {
+		resp.Response = &actions_proto.RetrieveMortgageStocksResponse_NotEnoughStocksError_{
+			&actions_proto.RetrieveMortgageStocksResponse_NotEnoughStocksError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var notEnoughCashError = func(reason string) *actions_proto.RetrieveMortgageStocksResponse {
+		resp.Response = &actions_proto.RetrieveMortgageStocksResponse_NotEnoughCashError_{
+			&actions_proto.RetrieveMortgageStocksResponse_NotEnoughCashError{
+				reason,
+			},
+		}
+		return resp
+	}
+	var internalServerError = func(err error) *actions_proto.RetrieveMortgageStocksResponse {
+		l.Errorf("Internal server error: '%+v'", err)
+		resp.Response = &actions_proto.RetrieveMortgageStocksResponse_InternalServerError{
+			&errors_proto.InternalServerError{
+				"We are facing some issues on the server. Please try again in some time.",
+			},
+		}
+		return resp
+	}
+
+	userId := getUserId(sess)
+	stockId := req.StockId
+	stockQty := int32(req.StockQuantity)
+
+	transaction, err := models.PerformMortgageTransaction(userId, stockId, stockQty)
+
+	switch e := err.(type) {
+	case models.NotEnoughStocksError:
+		return notEnoughStocksError(e.Error())
+	case models.NotEnoughCashError:
+		return notEnoughCashError(e.Error())
+	}
+	if err != nil {
+		return internalServerError(err)
+	}
+
 	resp.Response = &actions_proto.RetrieveMortgageStocksResponse_Result{
 		&actions_proto.RetrieveMortgageStocksResponse_RetrieveMortgageStocksSuccessResponse{
 			Success:      true,
-			TradingPrice: 123,
+			TradingPrice: transaction.Price,
 		},
 	}
 
