@@ -257,3 +257,57 @@ func (ask *Ask) Close() error {
 	l.Debugf("Done")
 	return nil
 }
+
+func GetMyAsks(userId, lastId, count uint32) (bool, map[uint32]*Ask, map[uint32]*Ask, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetMyAsks",
+		"userId": userId,
+		"lastId": lastId,
+		"count":  count,
+	})
+
+	l.Infof("Attempting to get ask orders for userId : %v", userId)
+
+	db, err := DbOpen()
+	if err != nil {
+		return true, nil, nil, err
+	}
+	defer db.Close()
+
+	var myClosedAsks []*Ask
+	var myOpenAsks []*Ask
+
+	//get all open asks
+	if err := db.Where("userId = ? and isClosed = ?", userId, 0).Find(&myOpenAsks).Error; err != nil {
+		return true, nil, nil, err
+	}
+
+	//set default value of count if it is zero
+	if count == 0 {
+		count = MY_ASK_COUNT
+	}
+	//get latest events if lastId is zero
+	if lastId != 0 {
+		db = db.Where("id <= ?", lastId)
+	}
+	//get closed asks
+	if err := db.Where("userId = ? and isClosed = ?", userId, 1).Order("desc id").Limit(count).Find(&myClosedAsks).Error; err != nil {
+		return true, nil, nil, err
+	}
+
+	myOpenAsksMap := make(map[uint32]*Ask)
+
+	for _, ask := range myOpenAsks {
+		myOpenAsksMap[ask.Id] = ask
+	}
+
+	myClosedAsksMap := make(map[uint32]*Ask)
+
+	for _, ask := range myClosedAsks {
+		myClosedAsksMap[ask.Id] = ask
+	}
+
+	var moreExists = len(myClosedAsks) < int(count)
+	l.Infof("Successfully fetched ask orders for userId : %v", userId)
+	return moreExists, myOpenAsksMap, myClosedAsksMap, nil
+}
