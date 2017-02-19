@@ -258,7 +258,7 @@ func (ask *Ask) Close() error {
 	return nil
 }
 
-func GetMyAsks(userId, lastId, count uint32) (bool, map[uint32]*Ask, map[uint32]*Ask, error) {
+func GetMyAsks(userId, lastId, count uint32) (bool, []*Ask, []*Ask, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetMyAsks",
 		"userId": userId,
@@ -298,19 +298,7 @@ func GetMyAsks(userId, lastId, count uint32) (bool, map[uint32]*Ask, map[uint32]
 		return true, nil, nil, err
 	}
 
-	myOpenAsksMap := make(map[uint32]*Ask)
-
-	for _, ask := range myOpenAsks {
-		myOpenAsksMap[ask.Id] = ask
-	}
-
-	myClosedAsksMap := make(map[uint32]*Ask)
-
-	for _, ask := range myClosedAsks {
-		myClosedAsksMap[ask.Id] = ask
-	}
-
 	var moreExists = len(myClosedAsks) >= int(count)
 	l.Infof("Successfully fetched ask orders for userId : %v", userId)
-	return moreExists, myOpenAsksMap, myClosedAsksMap, nil
+	return moreExists, myOpenAsks, myClosedAsks, nil
 }

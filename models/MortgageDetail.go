@@ -25,7 +25,7 @@ func (md *MortgageDetail) ToProto() *models_proto.MortgageDetail {
 	}
 }
 
-func GetMortgageDetails(userId uint32) (map[uint32]*MortgageDetail, error) {
+func GetMortgageDetails(userId uint32) ([]*MortgageDetail, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetMortgageDetails",
 		"userId": userId,
@@ -45,12 +45,6 @@ func GetMortgageDetails(userId uint32) (map[uint32]*MortgageDetail, error) {
 		return nil, err
 	}
 
-	mortgageDetailsMap := make(map[uint32]*MortgageDetail)
-
-	for _, mortgageDetail := range mortgageDetails {
-		mortgageDetailsMap[mortgageDetail.StockId] = mortgageDetail
-	}
-
 	l.Infof("Successfully fetched mortgageDetails for userId : %v", userId)
-	return mortgageDetailsMap, nil
+	return mortgageDetails, nil
 }

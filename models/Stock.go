@@ -140,7 +140,7 @@ func loadStocks() error {
 	return nil
 }
 
-func GetCompanyDetails(stockId uint32) (*Stock, map[string]*StockHistory, error) {
+func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "GetCompanyDetails",
 		"stockId": stockId,
@@ -168,12 +168,6 @@ func GetCompanyDetails(stockId uint32) (*Stock, map[string]*StockHistory, error)
 		return nil, nil, err
 	}
 
-	stockHistoryMap := make(map[string]*StockHistory)
-
-	for _, stockData := range stockHistory {
-		stockHistoryMap[stockData.CreatedAt] = stockData
-	}
-
 	l.Infof("Successfully fetched company profile for stock id : %v", stockId)
-	return stock, stockHistoryMap, nil
+	return stock, stockHistory, nil
 }

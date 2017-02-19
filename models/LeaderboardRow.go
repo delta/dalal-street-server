@@ -31,7 +31,7 @@ func (l *LeaderboardRow) ToProto() *models_proto.LeaderboardRow {
 	}
 }
 
-func GetLeaderboard(userId, startingId, count uint32) (map[uint32]*LeaderboardRow, uint32, uint32, error) {
+func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *LeaderboardRow, uint32, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":     "GetLeaderboard",
 		"userId":     userId,
@@ -52,7 +52,7 @@ func GetLeaderboard(userId, startingId, count uint32) (map[uint32]*LeaderboardRo
 
 	db, err := DbOpen()
 	if err != nil {
-		return nil, 0, TotalUserCount, err
+		return nil, nil, TotalUserCount, err
 	}
 	defer db.Close()
 
@@ -62,20 +62,14 @@ func GetLeaderboard(userId, startingId, count uint32) (map[uint32]*LeaderboardRo
 	var currentUserDetails *LeaderboardRow
 
 	if err := db.Where("id >= ?", startingId).Order("asc rank").Limit(count).Find(&leaderboardDetails).Error; err != nil {
-		return nil, 0, TotalUserCount, err
+		return nil, nil, TotalUserCount, err
 	}
 
 	if err := db.Where("userId = ?", userId).First(&currentUserDetails).Error; err != nil {
-		return nil, 0, TotalUserCount, err
+		return nil, nil, TotalUserCount, err
 	}
-
-	leaderBoardMap := make(map[uint32]*LeaderboardRow)
-	for _, leaderboardEntry := range leaderboardDetails {
-		leaderBoardMap[leaderboardEntry.Id] = leaderboardEntry
-	}
-	leaderBoardMap[currentUserDetails.Id] = currentUserDetails
 
 	l.Infof("Successfully fetched leaderboard for userId : %v", userId)
 
-	return leaderBoardMap, currentUserDetails.Id, TotalUserCount, nil
+	return leaderboardDetails, currentUserDetails, TotalUserCount, nil
 }

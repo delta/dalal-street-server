@@ -669,8 +669,8 @@ func GetCompanyProfile(sess session.Session, req *actions_proto.GetCompanyProfil
 
 	//Convert to proto
 	stockHistoryMap := make(map[string]*models_proto.StockHistory)
-	for timestamp, stockData := range stockHistory {
-		stockHistoryMap[timestamp] = stockData.ToProto()
+	for _, stockData := range stockHistory {
+		stockHistoryMap[stockData.CreatedAt] = stockData.ToProto()
 	}
 
 	resp.Response = &actions_proto.GetCompanyProfileResponse_Result{
@@ -718,8 +718,8 @@ func GetMarketEvents(sess session.Session, req *actions_proto.GetMarketEventsReq
 	//Convert to proto
 	marketEventsMap := make(map[uint32]*models_proto.MarketEvent)
 
-	for id, stockEvent := range marketEvents {
-		marketEventsMap[id] = stockEvent.ToProto()
+	for _, marketEvent := range marketEvents {
+		marketEventsMap[marketEvent.Id] = marketEvent.ToProto()
 	}
 
 	resp.Response = &actions_proto.GetMarketEventsResponse_Result{
@@ -768,14 +768,14 @@ func GetMyAsks(sess session.Session, req *actions_proto.GetMyAsksRequest) *actio
 	//Convert to proto
 	myOpenAskOrdersMap := make(map[uint32]*models_proto.Ask)
 
-	for id, ask := range myOpenAskOrders {
-		myOpenAskOrdersMap[id] = ask.ToProto()
+	for _, ask := range myOpenAskOrders {
+		myOpenAskOrdersMap[ask.Id] = ask.ToProto()
 	}
 
 	myClosedAskOrdersMap := make(map[uint32]*models_proto.Ask)
 
-	for id, ask := range myClosedAskOrders {
-		myClosedAskOrdersMap[id] = ask.ToProto()
+	for _, ask := range myClosedAskOrders {
+		myClosedAskOrdersMap[ask.Id] = ask.ToProto()
 	}
 
 	resp.Response = &actions_proto.GetMyAsksResponse_Result{
@@ -825,14 +825,14 @@ func GetMyBids(sess session.Session, req *actions_proto.GetMyBidsRequest) *actio
 	//Convert to proto
 	myOpenBidOrdersMap := make(map[uint32]*models_proto.Bid)
 
-	for id, bid := range myOpenBidOrders {
-		myOpenBidOrdersMap[id] = bid.ToProto()
+	for _, bid := range myOpenBidOrders {
+		myOpenBidOrdersMap[bid.Id] = bid.ToProto()
 	}
 
 	myClosedBidOrdersMap := make(map[uint32]*models_proto.Bid)
 
-	for id, bid := range myClosedBidOrders {
-		myClosedBidOrdersMap[id] = bid.ToProto()
+	for _, bid := range myClosedBidOrders {
+		myClosedBidOrdersMap[bid.Id] = bid.ToProto()
 	}
 
 	resp.Response = &actions_proto.GetMyBidsResponse_Result{
@@ -881,8 +881,8 @@ func GetNotifications(sess session.Session, req *actions_proto.GetNotificationsR
 	//Convert to proto
 	notificationsMap := make(map[uint32]*models_proto.Notification)
 
-	for id, notification := range notifications {
-		notificationsMap[id] = notification.ToProto()
+	for _, notification := range notifications {
+		notificationsMap[notification.Id] = notification.ToProto()
 	}
 
 	resp.Response = &actions_proto.GetNotificationsResponse_Result{
@@ -931,8 +931,8 @@ func GetTransactions(sess session.Session, req *actions_proto.GetTransactionsReq
 	//Convert to proto
 	transactionsMap := make(map[uint32]*models_proto.Transaction)
 
-	for id, transaction := range transactions {
-		transactionsMap[id] = transaction.ToProto()
+	for _, transaction := range transactions {
+		transactionsMap[transaction.Id] = transaction.ToProto()
 	}
 
 	resp.Response = &actions_proto.GetTransactionsResponse_Result{
@@ -980,9 +980,9 @@ func GetMortgageDetails(sess session.Session, req *actions_proto.GetMortgageDeta
 		return internalServerError(err)
 	}
 
-	for stockId, mortgageDetails := range mortgages {
-		mortgageMap[stockId] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails{
-			StockId:         stockId,
+	for _, mortgageDetails := range mortgages {
+		mortgageMap[mortgageDetails.StockId] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails{
+			StockId:         mortgageDetails.StockId,
 			NumStocksInBank: mortgageDetails.StocksInBank,
 		}
 	}
@@ -1023,19 +1023,20 @@ func GetLeaderboard(sess session.Session, req *actions_proto.GetLeaderboardReque
 	startingId := req.StartingId
 	count := req.Count
 
-	leaderboard, currentUserLeaderboardId, totalUsers, err := models.GetLeaderboard(userId, startingId, count)
+	leaderboard, currentUserLeaderboard, totalUsers, err := models.GetLeaderboard(userId, startingId, count)
 	if err != nil {
 		return internalServerError(err)
 	}
 
 	rankList := make(map[uint32]*models_proto.LeaderboardRow)
-	for id, leaderboardEntry := range leaderboard {
-		rankList[id] = leaderboardEntry.ToProto()
+	for _, leaderboardEntry := range leaderboard {
+		rankList[leaderboardEntry.Id] = leaderboardEntry.ToProto()
 	}
+	rankList[currentUserLeaderboard.Id] = currentUserLeaderboard.ToProto()
 
 	resp.Response = &actions_proto.GetLeaderboardResponse_Result{
 		&actions_proto.GetLeaderboardResponse_GetLeaderboardSuccessResponse{
-			MyRank:     leaderboard[currentUserLeaderboardId].Rank,
+			MyRank:     currentUserLeaderboard.Rank,
 			TotalUsers: totalUsers,
 			RankList:   rankList,
 		},

@@ -25,7 +25,7 @@ func (gNotification *Notification) ToProto() *models_proto.Notification {
 	}
 }
 
-func GetNotifications(lastId, count uint32) (bool, map[uint32]*Notification, error) {
+func GetNotifications(lastId, count uint32) (bool, []*Notification, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetNotifications",
 		"lastId": lastId,
@@ -57,13 +57,7 @@ func GetNotifications(lastId, count uint32) (bool, map[uint32]*Notification, err
 		return true, nil, err
 	}
 
-	notificationsMap := make(map[uint32]*Notification)
-
-	for _, notification := range notifications {
-		notificationsMap[notification.Id] = notification
-	}
-
 	var moreExists = len(notifications) < int(count)
 	l.Infof("Successfully fetched notifications")
-	return moreExists, notificationsMap, nil
+	return moreExists, notifications, nil
 }

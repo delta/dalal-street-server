@@ -28,7 +28,7 @@ func (gMarketEvent *MarketEvent) ToProto() *models_proto.MarketEvent {
 	return pMarketEvent
 }
 
-func GetMarketEvents(lastId, count uint32) (bool, map[uint32]*MarketEvent, error) {
+func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetMarketEvents",
 		"lastId": lastId,
@@ -60,13 +60,7 @@ func GetMarketEvents(lastId, count uint32) (bool, map[uint32]*MarketEvent, error
 		return true, nil, err
 	}
 
-	marketEventsMap := make(map[uint32]*MarketEvent)
-
-	for _, marketEvent := range marketEvents {
-		marketEventsMap[marketEvent.Id] = marketEvent
-	}
-
 	var moreExists = len(marketEvents) < int(count)
 	l.Infof("Successfully fetched market events")
-	return moreExists, marketEventsMap, nil
+	return moreExists, marketEvents, nil
 }
