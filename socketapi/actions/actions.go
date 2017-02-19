@@ -39,6 +39,14 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 	resp := &actions_proto.BuyStocksFromExchangeResponse{}
 
 	// Helpers
+	var notEnoughStocksError = func(reason string) *actions_proto.BuyStocksFromExchangeResponse {
+		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_NotEnoughStocksError_{
+			&actions_proto.BuyStocksFromExchangeResponse_NotEnoughStocksError{
+				reason,
+			},
+		}
+		return resp
+	}
 	var buyLimitExceedeedError = func(reason string) *actions_proto.BuyStocksFromExchangeResponse {
 		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_BuyLimitExceededError_{
 			&actions_proto.BuyStocksFromExchangeResponse_BuyLimitExceededError{
@@ -76,6 +84,8 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 		return buyLimitExceedeedError(e.Error())
 	case models.NotEnoughCashError:
 		return notEnoughCashError(e.Error())
+	case models.NotEnoughStocksError:
+		return notEnoughStocksError(e.Error())
 	}
 
 	if err != nil {

@@ -697,6 +697,10 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		stockQuantityRemoved = stock.StocksInExchange
 	}
 
+	if stockQuantityRemoved == 0 {
+		return nil, NotEnoughStocksError{}
+	}
+
 	price := stock.CurrentPrice
 
 	if price*stockQuantityRemoved > user.Cash {
@@ -715,7 +719,9 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		Total:         -int32(price * stockQuantityRemoved),
 	}
 
-	user.Cash = uint32(int32(user.Cash) + transaction.Total)
+	userCash := uint32(int32(user.Cash) + transaction.Total)
+	newStocksInExchange := stock.StocksInExchange - stockQuantityRemoved
+	newStocksInMarket := stock.StocksInMarket + stockQuantityRemoved
 
 	/* Committing to database */
 	db, err := DbOpen()
@@ -735,18 +741,29 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 
 	l.Debugf("Added transaction to Transactions table")
 
-	if err := tx.Save(user).Error; err != nil {
+	if err := tx.Model(user).Update("cash", userCash).Error; err != nil {
 		l.Errorf("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
 		tx.Rollback()
 		return nil, err
 	}
 
-	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
+	l.Debugf("Deducted cash from user's account. New balance: %d", userCash)
+
+	if err := tx.Model(stock).Updates(&Stock{StocksInExchange: newStocksInExchange, StocksInMarket: newStocksInMarket}).Error; err != nil {
+		l.Errorf("Error transfering stocks from exchange to market")
+		return nil, err
+	}
+
+	l.Debugf("Transferred stocks from Exchange to Market")
 
 	if err := tx.Commit().Error; err != nil {
 		l.Errorf("Error committing the transaction. Failing. %+v", err)
 		return nil, err
 	}
+
+	stock.StocksInExchange = newStocksInExchange
+	stock.StocksInMarket = newStocksInMarket
+	user.Cash = userCash
 
 	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
 
