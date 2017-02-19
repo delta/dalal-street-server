@@ -283,12 +283,31 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 		stockListProto[stockId] = stock.ToProto()
 	}
 
+	constantsMap := map[string]int32{
+		"SHORT_SELL_BORROW_LIMIT": models.SHORT_SELL_BORROW_LIMIT,
+		"BID_LIMIT":               models.BID_LIMIT,
+		"ASK_LIMIT":               models.ASK_LIMIT,
+		"BUY_LIMIT":               models.BUY_LIMIT,
+		"MINIMUM_CASH_LIMIT":      models.MINIMUM_CASH_LIMIT,
+		"BUY_FROM_EXCHANGE_LIMIT": models.BUY_FROM_EXCHANGE_LIMIT,
+		"STARTING_CASH":           models.STARTING_CASH,
+		"MORTGAGE_RETRIEVE_RATE":  models.MORTGAGE_RETRIEVE_RATE,
+		"MORTGAGE_DEPOSIT_RATE":   models.MORTGAGE_DEPOSIT_RATE,
+		"MARKET_EVENT_COUNT":      models.MARKET_EVENT_COUNT,
+		"MY_ASK_COUNT":            models.MY_ASK_COUNT,
+		"MY_BID_COUNT":            models.MY_BID_COUNT,
+		"GET_NOTIFICATION_COUNT":  models.GET_NOTIFICATION_COUNT,
+		"GET_TRANSACTION_COUNT":   models.GET_TRANSACTION_COUNT,
+		"LEADERBOARD_COUNT":       models.LEADERBOARD_COUNT,
+	}
+
 	resp.Response = &actions_proto.LoginResponse_Result{
 		&actions_proto.LoginResponse_LoginSuccessResponse{
 			SessionId:   sess.GetId(),
 			User:        user.ToProto(),
 			StocksOwned: stocksOwned,
 			StockList:   stockListProto,
+			Constants:   constantsMap,
 		},
 	}
 

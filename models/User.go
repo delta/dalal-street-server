@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -141,7 +142,7 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 	}
 
 	//update total user count
-	TotalUserCount += 1
+	atomic.AddUint32(&TotalUserCount, 1)
 
 	l.Infof("Created user")
 	return u, nil

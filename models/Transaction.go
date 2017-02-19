@@ -125,7 +125,7 @@ func GetTransactions(userId, lastId, count uint32) (bool, map[uint32]*Transactio
 		transactionsMap[transaction.Id] = transaction
 	}
 
-	var moreExists = len(transactions) < int(count)
+	var moreExists = len(transactions) >= int(count)
 	l.Infof("Successfully fetched transactions")
 	return moreExists, transactionsMap, nil
 }
