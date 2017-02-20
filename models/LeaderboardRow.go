@@ -2,6 +2,7 @@ package models
 
 import (
 	"time"
+
 	"github.com/Sirupsen/logrus"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
@@ -60,9 +61,9 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 	//for storing leaderboard details
 	var leaderboardDetails []*LeaderboardRow
 	//for storing user's position in leaderboard
-	var currentUserDetails *LeaderboardRow
+	currentUserDetails := LeaderboardRow{}
 
-	if err := db.Where("id >= ?", startingId).Order("asc rank").Limit(count).Find(&leaderboardDetails).Error; err != nil {
+	if err := db.Where("id >= ?", startingId).Order("rank asc").Limit(count).Find(&leaderboardDetails).Error; err != nil {
 		return nil, nil, TotalUserCount, err
 	}
 
@@ -72,7 +73,7 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 
 	l.Infof("Successfully fetched leaderboard for userId : %v", userId)
 
-	return leaderboardDetails, currentUserDetails, TotalUserCount, nil
+	return leaderboardDetails, &currentUserDetails, TotalUserCount, nil
 }
 
 type leaderboardQueryData struct {
@@ -100,7 +101,7 @@ func UpdateLeaderboard() {
 	}
 	defer db.Close()
 
-	db.Raw("SELECT U.id as user_id, U.cash as cash, SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) AS stock_worth, (U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))) AS total from Users U, Transactions T, Stocks S WHERE U.id = T.userId and T.stockId = S.id GROUP BY U.id ORDER BY Total DESC").Scan(&results)
+	db.Raw("SELECT U.id as user_id, U.cash as cash, ifNull(SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)),0) AS stock_worth, ifnull((U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))),U.cash) AS total from Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id GROUP BY U.id ORDER BY Total DESC;").Scan(&results)
 
 	var rank = 1
 	var counter = 1
@@ -125,10 +126,9 @@ func UpdateLeaderboard() {
 	db.Exec("LOCK TABLES Leaderboard WRITE")
 	defer db.Exec("UNLOCK TABLES")
 
-
 	//begin transaction
 	tx := db.Begin()
-	
+
 	db.Exec("TRUNCATE TABLE Leaderboard")
 
 	for _, leaderboardEntry := range leaderboardEntries {
@@ -152,6 +152,6 @@ func UpdateLeaderboard() {
 func UpdateLeaderboardTicker() {
 	for {
 		UpdateLeaderboard()
-		time.Sleep(2*time.Minute)
+		time.Sleep(2 * time.Minute)
 	}
 }
