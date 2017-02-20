@@ -141,8 +141,6 @@ func Test_UpdateLeaderboard(t *testing.T) {
 	var counter = 1
 
 	for index, result := range results {
-		result.Total = int32(result.Cash) + result.StockWorth
-
 		leaderboardEntries = append(leaderboardEntries, &LeaderboardRow{
 			Id:         uint32(index + 1),
 			UserId:     result.UserId,
