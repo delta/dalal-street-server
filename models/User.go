@@ -720,8 +720,8 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	}
 
 	userCash := uint32(int32(user.Cash) + transaction.Total)
-	newStocksInExchange := stock.StocksInExchange - stockQuantityRemoved
-	newStocksInMarket := stock.StocksInMarket + stockQuantityRemoved
+	stock.StocksInExchange -= stockQuantityRemoved
+	stock.StocksInMarket += stockQuantityRemoved
 
 	/* Committing to database */
 	db, err := DbOpen()
@@ -749,8 +749,10 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 
 	l.Debugf("Deducted cash from user's account. New balance: %d", userCash)
 
-	if err := tx.Model(stock).Updates(&Stock{StocksInExchange: newStocksInExchange, StocksInMarket: newStocksInMarket}).Error; err != nil {
-		l.Errorf("Error transfering stocks from exchange to market")
+	if err := tx.Save(stock).Error; err != nil {
+		l.Errorf("Error transfering stocks from exchange to market. Rolling back.")
+		stock.StocksInExchange += stockQuantityRemoved
+		stock.StocksInMarket -= stockQuantityRemoved
 		return nil, err
 	}
 
@@ -999,7 +1001,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 
 	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
-		return false, false, nil // supress this error!
+		return ask.IsClosed, bid.IsClosed, nil // supress this error!
 	}
 
 	return ask.IsClosed, bid.IsClosed, nil
