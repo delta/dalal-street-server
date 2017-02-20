@@ -243,7 +243,7 @@ func GetMyBids(userId, lastId, count uint32) (bool, []*Bid, []*Bid, error) {
 	if lastId != 0 {
 		db = db.Where("id <= ?", lastId)
 	}
-	if err := db.Where("userId = ?", userId).Order("desc id").Limit(count).Find(&myClosedBids).Error; err != nil {
+	if err := db.Where("userId = ?", userId).Order("id desc").Limit(count).Find(&myClosedBids).Error; err != nil {
 		return true, nil, nil, err
 	}
 

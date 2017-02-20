@@ -115,7 +115,7 @@ func GetTransactions(userId, lastId, count uint32) (bool, []*Transaction, error)
 	if lastId != 0 {
 		db = db.Where("id <= ?", lastId)
 	}
-	if err := db.Where("userId = ?", userId).Order("desc id").Limit(count).Find(&transactions).Error; err != nil {
+	if err := db.Where("userId = ?", userId).Order("id desc").Limit(count).Find(&transactions).Error; err != nil {
 		return true, nil, err
 	}
 

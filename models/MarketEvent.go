@@ -56,7 +56,7 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	if lastId != 0 {
 		db = db.Where("id <= ?", lastId)
 	}
-	if err := db.Order("desc id").Limit(count).Find(&marketEvents).Error; err != nil {
+	if err := db.Order("id desc").Limit(count).Find(&marketEvents).Error; err != nil {
 		return true, nil, err
 	}
 
