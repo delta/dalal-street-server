@@ -233,7 +233,7 @@ func GetMyBids(userId, lastId, count uint32) (bool, []*Bid, []*Bid, error) {
 	var myClosedBids []*Bid
 
 	//get all open bids
-	if err := db.Where("userId = ? and isClosed = ?", userId, 0).Find(&myOpenBids).Error; err != nil {
+	if err := db.Where("userId = ? AND isClosed = ?", userId, 0).Find(&myOpenBids).Error; err != nil {
 		return true, nil, nil, err
 	}
 
@@ -248,7 +248,7 @@ func GetMyBids(userId, lastId, count uint32) (bool, []*Bid, []*Bid, error) {
 	if lastId != 0 {
 		db = db.Where("id <= ?", lastId)
 	}
-	if err := db.Where("userId = ?", userId).Order("id desc").Limit(count).Find(&myClosedBids).Error; err != nil {
+	if err := db.Where("userId = ? AND isClosed = ?", userId, 1).Order("id desc").Limit(count).Find(&myClosedBids).Error; err != nil {
 		return true, nil, nil, err
 	}
 
