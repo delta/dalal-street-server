@@ -623,6 +623,33 @@ func Unsubscribe(sess session.Session, req *actions_proto.UnsubscribeRequest) *a
 		},
 	}
 
+	var badRequestError = func(err error) *actions_proto.UnsubscribeResponse {
+		l.Errorf(err.Error())
+		resp.Response = &actions_proto.UnsubscribeResponse_BadRequestError{
+			&errors_proto.BadRequestError{
+				err.Error(),
+			},
+		}
+		return resp
+	}
+
+	switch req.DataStreamType {
+	case datastreams_proto.DataStreamType_NOTIFICATIONS:
+		datastreams.UnregNotificationsListener(getUserId(sess), sess.GetId())
+	case datastreams_proto.DataStreamType_STOCK_PRICES:
+		datastreams.UnregStockPricesListener(sess.GetId())
+	case datastreams_proto.DataStreamType_STOCK_EXCHANGE:
+		datastreams.UnregStockExchangeListener(sess.GetId())
+	case datastreams_proto.DataStreamType_MARKET_EVENTS:
+		datastreams.UnregMarketEventsListener(sess.GetId())
+	case datastreams_proto.DataStreamType_MY_ORDERS:
+		datastreams.UnregOrdersListener(getUserId(sess), sess.GetId())
+	case datastreams_proto.DataStreamType_TRANSACTIONS:
+		datastreams.UnregTransactionsListener(getUserId(sess), sess.GetId())
+	default:
+		return badRequestError(fmt.Errorf("Invalid datastream id %d", req.DataStreamType))
+	}
+
 	l.Infof("Request completed successfully")
 
 	return resp
@@ -636,16 +663,35 @@ func Subscribe(done <-chan struct{}, updates chan interface{}, sess session.Sess
 	})
 	l.Infof("Subscribe requested")
 
+	resp := &actions_proto.SubscribeResponse{}
+
+	var badRequestError = func(err error) *actions_proto.SubscribeResponse {
+		l.Errorf(err.Error())
+		resp.Response = &actions_proto.SubscribeResponse_BadRequestError{
+			&errors_proto.BadRequestError{
+				err.Error(),
+			},
+		}
+		return resp
+	}
+
 	switch req.DataStreamType {
 	case datastreams_proto.DataStreamType_NOTIFICATIONS:
-		datastreams.RegNotificationListener(done, updates, getUserId(sess), sess.GetId())
+		datastreams.RegNotificationsListener(done, updates, getUserId(sess), sess.GetId())
 	case datastreams_proto.DataStreamType_STOCK_PRICES:
 		datastreams.RegStockPricesListener(done, updates, sess.GetId())
 	case datastreams_proto.DataStreamType_STOCK_EXCHANGE:
 		datastreams.RegStockExchangeListener(done, updates, sess.GetId())
+	case datastreams_proto.DataStreamType_MARKET_EVENTS:
+		datastreams.RegMarketEventsListener(done, updates, sess.GetId())
+	case datastreams_proto.DataStreamType_MY_ORDERS:
+		datastreams.RegOrdersListener(done, updates, getUserId(sess), sess.GetId())
+	case datastreams_proto.DataStreamType_TRANSACTIONS:
+		datastreams.RegTransactionsListener(done, updates, getUserId(sess), sess.GetId())
+	default:
+		return badRequestError(fmt.Errorf("Invalid datastream id %d", req.DataStreamType))
 	}
 
-	resp := &actions_proto.SubscribeResponse{}
 	resp.Response = &actions_proto.SubscribeResponse_Result{
 		&actions_proto.SubscribeResponse_SubscribeSuccessResponse{
 			Success: true,

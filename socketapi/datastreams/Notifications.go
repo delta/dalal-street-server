@@ -31,6 +31,7 @@ func SendNotification(n *models_proto.Notification) {
 	listeners, ok := notifListeners[n.UserId]
 	if !ok {
 		l.Debugf("No listener found. Done.")
+		notifListenersLock.Unlock()
 		return
 	}
 	notifListenersLock.Unlock()
@@ -59,7 +60,7 @@ func SendNotification(n *models_proto.Notification) {
 	l.Debugf("Sent to %d listeners", listeners)
 }
 
-func RegNotificationListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
+func RegNotificationsListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":       "RegNotificationListener",
 		"param_userId": userId,
@@ -77,26 +78,33 @@ func RegNotificationListener(done <-chan struct{}, update chan interface{}, user
 		nlu = notifListeners[userId]
 	}
 
+	nlu.Lock()
 	nlu.l[sessionId] = &listener{
 		update,
 		done,
 	}
+	nlu.Unlock()
 
 	l.Debugf("Appended to listeners")
 
 	go func() {
 		<-done
-		notifListenersLock.Lock()
-		defer notifListenersLock.Unlock()
-		listeners, ok := notifListeners[userId]
-		if !ok {
-			return
-		}
-		listeners.Lock()
-		delete(listeners.l, sessionId)
-		if len(listeners.l) == 0 {
-			delete(notifListeners, userId)
-		}
-		listeners.Unlock()
+		UnregNotificationsListener(userId, sessionId)
+		l.Debugf("Removed dead listener")
 	}()
+}
+
+func UnregNotificationsListener(userId uint32, sessionId string) {
+	notifListenersLock.Lock()
+	defer notifListenersLock.Unlock()
+	listeners, ok := notifListeners[userId]
+	if !ok {
+		return
+	}
+	listeners.Lock()
+	delete(listeners.l, sessionId)
+	if len(listeners.l) == 0 {
+		delete(notifListeners, userId)
+	}
+	listeners.Unlock()
 }

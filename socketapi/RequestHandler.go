@@ -142,6 +142,10 @@ func makeDataStreamUpdate(req *actions_proto.SubscribeRequest, update interface{
 		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_TransactionUpdate{
 			update.(*datastreams_proto.TransactionUpdate),
 		}
+	case *datastreams_proto.MyOrderUpdate:
+		dsuw.Update = &socketapi_proto.DataStreamUpdateWrapper_MyOrderUpdate{
+			update.(*datastreams_proto.MyOrderUpdate),
+		}
 	default:
 		return nil, errors.New(fmt.Sprintf("Unexpected type '%T'", update))
 	}
