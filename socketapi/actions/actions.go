@@ -936,7 +936,7 @@ func GetNotifications(sess session.Session, req *actions_proto.GetNotificationsR
 	lastId := req.LastNotificationId
 	count := req.Count
 
-	moreExists, notifications, err := models.GetNotifications(lastId, count)
+	moreExists, notifications, err := models.GetNotifications(getUserId(sess), lastId, count)
 
 	if err != nil {
 		return internalServerError(err)

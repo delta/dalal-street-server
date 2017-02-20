@@ -26,7 +26,7 @@ func (gNotification *Notification) ToProto() *models_proto.Notification {
 	}
 }
 
-func GetNotifications(lastId, count uint32) (bool, []*Notification, error) {
+func GetNotifications(userId, lastId, count uint32) (bool, []*Notification, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetNotifications",
 		"lastId": lastId,
@@ -40,6 +40,7 @@ func GetNotifications(lastId, count uint32) (bool, []*Notification, error) {
 		return true, nil, err
 	}
 	defer db.Close()
+	db.LogMode(true)
 
 	var notifications []*Notification
 
@@ -52,13 +53,14 @@ func GetNotifications(lastId, count uint32) (bool, []*Notification, error) {
 
 	//get latest events if lastId is zero
 	if lastId != 0 {
+		// 0 means broadcast!
 		db = db.Where("id <= ?", lastId)
 	}
-	if err := db.Order("id desc").Limit(count).Find(&notifications).Error; err != nil {
+	if err := db.Where("userId = 0 or userId = ?", userId).Order("id desc").Limit(count).Find(&notifications).Error; err != nil {
 		return true, nil, err
 	}
 
-	var moreExists = len(notifications) < int(count)
+	var moreExists = len(notifications) >= int(count)
 	l.Infof("Successfully fetched notifications")
 	return moreExists, notifications, nil
 }
