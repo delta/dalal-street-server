@@ -1,8 +1,9 @@
 package models
 
 import (
-	"time"
 	"testing"
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
@@ -43,30 +44,30 @@ func Test_UpdateLeaderboard(t *testing.T) {
 
 	var makeUser = func(id uint32, email string, name string, cash uint32, total int32) *User {
 		return &User{
-		  	Id : id,
-			Email : email,
-			Name : name,
-			Cash : cash,
-			Total : total,
-			CreatedAt : time.Now().Format(time.RFC3339),
+			Id:        id,
+			Email:     email,
+			Name:      name,
+			Cash:      cash,
+			Total:     total,
+			CreatedAt: time.Now().Format(time.RFC3339),
 		}
 	}
 
 	var makeStock = func(id uint32, sName string, fName string, desc string, curPrice uint32, dayHigh uint32, dayLow uint32, allHigh uint32, allLow uint32, stocks uint32, upOrDown bool) *Stock {
 		return &Stock{
-		  	Id: id,
-			ShortName: sName,
-			FullName: fName,
-			Description: desc,
-			CurrentPrice: curPrice,
-			DayHigh: dayHigh,
-			DayLow: dayLow,
-			AllTimeHigh: allHigh,
-			AllTimeLow: allLow,
+			Id:               id,
+			ShortName:        sName,
+			FullName:         fName,
+			Description:      desc,
+			CurrentPrice:     curPrice,
+			DayHigh:          dayHigh,
+			DayLow:           dayLow,
+			AllTimeHigh:      allHigh,
+			AllTimeLow:       allLow,
 			StocksInExchange: stocks,
-			UpOrDown: upOrDown,
-			CreatedAt: time.Now().Format(time.RFC3339),
-			UpdatedAt: time.Now().Format(time.RFC3339),
+			UpOrDown:         upOrDown,
+			CreatedAt:        time.Now().Format(time.RFC3339),
+			UpdatedAt:        time.Now().Format(time.RFC3339),
 		}
 	}
 
@@ -132,14 +133,16 @@ func Test_UpdateLeaderboard(t *testing.T) {
 		if err := db.Create(tr).Error; err != nil {
 			t.Fatal(err)
 		}
-	}	
+	}
 
-	db.Raw("SELECT U.id as user_id, U.cash as cash, SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) AS stock_worth, (U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))) AS total from Users U, Transactions T, Stocks S WHERE U.id = T.userId and T.stockId = S.id GROUP BY U.id ORDER BY Total DESC").Scan(&results)
+	db.Raw("SELECT U.id as user_id, U.cash as cash, ifNull(SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)),0) AS stock_worth, ifnull((U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))),U.cash) AS total from Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id GROUP BY U.id ORDER BY Total DESC;").Scan(&results)
 
 	var rank = 1
 	var counter = 1
 
 	for index, result := range results {
+		result.Total = int32(result.Cash) + result.StockWorth
+
 		leaderboardEntries = append(leaderboardEntries, &LeaderboardRow{
 			Id:         uint32(index + 1),
 			UserId:     result.UserId,
@@ -157,15 +160,14 @@ func Test_UpdateLeaderboard(t *testing.T) {
 	}
 
 	l.Infof("%+v", results)
-	l.Infof("%+v", leaderboardEntries)	
+	l.Infof("%+v", leaderboardEntries)
 
 	db.Exec("LOCK TABLES Leaderboard WRITE")
 	defer db.Exec("UNLOCK TABLES")
 
-
 	//begin transaction
 	tx := db.Begin()
-	
+
 	db.Exec("TRUNCATE TABLE Leaderboard")
 
 	for _, leaderboardEntry := range leaderboardEntries {
@@ -184,4 +186,3 @@ func Test_UpdateLeaderboard(t *testing.T) {
 
 	l.Infof("Successfully updated leaderboard")
 }
-

@@ -24,6 +24,7 @@ func main() {
 	socketapi.InitSocketApi()
 
 	go StartREPL()
+	go models.UpdateLeaderboardTicker()
 
 	http.Handle("/", http.FileServer(http.Dir("./public")))
 	http.HandleFunc("/ws", socketapi.Handle)
