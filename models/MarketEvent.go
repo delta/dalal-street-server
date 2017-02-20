@@ -60,7 +60,7 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 		return true, nil, err
 	}
 
-	var moreExists = len(marketEvents) < int(count)
+	var moreExists = len(marketEvents) >= int(count)
 	l.Infof("Successfully fetched market events")
 	return moreExists, marketEvents, nil
 }
