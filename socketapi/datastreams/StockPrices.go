@@ -95,9 +95,13 @@ func RegStockPricesListener(done <-chan struct{}, update chan interface{}, sessi
 	}
 	go func() {
 		<-done
-		stockPricesListenersMutex.Lock()
-		delete(stockPricesListeners, sessionId)
-		stockPricesListenersMutex.Unlock()
+		UnregStockPricesListener(sessionId)
 		l.Debugf("Found dead listener. Removed")
 	}()
+}
+
+func UnregStockPricesListener(sessionId string) {
+	stockPricesListenersMutex.Lock()
+	delete(stockPricesListeners, sessionId)
+	stockPricesListenersMutex.Unlock()
 }
