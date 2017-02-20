@@ -997,7 +997,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
-	if err := updateStockPrice(ask.StockId, stockTradePrice); err != nil {
+	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
 		return false, false, nil // supress this error!
 	}
