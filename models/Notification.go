@@ -54,7 +54,7 @@ func GetNotifications(lastId, count uint32) (bool, []*Notification, error) {
 	if lastId != 0 {
 		db = db.Where("id <= ?", lastId)
 	}
-	if err := db.Order("desc id").Limit(count).Find(&notifications).Error; err != nil {
+	if err := db.Order("id desc").Limit(count).Find(&notifications).Error; err != nil {
 		return true, nil, err
 	}
 

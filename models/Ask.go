@@ -294,7 +294,7 @@ func GetMyAsks(userId, lastId, count uint32) (bool, []*Ask, []*Ask, error) {
 		db = db.Where("id <= ?", lastId)
 	}
 	//get closed asks
-	if err := db.Where("userId = ? and isClosed = ?", userId, 1).Order("desc id").Limit(count).Find(&myClosedAsks).Error; err != nil {
+	if err := db.Where("userId = ? and isClosed = ?", userId, 1).Order("id desc").Limit(count).Find(&myClosedAsks).Error; err != nil {
 		return true, nil, nil, err
 	}
 
