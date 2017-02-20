@@ -982,6 +982,18 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 		return false, false, err
 	}
 
+	// insert an OrderFill
+	of := &OrderFill{
+		AskId:         ask.Id,
+		BidId:         bid.Id,
+		TransactionId: askTransaction.Id, // We'll always store Ask
+	}
+	if err := tx.Save(of).Error; err != nil {
+		l.Errorf("Error saving an orderfill. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return false, false, err
+	}
+
 	//Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		l.Errorf("Error committing the transaction. Failing. %+v", err)
@@ -1099,7 +1111,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	// A lock on user and stock has been acquired.
 	// Safe to make changes to this user and this stock
 
-	user.Cash = uint32(int32(user.Cash) + trTotal)
+	userCash := uint32(int32(user.Cash) + trTotal)
 
 	/* Committing to database */
 	db, err := DbOpen()
@@ -1131,6 +1143,8 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		l.Errorf("Error committing the transaction. Failing. %+v", err)
 		return nil, err
 	}
+
+	user.Cash = userCash
 
 	l.Debugf("Committed transaction. Success.")
 
