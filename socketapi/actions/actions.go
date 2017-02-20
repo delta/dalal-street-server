@@ -1047,7 +1047,7 @@ func GetMortgageDetails(sess session.Session, req *actions_proto.GetMortgageDeta
 	for _, mortgageDetails := range mortgages {
 		mortgageMap[mortgageDetails.StockId] = &actions_proto.GetMortgageDetailsResponse_GetMortgageDetailsSuccessResponse_MortgageDetails{
 			StockId:         mortgageDetails.StockId,
-			NumStocksInBank: mortgageDetails.StocksInBank,
+			NumStocksInBank: uint32(-mortgageDetails.StocksInBank),
 		}
 	}
 
