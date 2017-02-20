@@ -45,3 +45,38 @@ func InitLogger() {
 
 	Logger.Info("Logger started")
 }
+
+func GetNewFileLogger(fileName string, maxSize int, logLevel string, json bool) *logrus.Logger {
+	if fileName == "" {
+		fileName = "./log1.go"
+	}
+
+	if maxSize == 0 {
+		maxSize = 50
+	}
+
+	if logLevel == "" {
+		logLevel = "info"
+	}
+
+	level, err := logrus.ParseLevel(logLevel)
+	if err != nil {
+		panic(err)
+	}
+
+	logger := &logrus.Logger{
+		Out: &lumberjack.Logger{
+			Filename: fileName,
+			MaxSize:  maxSize, // MB
+		},
+		Level: level,
+	}
+
+	if json {
+		logger.Formatter = &logrus.JSONFormatter{}
+	} else {
+		logger.Formatter = &logrus.TextFormatter{}
+	}
+
+	return logger
+}

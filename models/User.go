@@ -763,8 +763,6 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		return nil, err
 	}
 
-	stock.StocksInExchange = newStocksInExchange
-	stock.StocksInMarket = newStocksInMarket
 	user.Cash = userCash
 
 	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
