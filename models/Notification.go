@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -60,4 +61,36 @@ func GetNotifications(lastId, count uint32) (bool, []*Notification, error) {
 	var moreExists = len(notifications) < int(count)
 	l.Infof("Successfully fetched notifications")
 	return moreExists, notifications, nil
+}
+
+func SendNotification(userId uint32, text string) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":       "SendNotification",
+		"param_userId": userId,
+		"param_text":   text,
+	})
+
+	l.Infof("Sending notification")
+
+	db, err := DbOpen()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	n := &Notification{
+		UserId: userId,
+		Text:   text,
+	}
+
+	if err := db.Save(n).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	datastreams.SendNotification(n.ToProto())
+
+	l.Infof("Done")
+
+	return nil
 }

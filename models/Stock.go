@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	datastreams "github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -63,6 +64,23 @@ var allStocks = struct {
 	make(map[uint32]*stockAndLock),
 }
 
+func GetStockCopy(stockId uint32) (Stock, error) {
+	allStocks.RLock()
+	defer allStocks.RUnlock()
+
+	stockNLock, ok := allStocks.m[stockId]
+
+	if !ok {
+		return Stock{}, fmt.Errorf("Invalid stock id %d", stockId)
+	}
+
+	stockNLock.RLock()
+	stockCopy := *stockNLock.stock
+	stockNLock.RUnlock()
+
+	return stockCopy, nil
+}
+
 func GetAllStocks() map[uint32]*Stock {
 	allStocks.RLock()
 	defer allStocks.RUnlock()
@@ -78,16 +96,26 @@ func GetAllStocks() map[uint32]*Stock {
 	return allStocksCopy
 }
 
-func updateStockPrice(stockId, price uint32) error {
-	allStocks.Lock()
-	defer allStocks.Unlock()
+func UpdateStockPrice(stockId, price uint32) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "loadStocks",
+	})
 
+	l.Infof("Attempting")
+
+	allStocks.Lock()
 	stockNLock, ok := allStocks.m[stockId]
 	if !ok {
 		return fmt.Errorf("Not found stock for id %d", stockId)
 	}
+	allStocks.Unlock()
+
+	stockNLock.Lock()
+	defer stockNLock.Unlock()
 
 	stock := stockNLock.stock
+	oldStockCopy := *stock
+
 	stock.CurrentPrice = price
 	if price > stock.DayHigh {
 		stock.DayHigh = price
@@ -106,6 +134,22 @@ func updateStockPrice(stockId, price uint32) error {
 	} else {
 		stock.UpOrDown = false
 	}
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer db.Close()
+
+	if err := db.Save(stock).Error; err != nil {
+		*stock = oldStockCopy
+		return err
+	}
+
+	datastreams.SendStockPriceUpdate(stockId, price)
+
+	l.Infof("Done")
 
 	return nil
 }
@@ -170,4 +214,46 @@ func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
 
 	l.Infof("Successfully fetched company profile for stock id : %v", stockId)
 	return stock, stockHistory, nil
+}
+
+func AddStocksToExchange(stockId, count uint32) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "AddStocksToExchange",
+		"param_stockId": stockId,
+		"param_count":   count,
+	})
+
+	l.Infof("Attempting")
+
+	allStocks.Lock()
+	stockNLock, ok := allStocks.m[stockId]
+	if !ok {
+		return fmt.Errorf("Not found stock for id %d", stockId)
+	}
+	allStocks.Unlock()
+
+	stockNLock.Lock()
+	defer stockNLock.Unlock()
+	stock := stockNLock.stock
+
+	stock.StocksInExchange += count
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer db.Close()
+
+	if err := db.Save(stock).Error; err != nil {
+		stock.StocksInExchange -= count
+		return err
+	}
+
+	datastreams.SendStockExchangeUpdate(stockId, stock.CurrentPrice, stock.StocksInExchange, stock.StocksInMarket)
+
+	l.Infof("Done")
+
+	return nil
+
 }
