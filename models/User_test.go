@@ -7,8 +7,13 @@ import (
 
 	"gopkg.in/jarcoal/httpmock.v1"
 
+	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
+
+func init() {
+	datastreams.InitDataStreams()
+}
 
 func Test_Login(t *testing.T) {
 	httpmock.Activate()
@@ -540,10 +545,10 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 	}
 
 	testcases := []struct {
-		userId        uint32
-		stockId       uint32
-		stockQuantity uint32
-		maxStkQtyGot  uint32
+		userId           uint32
+		stockId          uint32
+		stockQuantity    uint32
+		maxStkQtyGot     uint32
 		buyLimitExceeded bool
 	}{
 		{2, 1, 10, 10, false},

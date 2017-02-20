@@ -14,6 +14,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -767,6 +768,12 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 
 	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
 
+	go func(inExchange, inMarket uint32) {
+		datastreams.SendStockExchangeUpdate(stockId, price, inExchange, inMarket)
+		datastreams.SendTransaction(transaction.ToProto())
+		l.Infof("Sent through the datastreams")
+	}(stock.StocksInExchange, stock.StocksInMarket)
+
 	return transaction, nil
 }
 
@@ -1009,6 +1016,14 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
+	go func(askingUser User, biddingUser User, ask Ask, bid Bid) {
+		datastreams.SendTransaction(askTransaction.ToProto())
+		datastreams.SendTransaction(bidTransaction.ToProto())
+		datastreams.SendOrder(askingUser.Id, ask.Id, true, uint32(stockTradeQty), ask.IsClosed)
+		datastreams.SendOrder(biddingUser.Id, bid.Id, false, uint32(stockTradeQty), bid.IsClosed)
+		l.Infof("Sent through the datastreams")
+	}(*askingUser, *biddingUser, *ask, *bid)
+
 	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
 		return ask.IsClosed, bid.IsClosed, nil // supress this error!
@@ -1147,6 +1162,11 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	user.Cash = userCash
 
 	l.Debugf("Committed transaction. Success.")
+
+	go func(transaction Transaction) {
+		datastreams.SendTransaction(transaction.ToProto())
+		l.Infof("Sent through the datastreams")
+	}(*transaction)
 
 	return transaction, nil
 
