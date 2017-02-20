@@ -17,7 +17,7 @@ type orderListenersSingleUser struct {
 
 var orderListeners = make(map[uint32]*orderListenersSingleUser)
 
-func SendOrderUpdate(userId uint32, orderId uint32, isAsk bool, tradeQuantity uint32, isClosed bool) {
+func SendOrder(userId uint32, orderId uint32, isAsk bool, tradeQuantity uint32, isClosed bool) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "SendOrder",
 		"param_orderId":       orderId,
