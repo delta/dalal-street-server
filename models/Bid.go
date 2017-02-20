@@ -27,12 +27,17 @@ func (Bid) TableName() string {
 }
 
 func (gBid *Bid) ToProto() *models_proto.Bid {
+	m := make(map[OrderType]models_proto.OrderType)
+	m[Limit] = models_proto.OrderType_LIMIT
+	m[Market] = models_proto.OrderType_MARKET
+	m[StopLoss] = models_proto.OrderType_STOPLOSS
+
 	pBid := &models_proto.Bid{
-		Id:      gBid.Id,
-		UserId:  gBid.UserId,
-		StockId: gBid.StockId,
-		Price:   gBid.Price,
-		//	OrderType              OrderType `protobuf:"varint,5,opt,name=order_type,json=orderType,enum=dalalstreet.socketapi.models.OrderType" json:"order_type,omitempty"`
+		Id:                     gBid.Id,
+		UserId:                 gBid.UserId,
+		StockId:                gBid.StockId,
+		Price:                  gBid.Price,
+		OrderType:              m[gBid.OrderType],
 		StockQuantity:          gBid.StockQuantity,
 		StockQuantityFulfilled: gBid.StockQuantityFulfilled,
 		IsClosed:               gBid.IsClosed,
@@ -43,7 +48,7 @@ func (gBid *Bid) ToProto() *models_proto.Bid {
 		pBid.OrderType = models_proto.OrderType_LIMIT
 	} else if gBid.OrderType == Market {
 		pBid.OrderType = models_proto.OrderType_MARKET
-	} else if gBid.OrderType == Stoploss {
+	} else if gBid.OrderType == StopLoss {
 		pBid.OrderType = models_proto.OrderType_STOPLOSS
 	}
 	return pBid
