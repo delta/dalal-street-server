@@ -1096,7 +1096,7 @@ func GetLeaderboard(sess session.Session, req *actions_proto.GetLeaderboardReque
 	for _, leaderboardEntry := range leaderboard {
 		rankList[leaderboardEntry.Id] = leaderboardEntry.ToProto()
 	}
-	rankList[currentUserLeaderboard.Id] = currentUserLeaderboard.ToProto()
+	//rankList[currentUserLeaderboard.Id] = currentUserLeaderboard.ToProto()
 
 	resp.Response = &actions_proto.GetLeaderboardResponse_Result{
 		&actions_proto.GetLeaderboardResponse_GetLeaderboardSuccessResponse{

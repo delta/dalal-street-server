@@ -10,6 +10,7 @@ import (
 type LeaderboardRow struct {
 	Id         uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId     uint32 `gorm:"column:userId;not null" json:"user_id"`
+	UserName   string `gorm:"column:userName;not null" json:"user_name"`
 	Rank       uint32 `gorm:"column:rank;not null" json:"rank"`
 	Cash       uint32 `gorm:"column:cash;not null" json:"cash"`
 	Debt       uint32 `gorm:"column:debt;not null" json:"debt"`
@@ -25,6 +26,7 @@ func (l *LeaderboardRow) ToProto() *models_proto.LeaderboardRow {
 	return &models_proto.LeaderboardRow{
 		Id:         l.Id,
 		UserId:     l.UserId,
+		UserName:   l.UserName,
 		Cash:       l.Cash,
 		Rank:       l.Rank,
 		Debt:       l.Debt,
@@ -78,6 +80,7 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 
 type leaderboardQueryData struct {
 	UserId     uint32
+	UserName   string
 	Cash       uint32
 	StockWorth int32
 	Total      int32
@@ -101,7 +104,7 @@ func UpdateLeaderboard() {
 	}
 	defer db.Close()
 
-	db.Raw("SELECT U.id as user_id, U.cash as cash, ifNull(SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)),0) AS stock_worth, ifnull((U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))),U.cash) AS total from Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id GROUP BY U.id ORDER BY Total DESC;").Scan(&results)
+	db.Raw("SELECT U.id as user_id, U.name as user_name, U.cash as cash, ifNull(SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)),0) AS stock_worth, ifnull((U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))),U.cash) AS total from Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id GROUP BY U.id ORDER BY Total DESC;").Scan(&results)
 
 	var rank = 1
 	var counter = 1
@@ -110,6 +113,7 @@ func UpdateLeaderboard() {
 		leaderboardEntries = append(leaderboardEntries, &LeaderboardRow{
 			Id:         uint32(index + 1),
 			UserId:     result.UserId,
+			UserName:   result.UserName,
 			Cash:       result.Cash,
 			Rank:       uint32(rank),
 			Debt:       0,
