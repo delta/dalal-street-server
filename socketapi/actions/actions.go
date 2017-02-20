@@ -96,8 +96,7 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 
 	resp.Response = &actions_proto.BuyStocksFromExchangeResponse_Result{
 		&actions_proto.BuyStocksFromExchangeResponse_BuyStocksFromExchangeSuccessResponse{
-			TradingPrice:  transaction.Price,
-			StockQuantity: transaction.StockQuantity,
+			Transaction: transaction.ToProto(),
 		},
 	}
 
@@ -396,8 +395,7 @@ func MortgageStocks(sess session.Session, req *actions_proto.MortgageStocksReque
 
 	resp.Response = &actions_proto.MortgageStocksResponse_Result{
 		&actions_proto.MortgageStocksResponse_MortgageStocksSuccessResponse{
-			Success:      true,
-			TradingPrice: transaction.Price,
+			Transaction: transaction.ToProto(),
 		},
 	}
 
@@ -601,8 +599,7 @@ func RetrieveMortgageStocks(sess session.Session, req *actions_proto.RetrieveMor
 
 	resp.Response = &actions_proto.RetrieveMortgageStocksResponse_Result{
 		&actions_proto.RetrieveMortgageStocksResponse_RetrieveMortgageStocksSuccessResponse{
-			Success:      true,
-			TradingPrice: transaction.Price,
+			Transaction: transaction.ToProto(),
 		},
 	}
 
