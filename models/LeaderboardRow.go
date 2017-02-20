@@ -125,10 +125,11 @@ func UpdateLeaderboard() {
 	db.Exec("LOCK TABLES Leaderboard WRITE")
 	defer db.Exec("UNLOCK TABLES")
 
-	db.Exec("TRUNCATE TABLE Leaderboard")
 
 	//begin transaction
 	tx := db.Begin()
+	
+	db.Exec("TRUNCATE TABLE Leaderboard")
 
 	for _, leaderboardEntry := range leaderboardEntries {
 		if err := db.Save(leaderboardEntry).Error; err != nil {
