@@ -199,11 +199,10 @@ func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
 	}
 	defer db.Close()
 
-	var stock *Stock
-	if err := db.Where("id = ?", stockId).First(&stock).Error; err != nil {
-		l.Errorf("Errored : %+v", err)
-		return nil, nil, err
-	}
+	allStocks.m[stockId].RLock()
+	defer allStocks.m[stockId].RUnlock()
+
+	stock := *allStocks.m[stockId].stock
 
 	//FETCHING ENTIRE STOCK HISTORY!! MUST BE CHANGED LATER
 	var stockHistory []*StockHistory
@@ -213,7 +212,7 @@ func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
 	}
 
 	l.Infof("Successfully fetched company profile for stock id : %v", stockId)
-	return stock, stockHistory, nil
+	return &stock, stockHistory, nil
 }
 
 func AddStocksToExchange(stockId, count uint32) error {
