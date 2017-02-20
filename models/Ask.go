@@ -18,8 +18,8 @@ func (ot *OrderType) Scan(value interface{}) error {
 		*ot = Limit
 	case "Market":
 		*ot = Market
-	case "Stoploss":
-		*ot = Stoploss
+	case "StopLoss":
+		*ot = StopLoss
 	default:
 		return fmt.Errorf("Invalid value for OrderType. Got %s", string(value.([]byte)))
 	}
@@ -31,13 +31,13 @@ func (ot OrderType) Value() (driver.Value, error) { return ot.String(), nil }
 const (
 	Limit OrderType = iota
 	Market
-	Stoploss
+	StopLoss
 )
 
 var orderTypes = [...]string{
 	"Limit",
 	"Market",
-	"Stoploss",
+	"StopLoss",
 }
 
 func (ot OrderType) String() string {
@@ -50,7 +50,7 @@ func OrderTypeFromProto(pOt models_proto.OrderType) OrderType {
 	} else if pOt == models_proto.OrderType_MARKET {
 		return Market
 	} else {
-		return Stoploss
+		return StopLoss
 	}
 }
 
@@ -75,7 +75,7 @@ func (gAsk *Ask) ToProto() *models_proto.Ask {
 	m := make(map[OrderType]models_proto.OrderType)
 	m[Limit] = models_proto.OrderType_LIMIT
 	m[Market] = models_proto.OrderType_MARKET
-	m[Stoploss] = models_proto.OrderType_STOPLOSS
+	m[StopLoss] = models_proto.OrderType_STOPLOSS
 
 	pAsk := &models_proto.Ask{
 		Id:                     gAsk.Id,
@@ -93,7 +93,7 @@ func (gAsk *Ask) ToProto() *models_proto.Ask {
 		pAsk.OrderType = models_proto.OrderType_LIMIT
 	} else if gAsk.OrderType == Market {
 		pAsk.OrderType = models_proto.OrderType_MARKET
-	} else if gAsk.OrderType == Stoploss {
+	} else if gAsk.OrderType == StopLoss {
 		pAsk.OrderType = models_proto.OrderType_STOPLOSS
 	}
 
