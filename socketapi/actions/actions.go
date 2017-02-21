@@ -65,6 +65,14 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 		}
 		return resp
 	}
+	var badRequestError = func(reason string) *actions_proto.BuyStocksFromExchangeResponse {
+		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_BadRequestError{
+			&errors_proto.BadRequestError{
+				reason,
+			},
+		}
+		return resp
+	}
 	var internalServerError = func(err error) *actions_proto.BuyStocksFromExchangeResponse {
 		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_InternalServerError{
@@ -73,6 +81,11 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 			},
 		}
 		return resp
+	}
+
+	//Check for positive stock quantity
+	if req.StockQuantity <= 0 {
+		return badRequestError("Invalid Stock Quantity.")
 	}
 
 	userId := getUserId(sess)
@@ -369,6 +382,14 @@ func MortgageStocks(sess session.Session, req *actions_proto.MortgageStocksReque
 		}
 		return resp
 	}
+	var badRequestError = func(reason string) *actions_proto.MortgageStocksResponse {
+		resp.Response = &actions_proto.MortgageStocksResponse_BadRequestError{
+			&errors_proto.BadRequestError{
+				reason,
+			},
+		}
+		return resp
+	}
 	var internalServerError = func(err error) *actions_proto.MortgageStocksResponse {
 		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.MortgageStocksResponse_InternalServerError{
@@ -377,6 +398,11 @@ func MortgageStocks(sess session.Session, req *actions_proto.MortgageStocksReque
 			},
 		}
 		return resp
+	}
+
+	//Check for non-positive stock quantity
+	if req.StockQuantity <= 0 {
+		return badRequestError("Invalid Stock Quantity.")
 	}
 
 	userId := getUserId(sess)
@@ -431,6 +457,14 @@ func PlaceAskOrder(sess session.Session, req *actions_proto.PlaceAskOrderRequest
 		}
 		return resp
 	}
+	var badRequestError = func(reason string) *actions_proto.PlaceAskOrderResponse {
+		resp.Response = &actions_proto.PlaceAskOrderResponse_BadRequestError{
+			&errors_proto.BadRequestError{
+				reason,
+			},
+		}
+		return resp
+	}
 	var internalServerError = func(err error) *actions_proto.PlaceAskOrderResponse {
 		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.PlaceAskOrderResponse_InternalServerError{
@@ -439,6 +473,11 @@ func PlaceAskOrder(sess session.Session, req *actions_proto.PlaceAskOrderRequest
 			},
 		}
 		return resp
+	}
+
+	//Check for positive stock quantity
+	if req.StockQuantity <= 0 {
+		return badRequestError("Invalid Stock Quantity.")
 	}
 
 	userId := getUserId(sess)
@@ -501,6 +540,14 @@ func PlaceBidOrder(sess session.Session, req *actions_proto.PlaceBidOrderRequest
 		}
 		return resp
 	}
+	var badRequestError = func(reason string) *actions_proto.PlaceBidOrderResponse {
+		resp.Response = &actions_proto.PlaceBidOrderResponse_BadRequestError{
+			&errors_proto.BadRequestError{
+				reason,
+			},
+		}
+		return resp
+	}
 	var internalServerError = func(err error) *actions_proto.PlaceBidOrderResponse {
 		l.Errorf("Internal server error: '%+v'", err)
 		resp.Response = &actions_proto.PlaceBidOrderResponse_InternalServerError{
@@ -509,6 +556,11 @@ func PlaceBidOrder(sess session.Session, req *actions_proto.PlaceBidOrderRequest
 			},
 		}
 		return resp
+	}
+
+	//Check for positive stock quantity
+	if req.StockQuantity <= 0 {
+		return badRequestError("Invalid Stock Quantity.")
 	}
 
 	userId := getUserId(sess)
