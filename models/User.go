@@ -796,7 +796,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 *		- if askDone is true, ask can be removed
 *		- if bidDone is true, bid can be removed
  */
-func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, bid *Bid) (bool, bool, error) {
+func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, bid *Bid) (bool, bool, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "PerformOrderFillTransaction",
 		"askingUserId":  ask.UserId,
@@ -884,7 +884,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	//Check if askingUser has enough stocks
 	numStocks, err := getSingleStockCount(askingUser, ask.StockId)
 	if err != nil {
-		return false, false, err
+		return false, false, nil
 	}
 
 	var numStocksLeft = numStocks - int32(stockTradeQty)
@@ -936,7 +936,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
-		return false, false, err
+		return false, false, nil
 	}
 	defer db.Close()
 
@@ -947,7 +947,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	if err := tx.Save(askTransaction).Error; err != nil {
 		l.Errorf("Error creating the askTransaction. Rolling back. Error: %+v", err)
 		tx.Rollback()
-		return false, false, err
+		return false, false, nil
 	}
 
 	l.Debugf("Added askTransaction to Transactions table")
@@ -956,7 +956,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	if err := tx.Save(bidTransaction).Error; err != nil {
 		l.Errorf("Error creating the bidTransaction. Rolling back. Error: %+v", err)
 		tx.Rollback()
-		return false, false, err
+		return false, false, nil
 	}
 
 	l.Debugf("Added bidTransaction to Transactions table")
@@ -965,28 +965,28 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	if err := tx.Model(askingUser).Update("cash", askingUserCash).Error; err != nil {
 		l.Errorf("Error updating askingUser.Cash Rolling back. Error: %+v", err)
 		tx.Rollback()
-		return false, false, err
+		return false, false, nil
 	}
 
 	//update biddingUserCash
 	if err := tx.Model(biddingUser).Update("cash", biddingUserCash).Error; err != nil {
 		l.Errorf("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
 		tx.Rollback()
-		return false, false, err
+		return false, false, nil
 	}
 
 	//update StockQuantityFulfilled and IsClosed for ask order
 	if err := tx.Model(ask).Updates(Ask{StockQuantityFulfilled: askStockQuantityFulfilled, IsClosed: askIsClosed}).Error; err != nil {
 		l.Errorf("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 		tx.Rollback()
-		return false, false, err
+		return false, false, nil
 	}
 
 	//update StockQuantityFulfilled and IsClosed for bid order
 	if err := tx.Model(bid).Updates(Bid{StockQuantityFulfilled: bidStockQuantityFulfilled, IsClosed: bidIsClosed}).Error; err != nil {
 		l.Errorf("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 		tx.Rollback()
-		return false, false, err
+		return false, false, nil
 	}
 
 	// insert an OrderFill
@@ -998,13 +998,13 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	if err := tx.Save(of).Error; err != nil {
 		l.Errorf("Error saving an orderfill. Rolling back. Error: %+v", err)
 		tx.Rollback()
-		return false, false, err
+		return false, false, nil
 	}
 
 	//Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return false, false, err
+		return false, false, nil
 	}
 
 	askingUser.Cash = askingUserCash
@@ -1026,10 +1026,10 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 
 	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
-		return ask.IsClosed, bid.IsClosed, nil // supress this error!
+		return ask.IsClosed, bid.IsClosed, askTransaction
 	}
 
-	return ask.IsClosed, bid.IsClosed, nil
+	return ask.IsClosed, bid.IsClosed, askTransaction
 }
 
 func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {
