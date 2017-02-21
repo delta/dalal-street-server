@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -15,7 +16,7 @@ type StockDetails struct {
 /*
 *	map to store details of the placed orders. Maps stockId to the PlacedOrderDetails for that stockId
  */
-var stocks map[uint32]StockDetails
+var stocks = make(map[uint32]StockDetails)
 
 /*
 *	method to add the placed ask order to the ask channel. Called from method PlaceAskOrder
@@ -40,6 +41,8 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		"stockId": stockId,
 	})
 
+	l.Infof("Started %d %d", stock.asks.Size(), stock.bids.Size())
+
 	/*
 	*	processAsk is guaranteed exclusive access to stocks[]
 	*
@@ -56,7 +59,23 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	*		- if donefornow is false, continue iterations. Either some error has occured, or the topBid has been popped
 	 */
 	var processAsk = func(askOrder *Ask) (donefornow bool, err error) {
+		var l = logger.WithFields(logrus.Fields{
+			"method":         "processAsk",
+			"param_askOrder": askOrder,
+		})
+
 		topBidOrder := stocks[askOrder.StockId].bids.Head()
+		var sameUserBids []*Bid
+		for topBidOrder != nil && topBidOrder.UserId == askOrder.UserId {
+			sameUserBids = append(sameUserBids, topBidOrder)
+			topBidOrder = stocks[askOrder.StockId].bids.Pop()
+		}
+		defer func() {
+			for _, sameUserBid := range sameUserBids {
+				stocks[askOrder.StockId].bids.Push(sameUserBid, sameUserBid.Price, sameUserBid.StockQuantity)
+			}
+			l.Debugf("Unlocked same user bids")
+		}()
 
 		if topBidOrder == nil {
 			stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
@@ -94,13 +113,18 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		}
 		defer close(secondLockChan)
 
+		l.Debugf("Acquired locks")
+
 		if !isAskOrderMatching(askOrder) {
+			l.Debugf("Didn't find match. Pushing!")
 			stockQuantityYetToBeFulfilled := askOrder.StockQuantity - askOrder.StockQuantityFulfilled
 			if !askOrder.IsClosed {
 				stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, stockQuantityYetToBeFulfilled)
 			}
 			return true, nil
 		}
+
+		l.Debugf("Perform OrderFill Transaction")
 
 		var (
 			askDone bool
@@ -153,7 +177,22 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	*		- if donefornow is false, continue iterations. Either some error has occured, or the topAsk has been popped
 	 */
 	var processBid = func(bidOrder *Bid) (donefornow bool, err error) {
+		var l = logger.WithFields(logrus.Fields{
+			"method":         "processBid",
+			"param_bidOrder": bidOrder,
+		})
+
 		topAskOrder := stocks[bidOrder.StockId].asks.Head()
+		var sameUserAsks []*Ask
+		for topAskOrder != nil && topAskOrder.UserId == bidOrder.UserId {
+			sameUserAsks = append(sameUserAsks, topAskOrder)
+			topAskOrder = stocks[bidOrder.StockId].asks.Pop()
+		}
+		defer func() {
+			for _, sameUserAsk := range sameUserAsks {
+				stocks[bidOrder.StockId].asks.Push(sameUserAsk, sameUserAsk.Price, sameUserAsk.StockQuantity)
+			}
+		}()
 
 		if topAskOrder == nil {
 			stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
@@ -191,7 +230,10 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		}
 		defer close(secondLockChan)
 
+		l.Debugf("Acquired")
+
 		if !isBidOrderMatching(bidOrder) {
+			l.Debugf("Order not matching even in first attempt. Pushing!")
 			stockQuantityYetToBeFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
 			if !bidOrder.IsClosed {
 				stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, stockQuantityYetToBeFulfilled)
@@ -203,12 +245,17 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			askDone bool
 			bidDone bool
 		)
+
+		l.Debugf("Performing OrderFillTransaction")
+
 		//PerformOrderFillTransaction should update StockQuantityFulfilled and IsClosed
 		if isAskFirst {
 			askDone, bidDone, err = PerformOrderFillTransaction(firstUser, secondUser, topAskOrder, bidOrder)
 		} else {
 			askDone, bidDone, err = PerformOrderFillTransaction(secondUser, firstUser, topAskOrder, bidOrder)
 		}
+
+		l.Debugf("Got %+v %+v %+v", askDone, bidDone, err)
 
 		if err != nil {
 			stockQuantityYetToBeFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
@@ -243,8 +290,10 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	for {
 		select {
 		case askOrder := <-stock.askChan:
+			l.Debugf("Got ask. Processing")
 			for {
 				askDoneForNow, askErr = processAsk(askOrder)
+				l.Debugf("Processed ask (%+v, %+v)", askDoneForNow, askErr)
 				if askDoneForNow {
 					if askErr != nil {
 						l.Errorf("Errored : %+v", askErr)
@@ -255,8 +304,10 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			}
 
 		case bidOrder := <-stock.bidChan:
+			l.Debugf("Got bid. Processing")
 			for {
 				bidDoneForNow, bidErr = processBid(bidOrder)
+				l.Debugf("Processed bid (%+v, %+v)", bidDoneForNow, bidErr)
 				if bidDoneForNow {
 					if bidErr != nil {
 						l.Errorf("Errored : %+v", bidErr)
