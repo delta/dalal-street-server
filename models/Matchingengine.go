@@ -14,26 +14,26 @@ type StockDetails struct {
 
 /*
 *	map to store details of the placed orders. Maps stockId to the PlacedOrderDetails for that stockId
-*/
+ */
 var stocks map[uint32]StockDetails
 
 /*
 *	method to add the placed ask order to the ask channel. Called from method PlaceAskOrder
-*/
+ */
 func AddAskOrder(askOrder *Ask) {
 	stocks[askOrder.StockId].askChan <- askOrder
 }
 
 /*
 *	method to add the placed bid order to the bid channel. Called from method PlaceBidOrder
-*/
+ */
 func AddBidOrder(bidOrder *Bid) {
 	stocks[bidOrder.StockId].bidChan <- bidOrder
 }
 
 /*
 *	primary function to perform matching and transaction
-*/
+ */
 func StartStockMatching(stock StockDetails, stockId uint32) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "StartStockMatching",
@@ -54,7 +54,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	*		- if donefornow is true, no more iterations are required. Either the ask has been completely satisfied or there
 	*		  are no matching bids for now or PerformOrderFillTransaction has failed
 	*		- if donefornow is false, continue iterations. Either some error has occured, or the topBid has been popped
-	*/
+	 */
 	var processAsk = func(askOrder *Ask) (donefornow bool, err error) {
 		topBidOrder := stocks[askOrder.StockId].bids.Head()
 
@@ -151,7 +151,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	*		- if donefornow is true, no more iterations are required. Either the bid has been completely satisfied or there
 	*		  are no matching asks for now or PerformOrderFillTransaction has failed
 	*		- if donefornow is false, continue iterations. Either some error has occured, or the topAsk has been popped
-	*/
+	 */
 	var processBid = func(bidOrder *Bid) (donefornow bool, err error) {
 		topAskOrder := stocks[bidOrder.StockId].asks.Head()
 
@@ -235,16 +235,16 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	}
 	var (
 		askDoneForNow bool
-		askErr error
+		askErr        error
 		bidDoneForNow bool
-		bidErr error
+		bidErr        error
 	)
 	//run infinite loop
 	for {
 		select {
 		case askOrder := <-stock.askChan:
 			for {
-				askDoneForNow, askErr  = processAsk(askOrder)
+				askDoneForNow, askErr = processAsk(askOrder)
 				if askDoneForNow {
 					if askErr != nil {
 						l.Errorf("Errored : %+v", askErr)
@@ -272,8 +272,38 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 /*
 *	Init will be run once when server is started
 *	It calls StartStockmatching for all the stocks in concurrent goroutines
-*/
-func Init(stockIds []uint32) {
+ */
+func InitMatchingEngine() {
+
+	db, err := DbOpen()
+	if err != nil {
+		panic("Error opening database for matching engine")
+	}
+	defer db.Close()
+
+	var (
+		openAskOrders          []*Ask
+		openBidOrders          []*Bid
+		stockIds               []uint32
+		askUnfulfilledQuantity uint32
+		bidUnfulfilledQuantity uint32
+	)
+
+	//Load stock ids from database
+	if err := db.Model(&Stock{}).Pluck("id", &stockIds).Error; err != nil {
+		panic("Failed to load stock ids in matching engine")
+	}
+
+	//Load open ask orders from database
+	if err := db.Where("isClosed = ?", 0).Find(&openAskOrders).Error; err != nil {
+		panic("Error loading open ask orders in matching engine")
+	}
+
+	//Load open bid orders from database
+	if err := db.Where("isClosed = ?", 0).Find(&openBidOrders).Error; err != nil {
+		panic("Error loading open bid orders in matching engine")
+	}
+
 	for _, stockId := range stockIds {
 		stocks[stockId] = StockDetails{
 			askChan: make(chan *Ask),
@@ -281,6 +311,21 @@ func Init(stockIds []uint32) {
 			asks:    NewAskPQueue(MINPQ), //lower price has higher priority
 			bids:    NewBidPQueue(MAXPQ), //higher price has higher priority
 		}
+	}
+
+	//Load open ask orders into priority queue
+	for _, openAskOrder := range openAskOrders {
+		askUnfulfilledQuantity = openAskOrder.StockQuantity - openAskOrder.StockQuantityFulfilled
+		stocks[openAskOrder.StockId].asks.Push(openAskOrder, openAskOrder.Price, askUnfulfilledQuantity)
+	}
+
+	//Load open bid orders into priority queue
+	for _, openBidOrder := range openBidOrders {
+		bidUnfulfilledQuantity = openBidOrder.StockQuantity - openBidOrder.StockQuantityFulfilled
+		stocks[openBidOrder.StockId].bids.Push(openBidOrder, openBidOrder.Price, bidUnfulfilledQuantity)
+	}
+
+	for _, stockId := range stockIds {
 		go StartStockMatching(stocks[stockId], stockId)
 	}
 }
@@ -295,7 +340,7 @@ func min(i, j uint32) uint32 {
 
 /*
 *	function to check if the placed askorder price is less than that of the highest bidder for that stock
-*/
+ */
 func isAskOrderMatching(askOrder *Ask) bool {
 	stockId := askOrder.StockId
 	maxBid := stocks[stockId].bids.Head()
@@ -310,7 +355,7 @@ func isAskOrderMatching(askOrder *Ask) bool {
 
 /*
 *	function to check if the placed bidorder price is greater than that of the lowest askorder for that stock
-*/
+ */
 func isBidOrderMatching(bidOrder *Bid) bool {
 	stockId := bidOrder.StockId
 	minAsk := stocks[stockId].asks.Head()
