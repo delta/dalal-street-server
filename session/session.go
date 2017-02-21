@@ -43,7 +43,7 @@ func Load(id string) (Session, error) {
 	})
 
 	var (
-		sess    *session
+		sess    = &session{}
 		results map[string]string
 	)
 
