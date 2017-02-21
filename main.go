@@ -22,6 +22,7 @@ func main() {
 	models.InitModels()
 	session.InitSession()
 	socketapi.InitSocketApi()
+	models.InitMatchingEngine()
 
 	go StartREPL()
 	go models.UpdateLeaderboardTicker()
