@@ -524,9 +524,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
 
-	/*
-		AddAskOrder(ask, PerformOrderFillTransacction)
-	*/
+	go AddAskOrder(ask)
 
 	return ask.Id, nil
 }
@@ -589,6 +587,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	}
 
 	l.Infof("Created Bid order. BidId: %d", bid.Id)
+
+	go AddBidOrder(bid)
 
 	return bid.Id, nil
 
