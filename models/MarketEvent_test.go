@@ -9,6 +9,7 @@ func TestMarketEventToProto(t *testing.T) {
 	o := &MarketEvent{
 		Id:           2,
 		StockId:      3,
+		Headline:     "Hello",
 		Text:         "Hello World",
 		EmotionScore: -54,
 		CreatedAt:    "2017-02-09T00:00:00",

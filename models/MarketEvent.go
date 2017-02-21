@@ -9,6 +9,7 @@ type MarketEvent struct {
 	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	StockId      uint32 `gorm:"column:stockId;not null" json:"stock_id"`
 	EmotionScore int32  `gorm:"column:emotionScore;not null" json:"emotion_score"`
+	Headline     string `gorm:"column:headline;not null" json:"headline"`
 	Text         string `gorm:"column:text" json:"text"`
 	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
 }
@@ -21,6 +22,7 @@ func (gMarketEvent *MarketEvent) ToProto() *models_proto.MarketEvent {
 	pMarketEvent := &models_proto.MarketEvent{
 		Id:           gMarketEvent.Id,
 		StockId:      gMarketEvent.StockId,
+		Headline:     gMarketEvent.Headline,
 		Text:         gMarketEvent.Text,
 		EmotionScore: gMarketEvent.EmotionScore,
 		CreatedAt:    gMarketEvent.CreatedAt,
