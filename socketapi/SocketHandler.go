@@ -78,7 +78,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	l.Debugf("Upgraded to websocket protocol")
 
-	c := NewClient(make(chan struct{}), make(chan []byte, 256), conn, sess)
+	c := NewClient(make(chan struct{}), make(chan interface{}, 20), conn, sess)
 
 	go c.WritePump()
 	c.ReadPump()

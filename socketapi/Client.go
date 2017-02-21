@@ -10,6 +10,7 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/session"
 	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/repl"
 )
 
 const (
@@ -22,7 +23,7 @@ const (
 type client struct {
 	conn *websocket.Conn
 	sess session.Session
-	send chan []byte
+	send chan interface{}
 	done chan struct{}
 	id   uuid.UUID
 }
@@ -30,12 +31,12 @@ type client struct {
 type Client interface {
 	WritePump()
 	ReadPump()
-	Send() chan []byte
+	Send() chan interface{}
 	Done() <-chan struct{}
 	GetSession() session.Session
 }
 
-func NewClient(done chan struct{}, send chan []byte, conn *websocket.Conn, sess session.Session) Client {
+func NewClient(done chan struct{}, send chan interface{}, conn *websocket.Conn, sess session.Session) Client {
 	return &client{
 		conn: conn,
 		sess: sess,
@@ -49,7 +50,7 @@ func (c *client) Done() <-chan struct{} {
 	return c.done
 }
 
-func (c *client) Send() chan []byte {
+func (c *client) Send() chan interface{} {
 	return c.send
 }
 
@@ -63,6 +64,7 @@ func (c *client) ReadPump() {
 	})
 
 	defer func() {
+		l.Debugf("Closing connection for %+v", c.sess)
 		c.conn.Close()
 		//close(c.done)
 	}()
@@ -75,12 +77,23 @@ func (c *client) ReadPump() {
 	})
 
 	for {
-		_, bytes, err := c.conn.ReadMessage()
+		msgType, bytes, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
 				l.Errorf("Error in receving from websocket: '%v'.\nClient: %+v", err, c)
 			}
 			break
+		}
+
+		// Admin commands come as text messages
+		if msgType == websocket.TextMessage {
+			//if isAdmin, ok := c.sess.Get("IsAdmin"); ok && isAdmin == "true" {
+			c.send <- repl.Handle(c.done, c.sess.GetId(), string(bytes))
+			continue
+			/*} else {
+			l.Errorf("Some non-Admin's trying to send commands. Screwing him.")
+			return
+			}*/
 		}
 
 		dm := &socketapi_proto.DalalMessage{}
@@ -108,10 +121,47 @@ func (c *client) WritePump() {
 	pingTicker := time.NewTicker(pingPeriod)
 
 	defer func() {
+		l.Debugf("Closing connection for %+v", c.sess)
 		pingTicker.Stop()
 		c.conn.Close()
 		close(c.done)
 	}()
+
+	var sendBinary = func(msg interface{}) error {
+		w, err := c.conn.NextWriter(websocket.BinaryMessage)
+		if err != nil {
+			l.Errorf("Unable to get NextWriter. Stopping. '%+v'", err)
+			return err
+		}
+		w.Write(msg.([]byte))
+		n := len(c.send)
+		for i := 0; i < n; i++ {
+			w.Write((<-c.send).([]byte))
+		}
+		if err := w.Close(); err != nil {
+			l.Errorf("Error closing the Writer. Stopping. '%+v'", err)
+			return err
+		}
+		return nil
+	}
+
+	var sendText = func(msg interface{}) error {
+		w, err := c.conn.NextWriter(websocket.TextMessage)
+		if err != nil {
+			l.Errorf("Unable to get NextWriter. Stopping. '%+v'", err)
+			return err
+		}
+		w.Write([]byte(msg.(string)))
+		n := len(c.send)
+		for i := 0; i < n; i++ {
+			w.Write([]byte((<-c.send).(string))) // interface->string->[]byte
+		}
+		if err := w.Close(); err != nil {
+			l.Errorf("Error closing the Writer. Stopping. '%+v'", err)
+			return err
+		}
+		return nil
+	}
 
 	for {
 		select {
@@ -121,20 +171,21 @@ func (c *client) WritePump() {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			w, err := c.conn.NextWriter(websocket.BinaryMessage)
-			if err != nil {
-				l.Errorf("Unable to get NextWriter. Stopping. '%+v'", err)
+
+			switch t := msg.(type) {
+			case string:
+				if err := sendText(msg); err != nil {
+					return
+				}
+			case []byte:
+				if err := sendBinary(msg); err != nil {
+					return
+				}
+			default:
+				l.Errorf("Message should be either string or []byte. Given %t", t)
 				return
 			}
-			w.Write(msg)
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				w.Write(<-c.send)
-			}
-			if err := w.Close(); err != nil {
-				l.Errorf("Error closing the Writer. Stopping. '%+v'", err)
-				return
-			}
+
 		case <-pingTicker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
