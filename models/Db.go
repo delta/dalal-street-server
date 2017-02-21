@@ -18,4 +18,5 @@ func InitModels() {
 	})
 
 	loadStocks()
+	InitMatchingEngine()
 }

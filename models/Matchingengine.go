@@ -66,7 +66,7 @@ type StockDetails struct {
 	bids        *BidPQueue
 	askStoploss *AskPQueue
 	bidStoploss *BidPQueue
-	depth       MarketDepth
+	depth       *MarketDepth
 }
 
 /*
@@ -115,16 +115,39 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	*		- if donefornow is false, continue iterations. Either some error has occured, or the topBid has been popped
 	 */
 	var processAsk = func(askOrder *Ask) (donefornow bool) {
+		var l = logger.WithFields(logrus.Fields{
+			"method":         "processAsk",
+			"param_askOrder": askOrder,
+		})
+
+		l.Infof("Attempting")
+
 		topBidOrder := stocks[askOrder.StockId].bids.Head()
 		depth := stocks[askOrder.StockId].depth
 
+		l.Debugf("Ignoring same user's asks")
+
+		// Don't sell a user's stocks to himself.
+		var sameUserBids []*Bid
+		for topBidOrder != nil && topBidOrder.UserId == askOrder.UserId {
+			sameUserBids = append(sameUserBids, topBidOrder)
+			topBidOrder = stocks[askOrder.StockId].bids.Pop()
+		}
+		defer func() {
+			for _, sub := range sameUserBids {
+				stocks[askOrder.StockId].bids.Push(sub, sub.Price, sub.StockQuantity)
+			}
+		}()
+
 		if topBidOrder == nil {
+			l.Debugf("No matching top bid order currently. Adding to orderbook")
 			stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
 			depth.AddOrder(true, askOrder.Price, askOrder.StockQuantity)
 			return true
 		}
 
-		l.Infof("Acquiring lock in order of User Ids")
+		l.Debugf("TopBidOrder found as: %+v", topBidOrder)
+		l.Debugf("Acquiring lock in order of User Ids")
 
 		var firstUserId uint32
 		var secondUserId uint32
@@ -155,11 +178,11 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		}
 		defer close(secondLockChan)
 
-		l.Debugf("Acquired locks")
+		l.Debugf("Acquired the locks on users %d and %d", firstUserId, secondUserId)
 
 		if !isAskOrderMatching(askOrder) {
-			l.Debugf("Didn't find match. Pushing!")
 			stockQuantityYetToBeFulfilled := askOrder.StockQuantity - askOrder.StockQuantityFulfilled
+			l.Debugf("Unable to find the match. Putting ask in orderbook. Unfulfilled qty: %d", stockQuantityYetToBeFulfilled)
 			if !askOrder.IsClosed {
 				stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, stockQuantityYetToBeFulfilled)
 				depth.AddOrder(true, askOrder.Price, stockQuantityYetToBeFulfilled)
@@ -174,6 +197,8 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			bidDone bool
 			tr      *Transaction
 		)
+
+		l.Debugf("Performing OrderFill transaction")
 		//PerformOrderFillTransaction should update StockQuantityFulfilled and IsClosed
 		if isAskFirst {
 			askDone, bidDone, tr = PerformOrderFillTransaction(firstUser, secondUser, askOrder, topBidOrder)
@@ -187,11 +212,13 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			Otherwise if the bid is done, remove whatever is unfulfilled from the depth
 		*/
 		if tr != nil {
+			l.Infof("Trade made between ask and bid (%+v)", topBidOrder)
 			// tr is always AskTransaction. So its StockQty < 0. Make it positive.
 			depth.Trade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 			//depth.CloseOrder(true, askOrder.Price, tr.StockQuantity) - don't! Haven't added ask to depth
 			depth.CloseOrder(false, topBidOrder.Price, uint32(-tr.StockQuantity))
 		} else {
+			l.Infof("Trade not made. AskDone = %+v, BidDone = %v", askDone, bidDone)
 			/*
 				if askDone {
 					 do nothing. We haven't even added the ask to the depth
@@ -215,6 +242,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		// 	return false, nil
 		// }
 		if bidDone {
+			l.Debugf("Popping topBidOrder %+v", topBidOrder)
 			stocks[askOrder.StockId].bids.Pop()
 		}
 		if askDone {
@@ -243,15 +271,38 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	*		- if donefornow is false, continue iterations. Either some error has occured, or the topAsk has been popped
 	 */
 	var processBid = func(bidOrder *Bid) (donefornow bool) {
+		var l = logger.WithFields(logrus.Fields{
+			"method":         "processBid",
+			"param_bidOrder": bidOrder,
+		})
+
+		l.Infof("Attempting")
+
 		topAskOrder := stocks[bidOrder.StockId].asks.Head()
 		depth := stocks[bidOrder.StockId].depth
 
+		l.Debugf("Ignoring same user's bids")
+
+		// Don't sell a user's stocks to himself.
+		var sameUserAsks []*Ask
+		for topAskOrder != nil && topAskOrder.UserId == bidOrder.UserId {
+			sameUserAsks = append(sameUserAsks, topAskOrder)
+			topAskOrder = stocks[bidOrder.StockId].asks.Pop()
+		}
+		defer func() {
+			for _, sua := range sameUserAsks {
+				stocks[bidOrder.StockId].asks.Push(sua, sua.Price, sua.StockQuantity)
+			}
+		}()
+
 		if topAskOrder == nil {
+			l.Debugf("No matching top ask order currently. Adding to orderbook")
 			stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
 			depth.AddOrder(false, bidOrder.Price, bidOrder.StockQuantity)
 			return true
 		}
 
+		l.Debugf("TopAskOrder found as: %+v", topAskOrder)
 		l.Infof("Acquiring lock in order of User Ids")
 
 		var firstUserId uint32
@@ -283,11 +334,11 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		}
 		defer close(secondLockChan)
 
-		l.Debugf("Acquired")
+		l.Debugf("Acquired the locks on users %d and %d", firstUserId, secondUserId)
 
 		if !isBidOrderMatching(bidOrder) {
-			l.Debugf("Order not matching even in first attempt. Pushing!")
 			stockQuantityYetToBeFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
+			l.Debugf("Unable to find the match. Putting bid in orderbook. Unfulfilled qty: %d", stockQuantityYetToBeFulfilled)
 			if !bidOrder.IsClosed {
 				stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, stockQuantityYetToBeFulfilled)
 				depth.AddOrder(false, bidOrder.Price, stockQuantityYetToBeFulfilled)
@@ -301,7 +352,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			tr      *Transaction
 		)
 
-		l.Debugf("Performing OrderFillTransaction")
+		l.Debugf("Performing OrderFill transaction")
 
 		//PerformOrderFillTransaction should update StockQuantityFulfilled and IsClosed
 		if isAskFirst {
@@ -311,10 +362,14 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		}
 
 		if tr != nil {
+			l.Infof("Trade made between bid and ask (%+v)", topAskOrder)
+
 			depth.Trade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 			depth.CloseOrder(true, topAskOrder.Price, uint32(-tr.StockQuantity))
 			// don't depth.CloseOrder( bidOrder) - It's not even added to depth yet
 		} else {
+			l.Infof("Trade not made. AskDone = %+v, BidDone = %v", askDone, bidDone)
+
 			if askDone {
 				depth.CloseOrder(true, topAskOrder.Price, topAskOrder.StockQuantity-topAskOrder.StockQuantityFulfilled)
 			}
@@ -334,6 +389,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		// 	return false, nil
 		// }
 		if askDone {
+			l.Debugf("Popping topAskOrder %+v", topAskOrder)
 			stocks[bidOrder.StockId].asks.Pop()
 		}
 		if bidDone {
@@ -385,7 +441,6 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 *	It calls StartStockmatching for all the stocks in concurrent goroutines
  */
 func InitMatchingEngine() {
-
 	db, err := DbOpen()
 	if err != nil {
 		panic("Error opening database for matching engine")
@@ -421,6 +476,7 @@ func InitMatchingEngine() {
 			bidChan: make(chan *Bid),
 			asks:    NewAskPQueue(MINPQ), //lower price has higher priority
 			bids:    NewBidPQueue(MAXPQ), //higher price has higher priority
+			depth:   NewMarketDepth(),
 		}
 	}
 
@@ -461,7 +517,7 @@ func isAskOrderMatching(askOrder *Ask) bool {
 	if askOrder.OrderType == Market {
 		return true
 	}
-	return maxBid.Price > askOrder.Price
+	return maxBid.Price >= askOrder.Price
 }
 
 /*
@@ -476,5 +532,5 @@ func isBidOrderMatching(bidOrder *Bid) bool {
 	if bidOrder.OrderType == Market {
 		return true
 	}
-	return minAsk.Price < bidOrder.Price
+	return minAsk.Price <= bidOrder.Price
 }
