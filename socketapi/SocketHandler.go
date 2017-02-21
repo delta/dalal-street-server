@@ -63,19 +63,20 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	l.Infof("Connection from %+v", r.RemoteAddr)
 
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		l.Errorf("Could not upgrade connection: '%s'", err)
-		return
-	}
-	l.Debugf("Upgraded to websocket protocol")
-
 	sess, err := loadSession(r)
 	if err != nil {
 		l.Errorf("Could not load or create session. Replying with 500. '%s'", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	conn, err := upgrader.Upgrade(w, r, http.Header{"Set-Cookie": {"sid=" + sess.GetId() + "; HttpOnly"}})
+
+	if err != nil {
+		l.Errorf("Could not upgrade connection: '%s'", err)
+		return
+	}
+	l.Debugf("Upgraded to websocket protocol")
 
 	c := NewClient(make(chan struct{}), make(chan []byte, 256), conn, sess)
 
