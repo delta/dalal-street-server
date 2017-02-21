@@ -921,7 +921,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
 	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
-	bidStockQuantityFulfilled := bid.StockQuantityFulfilled - uint32(stockTradeQty)
+	bidStockQuantityFulfilled := bid.StockQuantityFulfilled + uint32(stockTradeQty)
 
 	var askIsClosed bool
 	var bidIsClosed bool
