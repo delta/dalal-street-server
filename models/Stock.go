@@ -206,7 +206,7 @@ func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
 
 	//FETCHING ENTIRE STOCK HISTORY!! MUST BE CHANGED LATER
 	var stockHistory []*StockHistory
-	if err := db.Where("stockId = ", stockId).Find(&stockHistory).Error; err != nil {
+	if err := db.Where("stockId = ?", stockId).Find(&stockHistory).Error; err != nil {
 		l.Errorf("Errored : %+v", err)
 		return nil, nil, err
 	}
