@@ -41,6 +41,7 @@ func InitStockPricesStream() {
 		updateProto := &datastreams_proto.StockPricesUpdate{
 			Prices: dirtyStocks,
 		}
+		dirtyStocks = make(map[uint32]uint32)
 		stockPricesMutex.Unlock()
 
 		sent := 0
