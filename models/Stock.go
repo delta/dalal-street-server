@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	datastreams "github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
@@ -180,6 +181,39 @@ func loadStocks() error {
 	allStocks.Unlock()
 
 	l.Infof("Loaded %+v", allStocks)
+
+	go func() {
+		for {
+			db, err := DbOpen()
+			if err != nil {
+				l.Error(err)
+				return
+			}
+			defer db.Close()
+
+			var prices = make(map[uint32]uint32)
+			for _, stock := range stocks {
+				allStocks.m[stock.Id].RLock()
+				prices[stock.Id] = allStocks.m[stock.Id].stock.CurrentPrice
+				allStocks.m[stock.Id].RUnlock()
+			}
+
+			currentTime := time.Now().UTC().Format(time.RFC3339)
+			for stkId, price := range prices {
+				stkHistoryPoint := &StockHistory{
+					StockId:    stkId,
+					StockPrice: price,
+					CreatedAt:  currentTime,
+				}
+				err := db.Save(stkHistoryPoint).Error
+				if err != nil {
+					l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
+				}
+			}
+
+			time.Sleep(3 * time.Minute) // Stock history updates every 3 minutes
+		}
+	}()
 
 	return nil
 }
