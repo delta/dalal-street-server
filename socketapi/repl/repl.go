@@ -226,7 +226,10 @@ func Handle(done <-chan struct{}, sid string, cmd string) (ret string) {
 			// if the client closed connection, there's no input. Inform the command that there's no more input
 			<-done
 			cmdSessionsMutex.Lock()
-			close(cmdSessions[sid].in)
+			// important, coz if the cmdSessions[sid] gets deleted, the chan is also closed.
+			if _, ok := cmdSessions[sid]; ok {
+				close(cmdSessions[sid].in)
+			}
 			cmdSessionsMutex.Unlock()
 		}()
 
