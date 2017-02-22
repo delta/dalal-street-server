@@ -99,6 +99,48 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 
 	l.Infof("Started %d %d", stock.asks.Size(), stock.bids.Size())
 
+	// Won't be called concurrently.
+	var triggerStoplosses = func(tr *Transaction) {
+		db, err := DbOpen()
+		if err != nil {
+			l.Errorf("Error while opening DB to trigger stoplosses. Not triggering them.")
+			return
+		}
+		defer db.Close()
+
+		l.Debugf("Triggering ask stoplosses")
+		topAskStoploss := stocks[stockId].askStoploss.Head()
+		// We trigger asks having higher than current price. That's because if it's an ask stoploss, then we will sell
+		// if the current price goes below the trigger price.
+		for topAskStoploss != nil && tr.Price <= topAskStoploss.Price {
+			l.Debugf("Triggering ask %+v", topAskStoploss)
+
+			topAskStoploss = stocks[stockId].askStoploss.Pop()
+			topAskStoploss.OrderType = StopLossActive
+			if err := db.Save(topAskStoploss).Error; err != nil {
+				l.Errorf("Error while changing state of %+v from StopLoss to StopLossActive", topAskStoploss)
+			}
+
+			stocks[stockId].asks.Push(topAskStoploss, topAskStoploss.Price, topAskStoploss.StockQuantity)
+		}
+
+		l.Debugf("Triggering bid stoplosses")
+		// We trigger bids having lower than current price. That's because if it's a bid stoploss, we will buy if the
+		// current price goes above the trigger price.
+		topBidStoploss := stocks[stockId].bidStoploss.Head()
+		for topBidStoploss != nil && tr.Price >= topBidStoploss.Price {
+			l.Debugf("Triggering bid %+v", topBidStoploss)
+
+			topBidStoploss = stocks[stockId].bidStoploss.Pop()
+			topBidStoploss.OrderType = StopLossActive
+			if err := db.Save(topBidStoploss).Error; err != nil {
+				l.Errorf("Error while changing state of %+v from StopLoss to StopLossActive", topBidStoploss)
+			}
+
+			stocks[stockId].bids.Push(topBidStoploss, topBidStoploss.Price, topBidStoploss.StockQuantity)
+		}
+	}
+
 	/*
 	*	processAsk is guaranteed exclusive access to stocks[]
 	*
@@ -217,6 +259,9 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			depth.Trade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 			//depth.CloseOrder(true, askOrder.Price, tr.StockQuantity) - don't! Haven't added ask to depth
 			depth.CloseOrder(false, topBidOrder.Price, uint32(-tr.StockQuantity))
+
+			// Trigger all stoplosses that can be triggered
+			triggerStoplosses(tr)
 		} else {
 			l.Infof("Trade not made. AskDone = %+v, BidDone = %v", askDone, bidDone)
 			/*
@@ -367,6 +412,9 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			depth.Trade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 			depth.CloseOrder(true, topAskOrder.Price, uint32(-tr.StockQuantity))
 			// don't depth.CloseOrder( bidOrder) - It's not even added to depth yet
+
+			// Trigger all the stoplosses that can be triggered.
+			triggerStoplosses(tr)
 		} else {
 			l.Infof("Trade not made. AskDone = %+v, BidDone = %v", askDone, bidDone)
 
@@ -410,7 +458,12 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	for {
 		select {
 		case askOrder := <-stock.askChan:
-			l.Debugf("Got ask. Processing")
+			l.Debugf("Got ask %+v. Processing", askOrder)
+			if askOrder.OrderType == StopLoss {
+				l.Debugf("Adding stopLoss to the list")
+				stocks[askOrder.StockId].askStoploss.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
+				break
+			}
 			for {
 				/*if askOrder.Type == StopLoss {
 					stocks[askOrder.StockId].sellStoploss.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
@@ -424,7 +477,12 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			}
 
 		case bidOrder := <-stock.bidChan:
-			l.Debugf("Got bid. Processing")
+			l.Debugf("Got bid %+v. Processing", bidOrder)
+			if bidOrder.OrderType == StopLoss {
+				l.Debugf("Adding stopLoss to the list")
+				stocks[bidOrder.StockId].bidStoploss.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
+				break
+			}
 			for {
 				bidDoneForNow = processBid(bidOrder)
 				if bidDoneForNow {
@@ -472,24 +530,34 @@ func InitMatchingEngine() {
 
 	for _, stockId := range stockIds {
 		stocks[stockId] = StockDetails{
-			askChan: make(chan *Ask),
-			bidChan: make(chan *Bid),
-			asks:    NewAskPQueue(MINPQ), //lower price has higher priority
-			bids:    NewBidPQueue(MAXPQ), //higher price has higher priority
-			depth:   NewMarketDepth(),
+			askChan:     make(chan *Ask),
+			bidChan:     make(chan *Bid),
+			asks:        NewAskPQueue(MINPQ), //lower price has higher priority
+			bids:        NewBidPQueue(MAXPQ), //higher price has higher priority
+			askStoploss: NewAskPQueue(MAXPQ), // stoplosses work like opposite of limit/market.
+			bidStoploss: NewBidPQueue(MINPQ), // They sell when price goes below a certain trigger price.
+			depth:       NewMarketDepth(),
 		}
 	}
 
 	//Load open ask orders into priority queue
 	for _, openAskOrder := range openAskOrders {
-		askUnfulfilledQuantity = openAskOrder.StockQuantity - openAskOrder.StockQuantityFulfilled
-		stocks[openAskOrder.StockId].asks.Push(openAskOrder, openAskOrder.Price, askUnfulfilledQuantity)
+		if openAskOrder.OrderType == StopLoss {
+			stocks[openAskOrder.StockId].askStoploss.Push(openAskOrder, openAskOrder.Price, 0)
+		} else {
+			askUnfulfilledQuantity = openAskOrder.StockQuantity - openAskOrder.StockQuantityFulfilled
+			stocks[openAskOrder.StockId].asks.Push(openAskOrder, openAskOrder.Price, askUnfulfilledQuantity)
+		}
 	}
 
 	//Load open bid orders into priority queue
 	for _, openBidOrder := range openBidOrders {
-		bidUnfulfilledQuantity = openBidOrder.StockQuantity - openBidOrder.StockQuantityFulfilled
-		stocks[openBidOrder.StockId].bids.Push(openBidOrder, openBidOrder.Price, bidUnfulfilledQuantity)
+		if openBidOrder.OrderType == StopLoss {
+			stocks[openBidOrder.StockId].bids.Push(openBidOrder, openBidOrder.Price, 0)
+		} else {
+			bidUnfulfilledQuantity = openBidOrder.StockQuantity - openBidOrder.StockQuantityFulfilled
+			stocks[openBidOrder.StockId].bids.Push(openBidOrder, openBidOrder.Price, bidUnfulfilledQuantity)
+		}
 	}
 
 	for _, stockId := range stockIds {

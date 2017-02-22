@@ -20,6 +20,8 @@ func (ot *OrderType) Scan(value interface{}) error {
 		*ot = Market
 	case "StopLoss":
 		*ot = StopLoss
+	case "StopLossActive":
+		*ot = StopLossActive
 	default:
 		return fmt.Errorf("Invalid value for OrderType. Got %s", string(value.([]byte)))
 	}
@@ -32,12 +34,14 @@ const (
 	Limit OrderType = iota
 	Market
 	StopLoss
+	StopLossActive
 )
 
 var orderTypes = [...]string{
 	"Limit",
 	"Market",
 	"StopLoss",
+	"StopLossActive",
 }
 
 func (ot OrderType) String() string {
@@ -49,8 +53,10 @@ func OrderTypeFromProto(pOt models_proto.OrderType) OrderType {
 		return Limit
 	} else if pOt == models_proto.OrderType_MARKET {
 		return Market
-	} else {
+	} else if pOt == models_proto.OrderType_STOPLOSS {
 		return StopLoss
+	} else {
+		return StopLossActive
 	}
 }
 

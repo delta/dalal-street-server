@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS Bids (
 	id int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
 	userId int(11) UNSIGNED NOT NULL,
 	stockId int(11) UNSIGNED NOT NULL,
-	orderType enum('Limit', 'Market', 'StopLoss'),
+	orderType enum('Limit', 'Market', 'StopLoss', 'StopLossActive'),
 	price int(11) UNSIGNED NOT NULL,
 	stockQuantity int(11) UNSIGNED NOT NULL,
 	stockQuantityFulFilled int(11) UNSIGNED NOT NULL,
