@@ -31,7 +31,11 @@ func InitStockExchangeStream() {
 
 	for {
 		stockExchangeMutex.Lock()
+
+		stockExchangeListenersMutex.Lock()
 		l.Debugf("%d listeners as of now", len(stockExchangeListeners))
+		stockExchangeListenersMutex.Unlock()
+
 		if len(dirtyStocksInExchange) == 0 {
 			stockExchangeMutex.Unlock()
 			l.Debugf("Nothing dirty yet. Sleeping for 15 seconds")

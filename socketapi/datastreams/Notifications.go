@@ -62,8 +62,9 @@ func SendNotification(n *models_proto.Notification) {
 
 func RegNotificationsListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":       "RegNotificationListener",
-		"param_userId": userId,
+		"method":          "RegNotificationListener",
+		"param_userId":    userId,
+		"param_sessionId": sessionId,
 	})
 
 	l.Debugf("Attempting")

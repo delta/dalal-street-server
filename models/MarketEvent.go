@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -65,4 +66,38 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	var moreExists = len(marketEvents) >= int(count)
 	l.Infof("Successfully fetched market events")
 	return moreExists, marketEvents, nil
+}
+
+func AddMarketEvent(stockId uint32, headline, text string) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":         "AddMarketEvent",
+		"param_stockId":  stockId,
+		"param_headline": headline,
+		"param_text":     text,
+	})
+
+	l.Infof("Attempting")
+
+	db, err := DbOpen()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	me := &MarketEvent{
+		StockId:  stockId,
+		Headline: headline,
+		Text:     text,
+	}
+
+	if err := db.Save(me).Error; err != nil {
+		l.Error(err)
+		return nil
+	}
+
+	l.Infof("Done")
+
+	datastreams.SendMarketEvent(me.ToProto())
+
+	return nil
 }

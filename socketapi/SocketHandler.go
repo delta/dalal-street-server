@@ -9,6 +9,7 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/socketapi/actions"
 	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/repl"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
@@ -25,6 +26,7 @@ func InitSocketApi() {
 	})
 	actions.InitActions()
 	datastreams.InitDataStreams()
+	repl.InitREPL()
 }
 
 func loadSession(r *http.Request) (session.Session, error) {
@@ -69,6 +71,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	sess.Set("IP", r.RemoteAddr)
 
 	conn, err := upgrader.Upgrade(w, r, http.Header{"Set-Cookie": {"sid=" + sess.GetId() + "; HttpOnly"}})
 

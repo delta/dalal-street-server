@@ -30,7 +30,11 @@ func InitStockPricesStream() {
 
 	for {
 		stockPricesMutex.Lock()
+
+		stockPricesListenersMutex.Lock()
 		l.Debugf("%d listeners as of now", len(stockPricesListeners))
+		stockPricesListenersMutex.Unlock()
+
 		if len(dirtyStocks) == 0 {
 			stockPricesMutex.Unlock()
 			l.Debugf("Nothing dirty yet. Sleeping for 15 seconds")

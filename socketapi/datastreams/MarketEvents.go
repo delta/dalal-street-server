@@ -7,6 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
 	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
 )
 
@@ -15,10 +16,10 @@ var (
 	marketEventsListeners      = make(map[string]listener)
 )
 
-func SendMarketEvent(updateProto *models_proto.MarketEvent) {
+func SendMarketEvent(meProto *models_proto.MarketEvent) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":            "SendMarketEvent",
-		"param_updateProto": updateProto,
+		"method":        "SendMarketEvent",
+		"param_meProto": meProto,
 	})
 
 	defer func() {
@@ -26,6 +27,10 @@ func SendMarketEvent(updateProto *models_proto.MarketEvent) {
 			l.Errorf("Error! Stack trace: %s", string(debug.Stack()))
 		}
 	}()
+
+	updateProto := &datastreams_proto.MarketEventUpdate{
+		meProto,
+	}
 
 	sent := 0
 	marketEventsListenersMutex.Lock()
@@ -35,7 +40,7 @@ func SendMarketEvent(updateProto *models_proto.MarketEvent) {
 		select {
 		case <-listener.done:
 			delete(marketEventsListeners, sessionId)
-			l.Debugf("Found dead listener. Removed")
+			l.Debugf("Found sid %s dead. Removed", sessionId)
 		case listener.update <- updateProto:
 			sent++
 		}
@@ -50,9 +55,10 @@ func SendMarketEvent(updateProto *models_proto.MarketEvent) {
 
 func RegMarketEventsListener(done <-chan struct{}, update chan interface{}, sessionId string) {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "RegMarketEventsListener",
+		"method":          "RegMarketEventsListener",
+		"param_sessionId": sessionId,
 	})
-	l.Debugf("Got a listener")
+	l.Debugf("Got a listener.")
 
 	marketEventsListenersMutex.Lock()
 	defer marketEventsListenersMutex.Unlock()
@@ -69,7 +75,7 @@ func RegMarketEventsListener(done <-chan struct{}, update chan interface{}, sess
 	go func() {
 		<-done
 		UnregMarketEventsListener(sessionId)
-		l.Debugf("Found dead listener. Removed")
+		l.Debugf("Found a dead listener. Removed")
 	}()
 }
 

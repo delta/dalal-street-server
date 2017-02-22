@@ -501,7 +501,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 func InitMatchingEngine() {
 	db, err := DbOpen()
 	if err != nil {
-		panic("Error opening database for matching engine")
+		panic("Error opening database for matching engine: " + err.Error())
 	}
 	defer db.Close()
 
@@ -515,17 +515,17 @@ func InitMatchingEngine() {
 
 	//Load stock ids from database
 	if err := db.Model(&Stock{}).Pluck("id", &stockIds).Error; err != nil {
-		panic("Failed to load stock ids in matching engine")
+		panic("Failed to load stock ids in matching engine: " + err.Error())
 	}
 
 	//Load open ask orders from database
 	if err := db.Where("isClosed = ?", 0).Find(&openAskOrders).Error; err != nil {
-		panic("Error loading open ask orders in matching engine")
+		panic("Error loading open ask orders in matching engine: " + err.Error())
 	}
 
 	//Load open bid orders from database
 	if err := db.Where("isClosed = ?", 0).Find(&openBidOrders).Error; err != nil {
-		panic("Error loading open bid orders in matching engine")
+		panic("Error loading open bid orders in matching engine: " + err.Error())
 	}
 
 	for _, stockId := range stockIds {

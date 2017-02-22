@@ -1,7 +1,6 @@
 package socketapi
 
 import (
-	"errors"
 	"fmt"
 	"runtime/debug"
 
@@ -100,7 +99,7 @@ func makeResponseExceptSubscribe(c *client, reqwrap *socketapi_proto.RequestWrap
 			GetLeaderboardResponse: actions.GetLeaderboard(c.sess, req),
 		}
 	} else {
-		return nil, errors.New(fmt.Sprintf("Unexpected type '%T'", reqwrap))
+		return nil, fmt.Errorf("Unexpected type '%T'", reqwrap)
 	}
 
 	return dm, nil
@@ -147,7 +146,7 @@ func makeDataStreamUpdate(req *actions_proto.SubscribeRequest, update interface{
 			update.(*datastreams_proto.MyOrderUpdate),
 		}
 	default:
-		return nil, errors.New(fmt.Sprintf("Unexpected type '%T'", update))
+		return nil, fmt.Errorf("Unexpected type '%T'", update)
 	}
 
 	return dm, nil
@@ -184,7 +183,7 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 
 		data, err := proto.Marshal(dm)
 		if err != nil {
-			l.Errorf("Unable to marshal response. Response: '%+v'", dm)
+			l.Errorf("Unable to marshal response. Response: '%+v'. Error: '%+v'", dm, err)
 			return
 		}
 
@@ -227,7 +226,7 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 
 	data, err := proto.Marshal(dm)
 	if err != nil {
-		l.Errorf("Unable to marshal response. Response: '%+v'", dm)
+		l.Errorf("Unable to marshal response. Response: '%+v'. Error: '%+v'", dm, err)
 		return
 	}
 
@@ -250,13 +249,13 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 
 			dm, err := makeDataStreamUpdate(reqwrap.GetSubscribeRequest(), update)
 			if err != nil {
-				l.Errorf("Unable to convert update into datastream. Update: '%+v'", update)
+				l.Errorf("Unable to convert update into datastream. Update: '%+v'. Error: '%+v'", update, err)
 				return
 			}
 
 			data, err := proto.Marshal(dm)
 			if err != nil {
-				l.Errorf("Error marshaling the datastreamupdate message. DalalMessage: '%+v'", dm)
+				l.Errorf("Error marshaling the datastreamupdate message. DalalMessage: '%+v'. Error: '%v'", dm, err)
 			}
 
 			select {

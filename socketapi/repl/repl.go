@@ -2,11 +2,16 @@ package repl
 
 import (
 	"fmt"
+	"runtime/debug"
 	"sync"
 
+	"github.com/Sirupsen/logrus"
+
 	"github.com/thakkarparth007/dalal-street-server/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
+var logger *logrus.Entry
 var validCmds []string
 
 type cmdSession struct {
@@ -89,7 +94,7 @@ var replCmds = map[string]replCmdFn{
 		s.print("Are you sure you want to add %d new stocks to exchange for %s? [Y/N]", newStocks, stock.FullName)
 
 		c := 'N'
-		s.read("%c\n", &c)
+		s.read("%c", &c)
 		if c == 'Y' {
 			err := models.AddStocksToExchange(stockId, newStocks)
 			if err != nil {
@@ -104,7 +109,7 @@ var replCmds = map[string]replCmdFn{
 		var newPrice uint32
 
 		s.print("Enter stockId and new price:")
-		s.read("%d %d\n", &stockId, &newPrice)
+		s.read("%d %d", &stockId, &newPrice)
 
 		stock, err := models.GetStockCopy(stockId)
 		if err != nil {
@@ -114,7 +119,7 @@ var replCmds = map[string]replCmdFn{
 		s.print("Are you sure you want to update %s's price to %d? [Y/N]", stock.FullName, newPrice)
 
 		c := 'N'
-		s.read("%c\n", &c)
+		s.read("%c", &c)
 		if c == 'Y' {
 			err := models.UpdateStockPrice(stockId, newPrice)
 			if err != nil {
@@ -124,15 +129,61 @@ var replCmds = map[string]replCmdFn{
 		}
 		s.finish("Not doing")
 	},
+	"add_market_event": func(s cmdSession) {
+		var stockId uint32
+		var headline string
+		var text string
+
+		s.print("Enter stockId and headline:")
+		s.read("%d %q", &stockId, &headline)
+
+		s.print("Enter brief text:")
+		s.read("%q", &text)
+
+		stock, err := models.GetStockCopy(stockId)
+		if err != nil {
+			s.error(err)
+		}
+
+		s.print("Are you sure you want to send '%s'[%s] for '%s'? [Y/N]", headline, text, stock.FullName)
+
+		c := 'N'
+		s.read("%c", &c)
+		if c == 'Y' {
+			err := models.AddMarketEvent(stockId, headline, text)
+			if err != nil {
+				s.error(err)
+			}
+			s.finish("Done")
+		}
+		s.finish("Not doing")
+	},
 }
 
-func init() {
+func InitREPL() {
+	logger := utils.Logger.WithFields(logrus.Fields{
+		"module": "socketapi/repl",
+	})
 	for cmd := range replCmds {
 		validCmds = append(validCmds, cmd)
 	}
+	logger.Info("REPL Started")
 }
 
-func Handle(done <-chan struct{}, sid string, cmd string) string {
+func Handle(done <-chan struct{}, sid string, cmd string) (ret string) {
+	var l = utils.Logger.WithFields(logrus.Fields{
+		"method":    "Handle",
+		"param_sid": sid,
+		"param_cmd": cmd,
+	})
+
+	defer func() {
+		if r := recover(); r != nil {
+			ret = "REPL Panicked! Ignoring this to save the server from death."
+			l.Errorf("Something really bad happened. Stack: %s", string(debug.Stack()))
+		}
+	}()
+
 	cmdSessionsMutex.Lock()
 	defer cmdSessionsMutex.Unlock()
 
