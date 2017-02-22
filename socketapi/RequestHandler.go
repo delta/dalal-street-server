@@ -160,6 +160,14 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 		"param_reqwrap": reqwrap,
 	})
 
+	// If you're not logged in and you wanna do non-logging-in stuff, I won't allow you.
+	if _, ok := c.sess.Get("userId"); !ok {
+		if reqwrap.GetLoginRequest() == nil {
+			c.conn.Close()
+			return
+		}
+	}
+
 	// Ensure that whatever happens in this request doesn't take down the whole server!
 	defer func() {
 		if r := recover(); r != nil {

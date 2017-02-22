@@ -158,7 +158,13 @@ func (sess *session) Delete(str string) error {
 	sql := "Delete FROM Sessions WHERE id=? AND `key`=?"
 	_, err = db.Exec(sql, sess.Id, str)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	delete(sess.m, str)
+
+	return nil
 }
 
 // Delete the entire session from database
@@ -177,6 +183,11 @@ func (sess *session) Destroy() error {
 
 	sql := "DELETE FROM Sessions WHERE id=?"
 	_, err = db.Exec(sql, sess.Id)
+	if err != nil {
+		return err
+	}
+
+	sess.m = make(map[string]string)
 
 	return err
 }
