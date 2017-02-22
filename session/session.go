@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
@@ -34,6 +35,10 @@ type Session interface {
 type session struct {
 	Id string
 	m  map[string]string
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }
 
 func Load(id string) (Session, error) {
