@@ -56,22 +56,28 @@ func (s cmdSession) finish(format string, args ...interface{}) {
 var replCmds = map[string]replCmdFn{
 	"sendnotif": func(s cmdSession) {
 		var userId uint32
+		var isGlobal bool
 		var text string
 
 		s.print("Enter userId and notification text:")
 		s.read("%d %q", &userId, &text)
 
-		u, err := models.GetUserCopy(userId)
-		if err != nil {
-			s.error("No user with id %d", userId)
-		}
+		if userId == 0 {
+			isGlobal = true
+			s.print("Are you sure you want to send '%s' to ALL users?", text)
+		} else {
+			u, err := models.GetUserCopy(userId)
+			if err != nil {
+				s.error("No user with id %d", userId)
+			}
 
-		s.print("Are you sure you want to send '%s' to %s (userid: %d)? [Y/N]", text, u.Name, u.Id)
+			s.print("Are you sure you want to send '%s' to %s (userid: %d)? [Y/N]", text, u.Name, u.Id)
+		}
 
 		c := 'N'
 		s.read("%c", &c)
 		if c == 'Y' {
-			err := models.SendNotification(userId, text)
+			err := models.SendNotification(userId, text, isGlobal)
 			if err != nil {
 				s.error(err)
 			}
@@ -133,6 +139,7 @@ var replCmds = map[string]replCmdFn{
 		var stockId uint32
 		var headline string
 		var text string
+		var isGlobal bool
 
 		s.print("Enter stockId and headline:")
 		s.read("%d %q", &stockId, &headline)
@@ -140,17 +147,22 @@ var replCmds = map[string]replCmdFn{
 		s.print("Enter brief text:")
 		s.read("%q", &text)
 
-		stock, err := models.GetStockCopy(stockId)
-		if err != nil {
-			s.error(err)
-		}
+		if stockId == 0 {
+			s.print("Are you sure you want to send '%s'[%s] for ALL stocks? [Y/N]", headline, text)
+			isGlobal = true
+		} else {
+			stock, err := models.GetStockCopy(stockId)
+			if err != nil {
+				s.error(err)
+			}
 
-		s.print("Are you sure you want to send '%s'[%s] for '%s'? [Y/N]", headline, text, stock.FullName)
+			s.print("Are you sure you want to send '%s'[%s] for '%s'? [Y/N]", headline, text, stock.FullName)
+		}
 
 		c := 'N'
 		s.read("%c", &c)
 		if c == 'Y' {
-			err := models.AddMarketEvent(stockId, headline, text)
+			err := models.AddMarketEvent(stockId, headline, text, isGlobal)
 			if err != nil {
 				s.error(err)
 			}

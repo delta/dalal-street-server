@@ -12,6 +12,7 @@ type MarketEvent struct {
 	EmotionScore int32  `gorm:"column:emotionScore;not null" json:"emotion_score"`
 	Headline     string `gorm:"column:headline;not null" json:"headline"`
 	Text         string `gorm:"column:text" json:"text"`
+	IsGlobal     bool   `gorm:"column:isGlobal" json:"is_global"`
 	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
 }
 
@@ -26,6 +27,7 @@ func (gMarketEvent *MarketEvent) ToProto() *models_proto.MarketEvent {
 		Headline:     gMarketEvent.Headline,
 		Text:         gMarketEvent.Text,
 		EmotionScore: gMarketEvent.EmotionScore,
+		IsGlobal:     gMarketEvent.IsGlobal,
 		CreatedAt:    gMarketEvent.CreatedAt,
 	}
 	return pMarketEvent
@@ -68,12 +70,13 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	return moreExists, marketEvents, nil
 }
 
-func AddMarketEvent(stockId uint32, headline, text string) error {
+func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "AddMarketEvent",
 		"param_stockId":  stockId,
 		"param_headline": headline,
 		"param_text":     text,
+		"param_isGlobal": isGlobal,
 	})
 
 	l.Infof("Attempting")
@@ -88,11 +91,12 @@ func AddMarketEvent(stockId uint32, headline, text string) error {
 		StockId:  stockId,
 		Headline: headline,
 		Text:     text,
+		IsGlobal: isGlobal,
 	}
 
 	if err := db.Save(me).Error; err != nil {
 		l.Error(err)
-		return nil
+		return err
 	}
 
 	l.Infof("Done")

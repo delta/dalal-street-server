@@ -7,10 +7,11 @@ import (
 )
 
 type Notification struct {
-	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	UserId    uint32 `gorm:"column:userId;not null" json:"user_id"`
-	Text      string `gorm:"column:text" json:"text"`
-	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
+	Id          uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	UserId      uint32 `gorm:"column:userId;not null" json:"user_id"`
+	Text        string `gorm:"column:text" json:"text"`
+	IsBroadcast bool   `gorm:"column:isBroadcast" json:"is_broadcast"`
+	CreatedAt   string `gorm:"column:createdAt;not null" json:"created_at"`
 }
 
 func (Notification) TableName() string {
@@ -19,10 +20,11 @@ func (Notification) TableName() string {
 
 func (gNotification *Notification) ToProto() *models_proto.Notification {
 	return &models_proto.Notification{
-		Id:        gNotification.Id,
-		UserId:    gNotification.UserId,
-		Text:      gNotification.Text,
-		CreatedAt: gNotification.CreatedAt,
+		Id:          gNotification.Id,
+		UserId:      gNotification.UserId,
+		Text:        gNotification.Text,
+		IsBroadcast: gNotification.IsBroadcast,
+		CreatedAt:   gNotification.CreatedAt,
 	}
 }
 
@@ -56,7 +58,7 @@ func GetNotifications(userId, lastId, count uint32) (bool, []*Notification, erro
 		// 0 means broadcast!
 		db = db.Where("id <= ?", lastId)
 	}
-	if err := db.Where("userId = 0 or userId = ?", userId).Order("id desc").Limit(count).Find(&notifications).Error; err != nil {
+	if err := db.Where("isBroadcast = true or userId = ?", userId).Order("id desc").Limit(count).Find(&notifications).Error; err != nil {
 		return true, nil, err
 	}
 
@@ -65,11 +67,12 @@ func GetNotifications(userId, lastId, count uint32) (bool, []*Notification, erro
 	return moreExists, notifications, nil
 }
 
-func SendNotification(userId uint32, text string) error {
+func SendNotification(userId uint32, text string, isBroadcast bool) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":       "SendNotification",
-		"param_userId": userId,
-		"param_text":   text,
+		"method":            "SendNotification",
+		"param_userId":      userId,
+		"param_text":        text,
+		"param_isBroadcast": isBroadcast,
 	})
 
 	l.Infof("Sending notification")
@@ -81,8 +84,9 @@ func SendNotification(userId uint32, text string) error {
 	defer db.Close()
 
 	n := &Notification{
-		UserId: userId,
-		Text:   text,
+		UserId:      userId,
+		Text:        text,
+		IsBroadcast: isBroadcast,
 	}
 
 	if err := db.Save(n).Error; err != nil {
