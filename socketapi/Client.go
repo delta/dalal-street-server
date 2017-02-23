@@ -87,13 +87,12 @@ func (c *client) ReadPump() {
 
 		// Admin commands come as text messages
 		if msgType == websocket.TextMessage {
-			//if isAdmin, ok := c.sess.Get("IsAdmin"); ok && isAdmin == "true" {
-			c.send <- repl.Handle(c.done, c.sess.GetId(), string(bytes))
+			if string(bytes) == "ping" {
+				c.send <- "pong"
+			} else {
+				c.send <- repl.Handle(c.done, c.sess, string(bytes))
+			}
 			continue
-			/*} else {
-			l.Errorf("Some non-Admin's trying to send commands. Screwing him.")
-			return
-			}*/
 		}
 
 		dm := &socketapi_proto.DalalMessage{}
