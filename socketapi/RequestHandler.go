@@ -61,7 +61,7 @@ func makeResponseExceptSubscribe(c *client, reqwrap *socketapi_proto.RequestWrap
 		}
 	} else if req := reqwrap.GetUnsubscribeRequest(); req != nil {
 		rw.Response = &socketapi_proto.ResponseWrapper_UnsubscribeResponse{
-			UnsubscribeResponse: actions.Unsubscribe(c.sess, req),
+			UnsubscribeResponse: actions.Unsubscribe(c.GetUUID(), c.sess, req),
 		}
 		// The ugly 'GetGet' is unfortunate, but that ugliness remains contained within
 		// this file. The first Get is Protobuf's 'Get'. The second Get is part of the
@@ -227,7 +227,7 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 
 	req := reqwrap.GetSubscribeRequest()
 	resp := &socketapi_proto.ResponseWrapper_SubscribeResponse{
-		SubscribeResponse: actions.Subscribe(done, updatechan, c.sess, req),
+		SubscribeResponse: actions.Subscribe(done, updatechan, c.GetUUID(), c.sess, req),
 	}
 
 	rw.Response = resp
@@ -264,6 +264,7 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 			data, err := proto.Marshal(dm)
 			if err != nil {
 				l.Errorf("Error marshaling the datastreamupdate message. DalalMessage: '%+v'. Error: '%v'", dm, err)
+				return
 			}
 
 			select {
@@ -273,6 +274,7 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 			}
 
 		case <-c.done:
+			l.Debugf("c.done closed. Leaving.")
 			return
 		}
 	}

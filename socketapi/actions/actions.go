@@ -733,7 +733,7 @@ func RetrieveMortgageStocks(sess session.Session, req *actions_proto.RetrieveMor
 	return resp
 }
 
-func Unsubscribe(sess session.Session, req *actions_proto.UnsubscribeRequest) *actions_proto.UnsubscribeResponse {
+func Unsubscribe(connId string, sess session.Session, req *actions_proto.UnsubscribeRequest) *actions_proto.UnsubscribeResponse {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Unsubscribe",
 		"param_session": fmt.Sprintf("%+v", sess),
@@ -760,17 +760,17 @@ func Unsubscribe(sess session.Session, req *actions_proto.UnsubscribeRequest) *a
 
 	switch req.DataStreamType {
 	case datastreams_proto.DataStreamType_NOTIFICATIONS:
-		datastreams.UnregNotificationsListener(getUserId(sess), sess.GetId())
+		datastreams.UnregNotificationsListener(getUserId(sess), connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_STOCK_PRICES:
-		datastreams.UnregStockPricesListener(sess.GetId())
+		datastreams.UnregStockPricesListener(connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_STOCK_EXCHANGE:
-		datastreams.UnregStockExchangeListener(sess.GetId())
+		datastreams.UnregStockExchangeListener(connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_MARKET_EVENTS:
-		datastreams.UnregMarketEventsListener(sess.GetId())
+		datastreams.UnregMarketEventsListener(connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_MY_ORDERS:
-		datastreams.UnregOrdersListener(getUserId(sess), sess.GetId())
+		datastreams.UnregOrdersListener(getUserId(sess), connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_TRANSACTIONS:
-		datastreams.UnregTransactionsListener(getUserId(sess), sess.GetId())
+		datastreams.UnregTransactionsListener(getUserId(sess), connId) //sess.GetId())
 	default:
 		return badRequestError(fmt.Errorf("Invalid datastream id %d", req.DataStreamType))
 	}
@@ -780,11 +780,12 @@ func Unsubscribe(sess session.Session, req *actions_proto.UnsubscribeRequest) *a
 	return resp
 }
 
-func Subscribe(done <-chan struct{}, updates chan interface{}, sess session.Session, req *actions_proto.SubscribeRequest) *actions_proto.SubscribeResponse {
+func Subscribe(done <-chan struct{}, updates chan interface{}, connId string, sess session.Session, req *actions_proto.SubscribeRequest) *actions_proto.SubscribeResponse {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Subscribe",
 		"param_session": fmt.Sprintf("%+v", sess),
 		"param_req":     fmt.Sprintf("%+v", req),
+		"param_connId":  connId,
 	})
 	l.Infof("Subscribe requested")
 
@@ -802,17 +803,17 @@ func Subscribe(done <-chan struct{}, updates chan interface{}, sess session.Sess
 
 	switch req.DataStreamType {
 	case datastreams_proto.DataStreamType_NOTIFICATIONS:
-		datastreams.RegNotificationsListener(done, updates, getUserId(sess), sess.GetId())
+		datastreams.RegNotificationsListener(done, updates, getUserId(sess), connId) // sess.GetId())
 	case datastreams_proto.DataStreamType_STOCK_PRICES:
-		datastreams.RegStockPricesListener(done, updates, sess.GetId())
+		datastreams.RegStockPricesListener(done, updates, connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_STOCK_EXCHANGE:
-		datastreams.RegStockExchangeListener(done, updates, sess.GetId())
+		datastreams.RegStockExchangeListener(done, updates, connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_MARKET_EVENTS:
-		datastreams.RegMarketEventsListener(done, updates, sess.GetId())
+		datastreams.RegMarketEventsListener(done, updates, connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_MY_ORDERS:
-		datastreams.RegOrdersListener(done, updates, getUserId(sess), sess.GetId())
+		datastreams.RegOrdersListener(done, updates, getUserId(sess), connId) // sess.GetId())
 	case datastreams_proto.DataStreamType_TRANSACTIONS:
-		datastreams.RegTransactionsListener(done, updates, getUserId(sess), sess.GetId())
+		datastreams.RegTransactionsListener(done, updates, getUserId(sess), connId) //sess.GetId())
 	default:
 		return badRequestError(fmt.Errorf("Invalid datastream id %d", req.DataStreamType))
 	}

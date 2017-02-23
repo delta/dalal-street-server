@@ -34,6 +34,7 @@ type Client interface {
 	Send() chan interface{}
 	Done() <-chan struct{}
 	GetSession() session.Session
+	GetUUID() string
 }
 
 func NewClient(done chan struct{}, send chan interface{}, conn *websocket.Conn, sess session.Session) Client {
@@ -56,6 +57,10 @@ func (c *client) Send() chan interface{} {
 
 func (c *client) GetSession() session.Session {
 	return c.sess
+}
+
+func (c *client) GetUUID() string {
+	return c.id.String()
 }
 
 func (c *client) ReadPump() {
