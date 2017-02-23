@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -33,8 +34,9 @@ type Session interface {
 }
 
 type session struct {
-	Id string
-	m  map[string]string
+	Id    string
+	mutex sync.RWMutex
+	m     map[string]string
 }
 
 func init() {
@@ -131,13 +133,17 @@ func (sess *session) Set(k string, v string) error {
 	}
 
 	l.Debugf("Set key in database")
+	sess.mutex.Lock()
 	sess.m[k] = v
+	sess.mutex.Unlock()
 	return nil
 }
 
 // Get the value providing key to the get function
 func (sess *session) Get(str string) (string, bool) {
+	sess.mutex.RLock()
 	value, ok := sess.m[str] // return value if found or ok=false if not found
+	sess.mutex.RUnlock()
 	return value, ok
 }
 
@@ -162,7 +168,9 @@ func (sess *session) Delete(str string) error {
 		return err
 	}
 
+	sess.mutex.Lock()
 	delete(sess.m, str)
+	sess.mutex.Unlock()
 
 	return nil
 }
