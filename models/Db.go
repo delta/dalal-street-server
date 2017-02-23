@@ -12,11 +12,11 @@ import (
 var logger *logrus.Entry
 var DbOpen = utils.DbOpen
 
-func InitModels() {
+func init() {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "models",
 	})
 
-	loadStocks()
-	InitMatchingEngine()
+	LoadStocks()
+	OpenMarket()
 }

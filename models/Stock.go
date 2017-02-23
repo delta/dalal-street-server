@@ -155,7 +155,7 @@ func UpdateStockPrice(stockId, price uint32) error {
 	return nil
 }
 
-func loadStocks() error {
+func LoadStocks() error {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "loadStocks",
 	})

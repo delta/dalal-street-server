@@ -213,7 +213,7 @@ func dbConn() (*sqlx.DB, error) {
 	return db, err
 }
 
-func InitSession() {
+func init() {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "session",
 	})

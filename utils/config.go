@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"flag"
 	"log"
 	"os"
 )
@@ -49,7 +50,8 @@ var Configuration = struct {
 
 // InitConfiguration reads the config.json file and loads the
 // config options into Configuration
-func InitConfiguration(configFileName string) {
+func init() {
+	configFileName := *flag.String("config", "config.json", "Name of the config file")
 	configFile, err := os.Open(configFileName)
 	if err != nil {
 		log.Fatalf("Failed to open %s. Cannot proceed", configFileName)

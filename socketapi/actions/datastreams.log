@@ -1,5 +1,0 @@
-[37mDEBU[0m[0000] Lol                                           [37mmodule[0m="socketapi/datastreams"
-[37mDEBU[0m[0000] 0 listeners as of now                         [37mmethod[0m=InitStockExchangeStream [37mmodule[0m="socketapi/datastreams"
-[37mDEBU[0m[0000] Nothing dirty yet. Sleeping for 15 seconds    [37mmethod[0m=InitStockExchangeStream [37mmodule[0m="socketapi/datastreams"
-[37mDEBU[0m[0000] 0 listeners as of now                         [37mmethod[0m=InitStockPricesStream [37mmodule[0m="socketapi/datastreams"
-[37mDEBU[0m[0000] Nothing dirty yet. Sleeping for 15 seconds    [37mmethod[0m=InitStockPricesStream [37mmodule[0m="socketapi/datastreams"

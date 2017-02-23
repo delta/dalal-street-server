@@ -5,24 +5,23 @@ import (
 	"net/http"
 
 	"github.com/thakkarparth007/dalal-street-server/models"
-	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/socketapi"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 func main() {
-	utils.InitConfiguration("config.json")
+	//utils.InitConfiguration("config.json")
 
 	if utils.Configuration.Stage != "prod" {
 		fmt.Println("WARNING: Server not running in prod stage.")
 	}
 
-	utils.InitLogger()
+	//utils.InitLogger()
 
-	models.InitModels()
-	session.InitSession()
-	socketapi.InitSocketApi()
-	models.InitMatchingEngine()
+	//models.InitMatchingEngine()
+	//models.InitModels()
+	//session.InitSession()
+	//socketapi.InitSocketApi()
 
 	go models.UpdateLeaderboardTicker()
 

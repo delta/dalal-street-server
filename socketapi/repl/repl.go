@@ -91,6 +91,36 @@ var replCmds = map[string]replCmdFn{
 		models.AdminLog(aun, "Logged out")
 		s.finish("Goodbye.")
 	},
+	"open_market": func(userSess session.Session, s cmdSession) {
+		aun, _ := userSess.Get("repl_Username")
+
+		s.print("Are you sure you want to open the market?")
+
+		c := 'N'
+		s.read("%c", &c)
+		if c == 'Y' {
+			models.OpenMarket()
+			models.AdminLog(aun, "Opened market")
+			s.finish("Done")
+		}
+
+		s.finish("Not doing")
+	},
+	"close_market": func(userSess session.Session, s cmdSession) {
+		aun, _ := userSess.Get("repl_Username")
+
+		s.print("Are you sure you want to close the market?")
+
+		c := 'N'
+		s.read("%c", &c)
+		if c == 'Y' {
+			models.CloseMarket()
+			models.AdminLog(aun, "Closed market")
+			s.finish("Done")
+		}
+
+		s.finish("Not doing")
+	},
 	"sendnotif": func(userSess session.Session, s cmdSession) {
 		var userId uint32
 		var isGlobal bool
@@ -224,7 +254,7 @@ var replCmds = map[string]replCmdFn{
 	},
 }
 
-func InitREPL() {
+func init() {
 	logger := utils.Logger.WithFields(logrus.Fields{
 		"module": "socketapi/repl",
 	})

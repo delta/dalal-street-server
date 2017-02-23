@@ -7,9 +7,6 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/thakkarparth007/dalal-street-server/session"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/actions"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/repl"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
@@ -20,13 +17,13 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func InitSocketApi() {
+func init() {
 	socketApiLogger = utils.Logger.WithFields(logrus.Fields{
 		"module": "socketapi/SocketHandler",
 	})
-	actions.InitActions()
-	datastreams.InitDataStreams()
-	repl.InitREPL()
+	//actions.InitActions()
+	//datastreams.InitDataStreams()
+	//repl.InitREPL()
 }
 
 func loadSession(r *http.Request) (session.Session, error) {
@@ -67,7 +64,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	sess, err := loadSession(r)
 	if err != nil {
-		l.Errorf("Could not load or create session. Replying with 500. '%s'", err)
+		l.Errorf("Could not load or create session. Replying with 500. '%+v'", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

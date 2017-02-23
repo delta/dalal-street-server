@@ -2,16 +2,16 @@
    "Stage": "dev",
 
    "EventId": "22",
-   "EventSecret": "s3kr3t",
+   "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
 
-   "LogFileName": "./dalalstreet.log",
+   "LogFileName": "./dalalstreet_test.log",
    "LogMaxSize": 50,
    "LogLevel": "debug",
 
    "DbUser": "root",
    "DbPassword": "",
-   "DbHost": "localhost",
-   "DbName": "dalalstreet",
+   "DbHost": "",
+   "DbName": "dalalstreet_test",
 
    "httpPort": 3000
 }

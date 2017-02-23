@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
 	"testing"
+
+	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func TestMarketEventToProto(t *testing.T) {
@@ -11,6 +12,7 @@ func TestMarketEventToProto(t *testing.T) {
 		StockId:      3,
 		Headline:     "Hello",
 		Text:         "Hello World",
+		IsGlobal:     true,
 		EmotionScore: -54,
 		CreatedAt:    "2017-02-09T00:00:00",
 	}

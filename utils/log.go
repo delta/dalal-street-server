@@ -10,7 +10,7 @@ import (
 var Logger *logrus.Logger
 
 // InitLogger initializes the logger with apropriate configuration options
-func InitLogger() {
+func init() {
 	var (
 		fileName string = Configuration.LogFileName
 		maxSize  int    = Configuration.LogMaxSize
@@ -18,7 +18,7 @@ func InitLogger() {
 	)
 
 	if Configuration.LogFileName == "" {
-		fileName = "./log.go"
+		fileName = "./log.log"
 	}
 
 	if Configuration.LogMaxSize == 0 {
@@ -48,7 +48,7 @@ func InitLogger() {
 
 func GetNewFileLogger(fileName string, maxSize int, logLevel string, json bool) *logrus.Logger {
 	if fileName == "" {
-		fileName = "./log1.go"
+		fileName = "./log1.log"
 	}
 
 	if maxSize == 0 {

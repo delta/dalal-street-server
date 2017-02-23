@@ -12,7 +12,7 @@ type listener struct {
 
 var logger *logrus.Entry
 
-func InitDataStreams() {
+func init() {
 	logger = utils.GetNewFileLogger("datastreams.log", 20, "debug", false).WithFields(logrus.Fields{
 		"module": "socketapi/datastreams",
 	})

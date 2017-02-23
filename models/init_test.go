@@ -9,5 +9,4 @@ func init() {
 	utils.InitConfiguration("config_test.json")
 	utils.Logger = logrus.New()
 	utils.Logger.Level = logrus.DebugLevel
-	InitModels()
 }

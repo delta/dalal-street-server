@@ -24,7 +24,7 @@ func getUserId(sess session.Session) uint32 {
 	return uint32(userIdInt)
 }
 
-func InitActions() {
+func init() {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "socketapi.actions",
 	})
@@ -81,6 +81,16 @@ func BuyStocksFromExchange(sess session.Session, req *actions_proto.BuyStocksFro
 			},
 		}
 		return resp
+	}
+	var marketClosedError = func() *actions_proto.BuyStocksFromExchangeResponse {
+		resp.Response = &actions_proto.BuyStocksFromExchangeResponse_MarketClosedError{
+			&errors_proto.MarketClosedError{},
+		}
+		return resp
+	}
+
+	if !models.IsMarketOpen() {
+		return marketClosedError()
 	}
 
 	//Check for positive stock quantity
@@ -147,6 +157,16 @@ func CancelAskOrder(sess session.Session, req *actions_proto.CancelAskOrderReque
 		}
 		return resp
 	}
+	var marketClosedError = func() *actions_proto.CancelAskOrderResponse {
+		resp.Response = &actions_proto.CancelAskOrderResponse_MarketClosedError{
+			&errors_proto.MarketClosedError{},
+		}
+		return resp
+	}
+
+	if !models.IsMarketOpen() {
+		return marketClosedError()
+	}
 
 	userId := getUserId(sess)
 	askId := req.AskId
@@ -201,6 +221,16 @@ func CancelBidOrder(sess session.Session, req *actions_proto.CancelBidOrderReque
 			},
 		}
 		return resp
+	}
+	var marketClosedError = func() *actions_proto.CancelBidOrderResponse {
+		resp.Response = &actions_proto.CancelBidOrderResponse_MarketClosedError{
+			&errors_proto.MarketClosedError{},
+		}
+		return resp
+	}
+
+	if !models.IsMarketOpen() {
+		return marketClosedError()
 	}
 
 	userId := getUserId(sess)
@@ -327,11 +357,14 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 
 	resp.Response = &actions_proto.LoginResponse_Result{
 		&actions_proto.LoginResponse_LoginSuccessResponse{
-			SessionId:   sess.GetId(),
-			User:        user.ToProto(),
-			StocksOwned: stocksOwned,
-			StockList:   stockListProto,
-			Constants:   constantsMap,
+			SessionId:                sess.GetId(),
+			User:                     user.ToProto(),
+			StocksOwned:              stocksOwned,
+			StockList:                stockListProto,
+			Constants:                constantsMap,
+			IsMarketOpen:             models.IsMarketOpen(),
+			MarketIsClosedHackyNotif: models.MARKET_IS_CLOSED_HACKY_NOTIF,
+			MarketIsOpenHackyNotif:   models.MARKET_IS_OPEN_HACKY_NOTIF,
 		},
 	}
 
@@ -398,6 +431,16 @@ func MortgageStocks(sess session.Session, req *actions_proto.MortgageStocksReque
 			},
 		}
 		return resp
+	}
+	var marketClosedError = func() *actions_proto.MortgageStocksResponse {
+		resp.Response = &actions_proto.MortgageStocksResponse_MarketClosedError{
+			&errors_proto.MarketClosedError{},
+		}
+		return resp
+	}
+
+	if !models.IsMarketOpen() {
+		return marketClosedError()
 	}
 
 	//Check for non-positive stock quantity
@@ -473,6 +516,16 @@ func PlaceAskOrder(sess session.Session, req *actions_proto.PlaceAskOrderRequest
 			},
 		}
 		return resp
+	}
+	var marketClosedError = func() *actions_proto.PlaceAskOrderResponse {
+		resp.Response = &actions_proto.PlaceAskOrderResponse_MarketClosedError{
+			&errors_proto.MarketClosedError{},
+		}
+		return resp
+	}
+
+	if !models.IsMarketOpen() {
+		return marketClosedError()
 	}
 
 	//Check for positive stock quantity
@@ -557,6 +610,16 @@ func PlaceBidOrder(sess session.Session, req *actions_proto.PlaceBidOrderRequest
 		}
 		return resp
 	}
+	var marketClosedError = func() *actions_proto.PlaceBidOrderResponse {
+		resp.Response = &actions_proto.PlaceBidOrderResponse_MarketClosedError{
+			&errors_proto.MarketClosedError{},
+		}
+		return resp
+	}
+
+	if !models.IsMarketOpen() {
+		return marketClosedError()
+	}
 
 	//Check for positive stock quantity
 	if req.StockQuantity <= 0 {
@@ -631,6 +694,16 @@ func RetrieveMortgageStocks(sess session.Session, req *actions_proto.RetrieveMor
 			},
 		}
 		return resp
+	}
+	var marketClosedError = func() *actions_proto.RetrieveMortgageStocksResponse {
+		resp.Response = &actions_proto.RetrieveMortgageStocksResponse_MarketClosedError{
+			&errors_proto.MarketClosedError{},
+		}
+		return resp
+	}
+
+	if !models.IsMarketOpen() {
+		return marketClosedError()
 	}
 
 	userId := getUserId(sess)

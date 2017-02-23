@@ -7,13 +7,8 @@ import (
 
 	"gopkg.in/jarcoal/httpmock.v1"
 
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
-
-func init() {
-	datastreams.InitDataStreams()
-}
 
 func Test_Login(t *testing.T) {
 	httpmock.Activate()
@@ -126,6 +121,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		for _, tc := range testcases {
 			db.Delete(tc.ask)
 		}
+		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
 		db.Close()
@@ -235,6 +231,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 		for _, tc := range testcases {
 			db.Delete(tc.bid)
 		}
+		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
 		db.Close()
@@ -353,6 +350,7 @@ func Test_CancelOrder(t *testing.T) {
 		for _, b := range bids {
 			db.Delete(b)
 		}
+		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
 		db.Close()
@@ -461,6 +459,7 @@ func Test_GetStocksOwned(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		db.Exec("DELETE FROM StockHistory")
 		for _, stock := range stocks {
 			if err := db.Delete(stock).Error; err != nil {
 				t.Fatal(err)
@@ -588,6 +587,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 				}
 			}
 		}
+		db.Exec("DELETE FROM StockHistory")
 		for _, stock := range stocks {
 			if err := db.Delete(stock).Error; err != nil {
 				t.Fatal(err)
@@ -614,7 +614,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 		}
 	}
 
-	if err := loadStocks(); err != nil {
+	if err := LoadStocks(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -759,6 +759,7 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		db.Exec("DELETE FROM StockHistory")
 		for _, stock := range stocks {
 			if err := db.Delete(stock).Error; err != nil {
 				t.Fatal(err)
@@ -790,7 +791,7 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 		}
 	}
 
-	if err := loadStocks(); err != nil {
+	if err := LoadStocks(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -897,6 +898,7 @@ func Test_PerformMortgageDepositTransaction(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		db.Exec("DELETE FROM StockHistory")
 		for _, stock := range stocks {
 			if err := db.Delete(stock).Error; err != nil {
 				t.Fatal(err)
@@ -928,7 +930,7 @@ func Test_PerformMortgageDepositTransaction(t *testing.T) {
 		}
 	}
 
-	if err := loadStocks(); err != nil {
+	if err := LoadStocks(); err != nil {
 		t.Fatal(err)
 	}
 
