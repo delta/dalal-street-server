@@ -49,7 +49,9 @@ func SendNotification(n *models_proto.Notification) {
 			l.Debugf("One has already left. Removing him.")
 			delete(listeners.l, sessId)
 			if len(listeners.l) == 0 {
+				notifListenersLock.Lock()
 				delete(notifListeners, n.UserId)
+				notifListenersLock.Unlock()
 			}
 		case listener.update <- notifUpdateProto:
 			sent++
