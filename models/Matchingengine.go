@@ -516,9 +516,13 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 *	It calls StartStockmatching for all the stocks in concurrent goroutines
  */
 func InitMatchingEngine() {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "InitMatchingEngine",
+	})
 	db, err := DbOpen()
 	if err != nil {
-		panic("Error opening database for matching engine: " + err.Error())
+		l.Errorf("Errored : %+v", err)
+		panic("Error opening database for matching engine")
 	}
 	defer db.Close()
 
