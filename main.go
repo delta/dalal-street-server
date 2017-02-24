@@ -15,9 +15,6 @@ func RealMain() {
 		recover()
 	}()
 
-	var x []string
-	x[0] = "hi"
-
 	if utils.Configuration.Stage != "prod" {
 		fmt.Println("WARNING: Server not running in prod stage.")
 	}
