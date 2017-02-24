@@ -27,12 +27,20 @@ func SendNotification(n *models_proto.Notification) {
 
 	l.Debugf("Attempting")
 
+	var userIds []uint32
+
 	notifListenersLock.Lock()
-	listeners, ok := notifListeners[n.UserId]
-	if !ok {
-		l.Debugf("No listener found. Done.")
-		notifListenersLock.Unlock()
-		return
+	if n.UserId != 0 {
+		if _, ok := notifListeners[n.UserId]; !ok {
+			l.Debugf("No listener found. Done.")
+			notifListenersLock.Unlock()
+			return
+		}
+		userIds = append(userIds, n.UserId)
+	} else {
+		for userId := range notifListeners {
+			userIds = append(userIds, userId)
+		}
 	}
 	notifListenersLock.Unlock()
 
@@ -40,26 +48,32 @@ func SendNotification(n *models_proto.Notification) {
 		n,
 	}
 
-	listeners.Lock()
-	l.Debugf("Sending to %d listeners", listeners)
 	sent := 0
-	for sessId, listener := range listeners.l {
-		select {
-		case <-listener.done:
-			l.Debugf("One has already left. Removing him.")
-			delete(listeners.l, sessId)
-			if len(listeners.l) == 0 {
-				notifListenersLock.Lock()
-				delete(notifListeners, n.UserId)
-				notifListenersLock.Unlock()
-			}
-		case listener.update <- notifUpdateProto:
-			sent++
-		}
-	}
-	listeners.Unlock()
+	l.Debugf("Sending to %d listeners", len(userIds))
+	for _, userId := range userIds {
+		notifListenersLock.Lock()
+		listeners := notifListeners[userId]
+		notifListenersLock.Unlock()
 
-	l.Debugf("Sent to %d listeners", listeners)
+		listeners.Lock()
+		for sessId, listener := range listeners.l {
+			select {
+			case <-listener.done:
+				l.Debugf("One has already left. Removing him.")
+				delete(listeners.l, sessId)
+				if len(listeners.l) == 0 {
+					notifListenersLock.Lock()
+					delete(notifListeners, n.UserId)
+					notifListenersLock.Unlock()
+				}
+			case listener.update <- notifUpdateProto:
+				sent++
+			}
+		}
+		listeners.Unlock()
+	}
+
+	l.Debugf("Sent to %d listeners", sent)
 }
 
 func RegNotificationsListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
