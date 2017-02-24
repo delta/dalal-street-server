@@ -121,6 +121,21 @@ var replCmds = map[string]replCmdFn{
 
 		s.finish("Not doing")
 	},
+	"load_stocks": func(userSess session.Session, s cmdSession) {
+		aun, _ := userSess.Get("repl_Username")
+
+		s.print("Are you sure you want to reload the stocks?")
+
+		c := 'N'
+		s.read("%c", &c)
+		if c == 'Y' {
+			models.LoadStocks()
+			models.AdminLog(aun, "Reloading the stocks")
+			s.finish("Done")
+		}
+
+		s.finish("Not doing")
+	},
 	"sendnotif": func(userSess session.Session, s cmdSession) {
 		var userId uint32
 		var isGlobal bool
