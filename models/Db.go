@@ -18,5 +18,6 @@ func init() {
 	})
 
 	LoadStocks()
-	OpenMarket()
+	//OpenMarket()
+	CloseMarket()
 }
