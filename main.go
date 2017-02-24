@@ -12,7 +12,9 @@ import (
 func RealMain() {
 	//utils.InitConfiguration("config.json")
 	defer func() {
-		recover()
+		if r := recover(); r != nil {
+			fmt.Printf("Error: '%+v'\n", r)
+		}
 	}()
 
 	if utils.Configuration.Stage != "prod" {
@@ -33,6 +35,10 @@ func RealMain() {
 
 	port := fmt.Sprintf(":%d", utils.Configuration.HttpPort)
 	utils.Logger.Fatal(http.ListenAndServe(port, nil))
+
+	for {
+
+	}
 }
 
 func main() {
