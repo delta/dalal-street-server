@@ -18,7 +18,7 @@ func main() {
 
 	//utils.InitLogger()
 
-	//models.InitMatchingEngine()
+	models.InitMatchingEngine()
 	//models.InitModels()
 	//session.InitSession()
 	//socketapi.InitSocketApi()
