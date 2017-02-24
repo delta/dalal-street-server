@@ -9,8 +9,14 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
-func main() {
+func RealMain() {
 	//utils.InitConfiguration("config.json")
+	defer func() {
+		recover()
+	}()
+
+	var x []string
+	x[0] = "hi"
 
 	if utils.Configuration.Stage != "prod" {
 		fmt.Println("WARNING: Server not running in prod stage.")
@@ -30,4 +36,10 @@ func main() {
 
 	port := fmt.Sprintf(":%d", utils.Configuration.HttpPort)
 	utils.Logger.Fatal(http.ListenAndServe(port, nil))
+}
+
+func main() {
+	for {
+		RealMain()
+	}
 }
