@@ -9,9 +9,9 @@
    "LogLevel": "debug",
 
    "DbUser": "root",
-   "DbPassword": "",
-   "DbHost": "",
-   "DbName": "dalalstreet_test",
+   "DbPassword": "pass",
+   "DbHost": "tcp(db:3306)",
+   "DbName": "dalalstreet",
 
    "httpPort": 3000
 }
