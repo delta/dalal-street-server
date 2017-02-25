@@ -1,63 +1,10 @@
 package models
 
 import (
-	"container/list"
-
 	"github.com/Sirupsen/logrus"
+
+	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
 )
-
-type Trade struct {
-	TradeQuantity uint32
-	TradePrice    uint32
-	TradeTime     string
-}
-
-type MarketDepth struct {
-	AskDepth     map[uint32]uint32
-	BidDepth     map[uint32]uint32
-	LatestTrades *list.List
-}
-
-func NewMarketDepth() *MarketDepth {
-	return &MarketDepth{
-		AskDepth:     make(map[uint32]uint32),
-		BidDepth:     make(map[uint32]uint32),
-		LatestTrades: list.New(),
-	}
-}
-
-func (md *MarketDepth) AddOrder(isAsk bool, price uint32, stockQuantity uint32) {
-	depth := md.AskDepth
-	if !isAsk {
-		depth = md.BidDepth
-	}
-
-	depth[price] += stockQuantity
-}
-
-func (md *MarketDepth) Trade(price, qty uint32, createdAt string) {
-	t := &Trade{
-		qty,
-		price,
-		createdAt,
-	}
-
-	if md.LatestTrades.Len() >= 10 {
-		f := md.LatestTrades.Front()
-		md.LatestTrades.Remove(f)
-	}
-
-	md.LatestTrades.PushBack(t)
-}
-
-func (md *MarketDepth) CloseOrder(isAsk bool, price uint32, stockQuantity uint32) {
-	depth := md.AskDepth
-	if !isAsk {
-		depth = md.BidDepth
-	}
-
-	depth[price] += stockQuantity
-}
 
 type StockDetails struct {
 	askChan     chan *Ask
@@ -66,7 +13,7 @@ type StockDetails struct {
 	bids        *BidPQueue
 	askStoploss *AskPQueue
 	bidStoploss *BidPQueue
-	depth       *MarketDepth
+	depth       *datastreams.MarketDepth
 }
 
 /*
@@ -557,7 +504,7 @@ func InitMatchingEngine() {
 			bids:        NewBidPQueue(MAXPQ), //higher price has higher priority
 			askStoploss: NewAskPQueue(MAXPQ), // stoplosses work like opposite of limit/market.
 			bidStoploss: NewBidPQueue(MINPQ), // They sell when price goes below a certain trigger price.
-			depth:       NewMarketDepth(),
+			depth:       datastreams.NewMarketDepth(stockId),
 		}
 	}
 
