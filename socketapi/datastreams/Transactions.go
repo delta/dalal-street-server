@@ -49,7 +49,9 @@ func SendTransaction(n *models_proto.Transaction) {
 			l.Debugf("One has already left. Removing him.")
 			delete(listeners.l, sessId)
 			if len(listeners.l) == 0 {
+				transListenersLock.Lock()
 				delete(transListeners, n.UserId)
+				transListenersLock.Unlock()
 			}
 		case listener.update <- transUpdateProto:
 			sent++
