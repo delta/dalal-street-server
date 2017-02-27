@@ -347,18 +347,15 @@ func getUser(id uint32) (chan struct{}, *User, error) {
 
 	/* Try to see if the user is there in the map */
 	userLocks.Lock()
-	defer func() {
-		userLocks.Unlock()
-		l.Debugf("Unlocked userLocks map")
-	}()
-
 	l.Debugf("Locked userLocks map")
 
 	_, ok := userLocks.m[id]
 	if ok {
 		u = userLocks.m[id]
-		l.Debugf("Found user in userLocks map. Locking.")
+		userLocks.Unlock()
+		l.Debugf("Found user in userLocks map. Unlocked the map")
 		u.Lock()
+		l.Debugf("Locked user")
 		go func() {
 			l.Debugf("Waiting for caller to release lock")
 			<-ch
@@ -373,17 +370,23 @@ func getUser(id uint32) (chan struct{}, *User, error) {
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
+		userLocks.Unlock()
+		l.Debugf("Unlocked userLocks map")
 		return nil, nil, err
 	}
 	defer db.Close()
 
 	userLocks.m[id] = u
-	if errDb := db.First(u.user, id); errDb.Error != nil {
-		if errDb.RecordNotFound() {
+	db = db.First(u.user, id)
+	userLocks.Unlock()
+	l.Debugf("Talked to db. Unlocked userLocks.")
+
+	if db.Error != nil {
+		if db.RecordNotFound() {
 			l.Errorf("Attempted to get non-existing user")
 			return nil, nil, fmt.Errorf("User with Id %d does not exist", id)
 		} else {
-			return nil, nil, errDb.Error
+			return nil, nil, db.Error
 		}
 	}
 
@@ -417,12 +420,13 @@ func GetUserCopy(id uint32) (User, error) {
 
 	/* Try to see if the user is there in the map */
 	userLocks.Lock()
-	defer userLocks.Unlock()
+	l.Debugf("Locked userLocks map")
 
 	_, ok := userLocks.m[id]
 	if ok {
 		u = userLocks.m[id]
-		l.Debugf("Found user in userLocks map. Locking.")
+		userLocks.Unlock()
+		l.Debugf("Found user in userLocks map. Unlocked map.")
 		u.RLock()
 		defer u.RUnlock()
 		return *u.user, nil
@@ -433,11 +437,17 @@ func GetUserCopy(id uint32) (User, error) {
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
+		userLocks.Unlock()
+		l.Debugf("Unlocked userLocks map")
 		return User{}, err
 	}
 	defer db.Close()
 
 	userLocks.m[id] = u
+	db = db.First(u.user, id)
+	l.Debugf("Talked to Db. Unlocking userLocks")
+	userLocks.Unlock()
+
 	if errDb := db.First(u.user, id); errDb.Error != nil {
 		if errDb.RecordNotFound() {
 			l.Errorf("Attempted to get non-existing user")
@@ -718,6 +728,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		StockQuantity: int32(stockQuantityRemoved),
 		Price:         price,
 		Total:         -int32(price * stockQuantityRemoved),
+		CreatedAt:     time.Now().Format(time.RFC3339),
 	}
 
 	userCash := uint32(int32(user.Cash) + transaction.Total)
@@ -853,6 +864,23 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 		return false, true, nil
 	}
 
+	var updateDataStreams = func(askingUserId, biddingUserId uint32, askTrans, bidTrans *Transaction, ask *Ask, bid *Bid) {
+		var stockTradeQty uint32
+		if askTrans != nil {
+			datastreams.SendTransaction(askTrans.ToProto())
+			stockTradeQty = uint32(askTrans.StockQuantity)
+		}
+		if bidTrans != nil {
+			datastreams.SendTransaction(bidTrans.ToProto())
+			stockTradeQty = uint32(askTrans.StockQuantity)
+		}
+
+		datastreams.SendOrder(askingUserId, ask.Id, true, stockTradeQty, ask.IsClosed)
+		datastreams.SendOrder(biddingUserId, bid.Id, false, stockTradeQty, bid.IsClosed)
+
+		l.Infof("Sent through the datastreams")
+	}
+
 	var bidUnfulfilledStockQuantity = bid.StockQuantity - bid.StockQuantityFulfilled
 	var askUnfulfilledStockQuantity = ask.StockQuantity - ask.StockQuantityFulfilled
 
@@ -878,6 +906,9 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
 		l.Debugf("Check1: Failed. Not enough cash.")
+		bid.IsClosed = true
+		go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
+		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
 		return false, true, nil
 	}
 
@@ -895,6 +926,9 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 		if currentAllowedQty > ASK_LIMIT {
 			currentAllowedQty = ASK_LIMIT
 		}
+		ask.IsClosed = true
+		go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
+		go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
 		return true, false, nil
 	}
 
@@ -907,6 +941,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 			StockQuantity: stockQty,
 			Price:         price,
 			Total:         total,
+			CreatedAt:     time.Now().Format(time.RFC3339),
 		}
 	}
 
@@ -1014,15 +1049,9 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	bid.IsClosed = bidIsClosed
 	bid.StockQuantityFulfilled = bidStockQuantityFulfilled
 
-	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
+	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
 
-	go func(askingUser User, biddingUser User, ask Ask, bid Bid) {
-		datastreams.SendTransaction(askTransaction.ToProto())
-		datastreams.SendTransaction(bidTransaction.ToProto())
-		datastreams.SendOrder(askingUser.Id, ask.Id, true, uint32(stockTradeQty), ask.IsClosed)
-		datastreams.SendOrder(biddingUser.Id, bid.Id, false, uint32(stockTradeQty), bid.IsClosed)
-		l.Infof("Sent through the datastreams")
-	}(*askingUser, *biddingUser, *ask, *bid)
+	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
 	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
@@ -1121,6 +1150,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		StockQuantity: stockQuantity,
 		Price:         0,
 		Total:         trTotal,
+		CreatedAt:     time.Now().Format(time.RFC3339),
 	}
 
 	// A lock on user and stock has been acquired.

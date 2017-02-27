@@ -298,6 +298,10 @@ func Login(sess session.Session, req *actions_proto.LoginRequest) *actions_proto
 		email := req.GetEmail()
 		password := req.GetPassword()
 
+		if email == "" && password == "" {
+			return invalidCredentialsError("")
+		}
+
 		user, err = models.Login(email, password)
 	} else {
 		alreadyLoggedIn = true
@@ -771,8 +775,11 @@ func Unsubscribe(connId string, sess session.Session, req *actions_proto.Unsubsc
 		datastreams.UnregOrdersListener(getUserId(sess), connId) //sess.GetId())
 	case datastreams_proto.DataStreamType_TRANSACTIONS:
 		datastreams.UnregTransactionsListener(getUserId(sess), connId) //sess.GetId())
+	case datastreams_proto.DataStreamType_MARKET_DEPTH:
+		stockId, _ := strconv.ParseUint(req.DataStreamId, 10, 32)
+		datastreams.UnregMarketDepthListener(connId, uint32(stockId))
 	default:
-		return badRequestError(fmt.Errorf("Invalid datastream id %d", req.DataStreamType))
+		return badRequestError(fmt.Errorf("Invalid datastream type %d", req.DataStreamType))
 	}
 
 	l.Infof("Request completed successfully")
@@ -814,6 +821,9 @@ func Subscribe(done <-chan struct{}, updates chan interface{}, connId string, se
 		datastreams.RegOrdersListener(done, updates, getUserId(sess), connId) // sess.GetId())
 	case datastreams_proto.DataStreamType_TRANSACTIONS:
 		datastreams.RegTransactionsListener(done, updates, getUserId(sess), connId) //sess.GetId())
+	case datastreams_proto.DataStreamType_MARKET_DEPTH:
+		stockId, _ := strconv.ParseUint(req.DataStreamId, 10, 32)
+		datastreams.RegMarketDepthListener(done, updates, connId, uint32(stockId))
 	default:
 		return badRequestError(fmt.Errorf("Invalid datastream id %d", req.DataStreamType))
 	}

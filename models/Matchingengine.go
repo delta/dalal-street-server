@@ -69,6 +69,8 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			}
 
 			stocks[stockId].asks.Push(topAskStoploss, topAskStoploss.Price, topAskStoploss.StockQuantity)
+			stocks[stockId].depth.AddOrder(true, true, topAskStoploss.Price, topAskStoploss.StockQuantity)
+			topAskStoploss = stocks[stockId].askStoploss.Head()
 		}
 
 		l.Debugf("Triggering bid stoplosses")
@@ -85,6 +87,8 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			}
 
 			stocks[stockId].bids.Push(topBidStoploss, topBidStoploss.Price, topBidStoploss.StockQuantity)
+			stocks[stockId].depth.AddOrder(true, false, topBidStoploss.Price, topBidStoploss.StockQuantity)
+			topBidStoploss = stocks[stockId].bidStoploss.Head()
 		}
 	}
 
@@ -131,7 +135,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		if topBidOrder == nil {
 			l.Debugf("No matching top bid order currently. Adding to orderbook")
 			stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
-			depth.AddOrder(true, askOrder.Price, askOrder.StockQuantity)
+			depth.AddOrder(askOrder.OrderType == Market, true, askOrder.Price, askOrder.StockQuantity)
 			return true
 		}
 
@@ -152,6 +156,9 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			secondUserId = askOrder.UserId
 			isAskFirst = false
 		}
+
+		l.Debugf("Want first and second as %d, %d for stockid: %d", firstUserId, secondUserId, stockId)
+		defer l.Debugf("Closed channels of %d and %d for stockid: %d", firstUserId, secondUserId, stockId)
 
 		firstLockChan, firstUser, err := getUser(firstUserId)
 		if err != nil {
@@ -174,7 +181,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			l.Debugf("Unable to find the match. Putting ask in orderbook. Unfulfilled qty: %d", stockQuantityYetToBeFulfilled)
 			if !askOrder.IsClosed {
 				stocks[askOrder.StockId].asks.Push(askOrder, askOrder.Price, stockQuantityYetToBeFulfilled)
-				depth.AddOrder(true, askOrder.Price, stockQuantityYetToBeFulfilled)
+				depth.AddOrder(askOrder.OrderType == Market, true, askOrder.Price, stockQuantityYetToBeFulfilled)
 			}
 			return true
 		}
@@ -205,7 +212,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			// tr is always AskTransaction. So its StockQty < 0. Make it positive.
 			depth.Trade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 			//depth.CloseOrder(true, askOrder.Price, tr.StockQuantity) - don't! Haven't added ask to depth
-			depth.CloseOrder(false, topBidOrder.Price, uint32(-tr.StockQuantity))
+			depth.CloseOrder(topBidOrder.OrderType == Market, false, topBidOrder.Price, uint32(-tr.StockQuantity))
 
 			// Trigger all stoplosses that can be triggered
 			triggerStoplosses(tr)
@@ -217,7 +224,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 				}
 			*/
 			if bidDone {
-				depth.CloseOrder(false, topBidOrder.Price, topBidOrder.StockQuantity-topBidOrder.StockQuantityFulfilled)
+				depth.CloseOrder(topBidOrder.OrderType == Market, false, topBidOrder.Price, topBidOrder.StockQuantity-topBidOrder.StockQuantityFulfilled)
 			}
 		}
 
@@ -290,7 +297,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 		if topAskOrder == nil {
 			l.Debugf("No matching top ask order currently. Adding to orderbook")
 			stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
-			depth.AddOrder(false, bidOrder.Price, bidOrder.StockQuantity)
+			depth.AddOrder(bidOrder.OrderType == Market, false, bidOrder.Price, bidOrder.StockQuantity)
 			return true
 		}
 
@@ -333,7 +340,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			l.Debugf("Unable to find the match. Putting bid in orderbook. Unfulfilled qty: %d", stockQuantityYetToBeFulfilled)
 			if !bidOrder.IsClosed {
 				stocks[bidOrder.StockId].bids.Push(bidOrder, bidOrder.Price, stockQuantityYetToBeFulfilled)
-				depth.AddOrder(false, bidOrder.Price, stockQuantityYetToBeFulfilled)
+				depth.AddOrder(bidOrder.OrderType == Market, false, bidOrder.Price, stockQuantityYetToBeFulfilled)
 			}
 			return true
 		}
@@ -357,7 +364,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			l.Infof("Trade made between bid and ask (%+v)", topAskOrder)
 
 			depth.Trade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
-			depth.CloseOrder(true, topAskOrder.Price, uint32(-tr.StockQuantity))
+			depth.CloseOrder(topAskOrder.OrderType == Market, true, topAskOrder.Price, uint32(-tr.StockQuantity))
 			// don't depth.CloseOrder( bidOrder) - It's not even added to depth yet
 
 			// Trigger all the stoplosses that can be triggered.
@@ -366,7 +373,7 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 			l.Infof("Trade not made. AskDone = %+v, BidDone = %v", askDone, bidDone)
 
 			if askDone {
-				depth.CloseOrder(true, topAskOrder.Price, topAskOrder.StockQuantity-topAskOrder.StockQuantityFulfilled)
+				depth.CloseOrder(topAskOrder.OrderType == Market, true, topAskOrder.Price, topAskOrder.StockQuantity-topAskOrder.StockQuantityFulfilled)
 			}
 			/*
 				if bidDone {

@@ -1,7 +1,6 @@
 package datastreams
 
 import (
-	"container/list"
 	"fmt"
 	"runtime/debug"
 	"sync"
@@ -40,8 +39,8 @@ type MarketDepth struct {
 	bidDepthDiff map[uint32]int32
 
 	latestTradesLock sync.Mutex
-	latestTrades     *list.List
-	latestTradesDiff []Trade
+	latestTrades     []*Trade
+	latestTradesDiff []*Trade
 }
 
 var marketDepthsMap = make(map[uint32]*MarketDepth)
@@ -54,14 +53,14 @@ func NewMarketDepth(stockId uint32) *MarketDepth {
 		askDepthDiff: make(map[uint32]int32),
 		bidDepth:     make(map[uint32]uint32),
 		bidDepthDiff: make(map[uint32]int32),
-		latestTrades: list.New(),
 	}
+	go marketDepthsMap[stockId].run()
 	return marketDepthsMap[stockId]
 }
 
 func (md *MarketDepth) run() {
 	var l = logger.WithFields(logrus.Fields{
-		"method":        "run",
+		"method":        "MarketDepth.run",
 		"param_stockId": md.stockId,
 	})
 
@@ -85,7 +84,7 @@ func (md *MarketDepth) run() {
 		md.listenersLock.Unlock()
 
 		var mdUpdate = &datastreams_proto.MarketDepthUpdate{
-			StockId: 1,
+			StockId: md.stockId,
 		}
 		var shouldSend = false
 
@@ -134,12 +133,18 @@ func (md *MarketDepth) run() {
 		}
 		md.listenersLock.Unlock()
 
-		l.Debugf("Sent to %d listeners! Sleeping for 15 seconds", sent)
+		l.Debugf("Sent %+v to %d listeners! Sleeping for 15 seconds", mdUpdate, sent)
 		time.Sleep(time.Minute / 4)
 	}
 }
 
 func (md *MarketDepth) AddListener(done <-chan struct{}, update chan interface{}, sessionId string) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":          "MarketDepth.AddListener",
+		"param_stockId":   md.stockId,
+		"param_sessionId": sessionId,
+	})
+
 	md.listenersLock.Lock()
 	defer md.listenersLock.Unlock()
 
@@ -147,29 +152,89 @@ func (md *MarketDepth) AddListener(done <-chan struct{}, update chan interface{}
 		update,
 		done,
 	}
+
+	var mdUpdate = &datastreams_proto.MarketDepthUpdate{
+		StockId: md.stockId,
+	}
+
+	md.askDepthLock.Lock()
+	mdUpdate.AskDepth = md.askDepth
+	md.askDepthLock.Unlock()
+
+	md.bidDepthLock.Lock()
+	mdUpdate.BidDepth = md.bidDepth
+	md.bidDepthLock.Unlock()
+
+	md.latestTradesLock.Lock()
+	for _, t := range md.latestTrades {
+		mdUpdate.LatestTrades = append(mdUpdate.LatestTrades, t.ToProto())
+	}
+	md.latestTradesLock.Unlock()
+
+	l.Debugf("Sending %+v", mdUpdate)
+
+	// Required to be done in a go-func, otherwise deadlock results. update chan isn't read until this function returns.
+	go func() {
+		select {
+		case <-done:
+			l.Debugf("Client exited before sending")
+		case update <- mdUpdate:
+			l.Debugf("Sent")
+		}
+	}()
+
+	l.Debugf("Done")
 }
 
 func (md *MarketDepth) RemoveListener(sessionId string) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":          "MarketDepth.RemoveListener",
+		"param_stockId":   md.stockId,
+		"param_sessionId": sessionId,
+	})
 	md.listenersLock.Lock()
 	delete(md.listeners, sessionId)
 	md.listenersLock.Unlock()
+	l.Debugf("Removed")
 }
 
-func (md *MarketDepth) AddOrder(isAsk bool, price uint32, stockQuantity uint32) {
+func (md *MarketDepth) AddOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":              "MarketDepth.AddOrder",
+		"param_stockId":       md.stockId,
+		"param_isMarket":      isMarket,
+		"param_isAsk":         isAsk,
+		"param_price":         price,
+		"param_stockQuantity": stockQuantity,
+	})
+
+	l.Debugf("Adding")
+
 	if isAsk {
 		md.askDepthLock.Lock()
 		md.askDepth[price] += stockQuantity
 		md.askDepthDiff[price] += int32(stockQuantity)
 		md.askDepthLock.Unlock()
+
+		l.Debugf("Added")
 		return
 	}
 	md.bidDepthLock.Lock()
 	md.bidDepth[price] += stockQuantity
 	md.bidDepthDiff[price] += int32(stockQuantity)
 	md.bidDepthLock.Unlock()
+
+	l.Debugf("Added")
 }
 
 func (md *MarketDepth) Trade(price, qty uint32, createdAt string) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "MarketDepth.Trade",
+		"param_stockId": md.stockId,
+		"param_price":   price,
+		"param_qty":     qty,
+	})
+
 	t := &Trade{
 		qty,
 		price,
@@ -177,21 +242,18 @@ func (md *MarketDepth) Trade(price, qty uint32, createdAt string) {
 	}
 
 	md.latestTradesLock.Lock()
-	if md.latestTrades.Len() >= 10 {
-		f := md.latestTrades.Front()
-		md.latestTrades.Remove(f)
+	if len(md.latestTrades) >= 10 {
+		md.latestTrades = md.latestTrades[9-len(md.latestTrades):]
 	}
 
-	md.latestTrades.PushBack(t)
-	md.latestTradesDiff = append(md.latestTradesDiff, Trade{
-		TradeQuantity: qty,
-		TradePrice:    price,
-		TradeTime:     createdAt,
-	})
+	md.latestTrades = append(md.latestTrades, t)
+	md.latestTradesDiff = append(md.latestTradesDiff, t)
 	md.latestTradesLock.Unlock()
+
+	l.Debugf("Added")
 }
 
-func (md *MarketDepth) CloseOrder(isAsk bool, price uint32, stockQuantity uint32) {
+func (md *MarketDepth) CloseOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
 	if isAsk {
 		md.askDepthLock.Lock()
 		md.askDepth[price] -= stockQuantity
@@ -219,14 +281,16 @@ func (md *MarketDepth) CloseOrder(isAsk bool, price uint32, stockQuantity uint32
 
 func RegMarketDepthListener(done <-chan struct{}, update chan interface{}, sessionId string, stockId uint32) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":        "RegMarketDepthListener",
-		"param_stockId": stockId,
+		"method":          "RegMarketDepthListener",
+		"param_sessionId": sessionId,
+		"param_stockId":   stockId,
 	})
 
 	l.Debugf("Got a listener")
 
 	md, ok := marketDepthsMap[stockId]
 	if !ok {
+		l.Errorf("Invalid stock id")
 		return fmt.Errorf("Invalid stockId")
 	}
 
@@ -238,4 +302,23 @@ func RegMarketDepthListener(done <-chan struct{}, update chan interface{}, sessi
 	}()
 
 	return nil
+}
+
+func UnregMarketDepthListener(sessionId string, stockId uint32) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":          "UnregMarketDepthListener",
+		"param_sessionId": sessionId,
+		"param_stockId":   stockId,
+	})
+
+	l.Debugf("Unregistering")
+
+	md, ok := marketDepthsMap[stockId]
+	if !ok {
+		l.Errorf("Invalid stock id")
+		return
+	}
+
+	md.RemoveListener(sessionId)
+	l.Debugf("Done")
 }
