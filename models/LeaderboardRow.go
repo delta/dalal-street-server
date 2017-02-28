@@ -60,6 +60,8 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 	}
 	defer db.Close()
 
+	db.Model(&User{}).Count(&TotalUserCount)
+
 	//for storing leaderboard details
 	var leaderboardDetails []*LeaderboardRow
 	//for storing user's position in leaderboard
@@ -73,7 +75,7 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 		return nil, nil, TotalUserCount, err
 	}
 
-	l.Infof("Successfully fetched leaderboard for userId : %v", userId)
+	l.Infof("Successfully fetched leaderboard for userId : %v, %+v", userId, leaderboardDetails)
 
 	return leaderboardDetails, &currentUserDetails, TotalUserCount, nil
 }

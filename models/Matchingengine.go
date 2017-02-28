@@ -410,18 +410,15 @@ func StartStockMatching(stock StockDetails, stockId uint32) {
 	)
 
 	// Clear all existing orders in the book
-	topAskOrder := stock.asks.Pop()
-	for topAskOrder != nil {
+	var existingAsks []*Ask
+	for stock.asks.Size() != 0 {
+		existingAsks = append(existingAsks, stock.asks.Pop())
+	}
+
+	for _, topAskOrder := range existingAsks {
 		for !processAsk(topAskOrder) {
 
 		}
-		// was it placed back in the order book?
-		// if so, it means neither this, nor any order below
-		// this can be processed.
-		if topAskOrder == stock.asks.Head() {
-			break
-		}
-		// else, continue popping orders
 		topAskOrder = stock.asks.Pop()
 	}
 

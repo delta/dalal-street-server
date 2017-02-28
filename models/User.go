@@ -868,15 +868,19 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 		var stockTradeQty uint32
 		if askTrans != nil {
 			datastreams.SendTransaction(askTrans.ToProto())
-			stockTradeQty = uint32(askTrans.StockQuantity)
+			stockTradeQty = uint32(bidTrans.StockQuantity)
 		}
 		if bidTrans != nil {
 			datastreams.SendTransaction(bidTrans.ToProto())
-			stockTradeQty = uint32(askTrans.StockQuantity)
+			stockTradeQty = uint32(bidTrans.StockQuantity)
 		}
 
-		datastreams.SendOrder(askingUserId, ask.Id, true, stockTradeQty, ask.IsClosed)
-		datastreams.SendOrder(biddingUserId, bid.Id, false, stockTradeQty, bid.IsClosed)
+		if stockTradeQty != 0 || ask.IsClosed {
+			datastreams.SendOrder(askingUserId, ask.Id, true, stockTradeQty, ask.IsClosed)
+		}
+		if stockTradeQty != 0 || bid.IsClosed {
+			datastreams.SendOrder(biddingUserId, bid.Id, false, stockTradeQty, bid.IsClosed)
+		}
 
 		l.Infof("Sent through the datastreams")
 	}
@@ -1049,7 +1053,7 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	bid.IsClosed = bidIsClosed
 	bid.StockQuantityFulfilled = bidStockQuantityFulfilled
 
-	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
+	go updateDataStreams(askingUser.Id, biddingUser.Id, askTransaction, bidTransaction, ask, bid)
 
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
