@@ -24,6 +24,7 @@ type Stock struct {
 	StocksInMarket   uint32 `gorm:"column:stocksInMarket;not null" json:"stocks_in_market"`
 	PreviousDayClose uint32 `gorm:"column:previousDayClose;not null" json:"previous_day_close"`
 	UpOrDown         bool   `gorm:"column:upOrDown;not null" json:"up_or_down"`
+	AvgLastPrice     uint32	`gorm:"column:avgLastPrice;not null" json:"avg_last_price"`
 	CreatedAt        string `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt        string `gorm:"column:updatedAt;not null" json:"updated_at"`
 }
@@ -47,6 +48,7 @@ func (gStock *Stock) ToProto() *models_proto.Stock {
 		StocksInMarket:   gStock.StocksInMarket,
 		UpOrDown:         gStock.UpOrDown,
 		PreviousDayClose: gStock.PreviousDayClose,
+		AvgLastPrice:     gStock.AvgLastPrice,
 		CreatedAt:        gStock.CreatedAt,
 		UpdatedAt:        gStock.UpdatedAt,
 	}
@@ -63,6 +65,14 @@ var allStocks = struct {
 }{
 	sync.RWMutex{},
 	make(map[uint32]*stockAndLock),
+}
+
+var avgLastPrice = struct {
+	sync.RWMutex
+	m map[uint32]uint32
+}{
+	sync.RWMutex{},
+	make(map[uint32]uint32),
 }
 
 func GetStockCopy(stockId uint32) (Stock, error) {
@@ -136,6 +146,11 @@ func UpdateStockPrice(stockId, price uint32) error {
 		stock.UpOrDown = false
 	}
 
+	avgLastPrice.Lock()
+	avgLastPrice.m[stock.Id] = avgLastPrice.m[stock.Id] - uint32((avgLastPrice.m[stock.Id] + stock.CurrentPrice)/20)
+	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
+	avgLastPrice.Unlock()
+
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
@@ -175,9 +190,12 @@ func LoadStocks() error {
 	}
 
 	allStocks.Lock()
+	avgLastPrice.Lock()
 	for _, stock := range stocks {
 		allStocks.m[stock.Id] = &stockAndLock{stock: stock}
+		avgLastPrice.m[stock.Id] = stock.CurrentPrice
 	}
+	avgLastPrice.Unlock()
 	allStocks.Unlock()
 
 	l.Infof("Loaded %+v", allStocks)
