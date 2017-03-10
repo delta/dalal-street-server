@@ -147,7 +147,7 @@ func UpdateStockPrice(stockId, price uint32) error {
 	}
 
 	avgLastPrice.Lock()
-	avgLastPrice.m[stock.Id] = avgLastPrice.m[stock.Id] - uint32((avgLastPrice.m[stock.Id] + stock.CurrentPrice)/20)
+	avgLastPrice.m[stock.Id] = avgLastPrice.m[stock.Id] - uint32(float32(avgLastPrice.m[stock.Id])/20 - float32(stock.CurrentPrice)/20)
 	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
 	avgLastPrice.Unlock()
 
