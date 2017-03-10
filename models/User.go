@@ -483,20 +483,23 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Attempting")
 
-	l.Debugf("Acquiring lock for ask order threshold check with stock id : %v ", ask.StockId)
+	//Check for 20% cap
+	if ask.OrderType != Market {
+		l.Debugf("Acquiring lock for ask order threshold check with stock id : %v ", ask.StockId)
 
-	allStocks.m[ask.StockId].RLock()
-	currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
-	allStocks.m[ask.StockId].RUnlock()
+		allStocks.m[ask.StockId].RLock()
+		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
+		allStocks.m[ask.StockId].RUnlock()
 
-	l.Debugf("Releasing lock for ask order threshold check with stock id : %v ", ask.StockId)
+		l.Debugf("Releasing lock for ask order threshold check with stock id : %v ", ask.StockId)
 
-	var upperLimit = uint32(1.2*float32(currentPrice))
-	var lowerLimit = uint32(0.8*float32(currentPrice))
+		var upperLimit = uint32(1.2*float32(currentPrice))
+		var lowerLimit = uint32(0.8*float32(currentPrice))
 
-	if(ask.Price > upperLimit || ask.Price < lowerLimit) {
-		l.Debugf("Threshold price check failed for ask order")
-		return 0, AskLimitExceededError{}
+		if(ask.Price > upperLimit || ask.Price < lowerLimit) {
+			l.Debugf("Threshold price check failed for ask order")
+			return 0, AskLimitExceededError{}
+		}	
 	}
 
 	l.Debugf("Acquiring exclusive write on user")
@@ -572,21 +575,25 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Infof("PlaceBidOrder requested")
 
-	l.Debugf("Acquiring lock for bid order threshold check with stock id : %v ", bid.StockId)
+	//Check for 20% cap on bid prices
+	if bid.OrderType != Market {
+		l.Debugf("Acquiring lock for bid order threshold check with stock id : %v ", bid.StockId)
 
-	allStocks.m[bid.StockId].RLock()
-	currentPrice := allStocks.m[bid.StockId].stock.CurrentPrice
-	allStocks.m[bid.StockId].RUnlock()
+		allStocks.m[bid.StockId].RLock()
+		currentPrice := allStocks.m[bid.StockId].stock.CurrentPrice
+		allStocks.m[bid.StockId].RUnlock()
 
-	l.Debugf("Releasing lock for bid order threshold check with stock id : %v ", bid.StockId)
+		l.Debugf("Releasing lock for bid order threshold check with stock id : %v ", bid.StockId)
 
-	var upperLimit = uint32(1.2*float32(currentPrice))
-	var lowerLimit = uint32(0.8*float32(currentPrice))
+		var upperLimit = uint32(1.2*float32(currentPrice))
+		var lowerLimit = uint32(0.8*float32(currentPrice))
 
-	if(bid.Price > upperLimit || bid.Price < lowerLimit) {
-		l.Debugf("Threshold price check failed for bid order")
-		return 0, BidLimitExceededError{}
+		if(bid.Price > upperLimit || bid.Price < lowerLimit) {
+			l.Debugf("Threshold price check failed for bid order")
+			return 0, BidLimitExceededError{}
+		}
 	}
+
 
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUser(userId)
@@ -1119,11 +1126,15 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		l.Debugf("Released exclusive write on user")
 	}()
 
-	allStocks.m[stockId].RLock()
-	currentStockPrice := allStocks.m[stockId].stock.CurrentPrice
-	allStocks.m[stockId].RUnlock()
+	// allStocks.m[stockId].RLock()
+	// currentStockPrice := allStocks.m[stockId].stock.CurrentPrice
+	// allStocks.m[stockId].RUnlock()
 
-	l.Debugf("Taking current price of stock as %d", currentStockPrice)
+	avgLastPrice.RLock()
+	avgStockPrice := avgLastPrice.m[stockId]
+	avgLastPrice.RUnlock()
+
+	l.Debugf("Taking avg price of stock as %d", avgStockPrice)
 
 	var rate int32
 
@@ -1173,7 +1184,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		}
 	}
 
-	trTotal := -int32(currentStockPrice) * stockQuantity * rate / 100
+	trTotal := -int32(avgStockPrice) * stockQuantity * rate / 100
 	if int32(user.Cash)+trTotal < 0 {
 		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", trTotal, user.Cash)
 		return nil, NotEnoughCashError{}
