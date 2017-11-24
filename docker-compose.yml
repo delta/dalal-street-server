@@ -3,26 +3,30 @@ services:
     web:
         container_name: dalalstreet_web_1
         image: nginx:latest
-        build: ./docker/dalalfrontend
+        build: 
+            context: ./Dockerfiles
+            dockerfile: Dockerfile-frontend
         volumes: 
-            - ./docker/nginx:/etc/nginx/conf.d
+            - ./conf:/etc/nginx/conf.d
             - ./frontend:/var/www/dalalstreet
         ports:
-            - 9000:80
+            - "9000:80"
     
     dalalserver:
         container_name: dalalstreet_server_1
-        build: .
+        build:
+            context: ./Dockerfiles
+            dockerfile: Dockerfile-server
         volumes: 
             - $GOPATH:/go
         ports:
-            - 9020:3000
+            - "9020:3000"
         depends_on:
             - db
         env_file:
             - .env
         environment:
-            MYSQL_DATABASE: ${DB_NAME} 
+            MYSQL_DATABASE: ${DB_NAME}
 
     db:
         container_name: dalalstreet_db_1
@@ -35,7 +39,7 @@ services:
             MYSQL_DATABASE: ${DB_NAME}
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
         ports:
-            - 9006:3306
+            - "9030:3306"
     
     phpmyadmin:
         container_name: dalalstreet_pma_1
@@ -43,6 +47,6 @@ services:
         env_file:
             - .env
         ports:
-            - 9010:80
+            - "9040:80"
         depends_on:
             - db
