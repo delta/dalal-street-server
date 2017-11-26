@@ -27,6 +27,7 @@ services:
             - .env
         environment:
             MYSQL_DATABASE: ${DB_NAME}
+            DALAL_ENV: Docker
 
     db:
         container_name: dalalstreet_db_1

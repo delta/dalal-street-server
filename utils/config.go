@@ -7,8 +7,8 @@ import (
 	"os"
 )
 
-// Configuration contains all the configuration options
-var Configuration = struct {
+// Config contains all the configuration options
+type Config struct {
 	// Environment related options
 
 	// Stage is the current execution environment. Can be one of "prod", "dev" or "test"
@@ -46,11 +46,38 @@ var Configuration = struct {
 
 	// HttpPort is the port on which the http server will run
 	HttpPort int
+}
+
+// Struct to load configurations of all possible modes i.e dev, docker, prod, test
+// Only one of them will be selected based on the environment variable DALAL_ENV
+var AllConfigurations = struct {
+
+	// Configuration for environment : dev
+	Dev Config
+
+	// Configuration for environment : docker
+	Docker Config
+
+	// Configuration for environment : prod
+	Prod Config
+
+	// Configuration for environment : test
+	Test Config
 }{}
+
+// To store the selected configuration based on the env variable DALAL_ENV
+var Configuration Config
 
 // InitConfiguration reads the config.json file and loads the
 // config options into Configuration
 func init() {
+	stage, exists := os.LookupEnv("DALAL_ENV")
+
+	if !exists {
+		log.Printf("Set environment variable DALAL_ENV to one of : Dev, Docker, Prod, Test. Taking Dev as default.")
+		stage = "Dev"
+	}
+
 	configFileName := *flag.String("config", "config.json", "Name of the config file")
 	configFile, err := os.Open(configFileName)
 	if err != nil {
@@ -60,10 +87,24 @@ func init() {
 	defer configFile.Close()
 
 	decoder := json.NewDecoder(configFile)
-	err = decoder.Decode(&Configuration)
+	err = decoder.Decode(&AllConfigurations)
 
 	if err != nil {
 		log.Fatalf("Failed to load configuration. Cannot proceed. Error: ", err)
+	}
+
+	switch stage {
+		case "Dev" :
+			Configuration = AllConfigurations.Dev
+		case "Docker" :
+			Configuration = AllConfigurations.Docker
+		case "Prod" :
+			Configuration = AllConfigurations.Prod
+		case "Test" :
+			Configuration = AllConfigurations.Test
+		default :
+			// Take Dev as default
+			Configuration = AllConfigurations.Dev
 	}
 
 	log.Printf("Loaded configuration from %s: %+v\n", configFileName, Configuration)

@@ -1,17 +1,73 @@
 {
-   "Stage": "dev",
+   "Dev": {
+      "Stage": "dev",
 
-   "EventId": "22",
-   "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+      "EventId": "22",
+      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
 
-   "LogFileName": "./dalalstreet_test1.log",
-   "LogMaxSize": 50,
-   "LogLevel": "info",
+      "LogFileName": "./dalalstreet_dev.log",
+      "LogMaxSize": 50,
+      "LogLevel": "info",
 
-   "DbUser": "root",
-   "DbPassword": "",
-   "DbHost": "",
-   "DbName": "dalalstreet_test1",
+      "DbUser": "root",
+      "DbPassword": "MYSQL_ROOT_PASSOWORD",
+      "DbHost": "",
+      "DbName": "DalalStreet",
 
-   "httpPort": 3000
+      "httpPort": 3000
+   },
+
+   "Docker": {
+      "Stage": "docker",
+
+      "EventId": "22",
+      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+
+      "LogFileName": "./dalalstreet_docker.log",
+      "LogMaxSize": 50,
+      "LogLevel": "info",
+
+      "DbUser": "root",
+      "DbPassword": "MYSQL_CONTAINER_ROOT_PASSOWORD",
+      "DbHost": "tcp(db:3306)",
+      "DbName": "DalalStreet",
+
+      "httpPort": 3000
+   },
+
+   "Prod": {
+      "Stage": "prod",
+
+      "EventId": "22",
+      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+
+      "LogFileName": "./dalalstreet.log",
+      "LogMaxSize": 50,
+      "LogLevel": "info",
+
+      "DbUser": "root",
+      "DbPassword": "MYSQL_ROOT_PASSOWORD",
+      "DbHost": "",
+      "DbName": "DalalStreet",
+
+      "httpPort": 3000
+   },
+
+   "Test": {
+      "Stage": "test",
+
+      "EventId": "22",
+      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+
+      "LogFileName": "./dalalstreet_test.log",
+      "LogMaxSize": 50,
+      "LogLevel": "info",
+
+      "DbUser": "root",
+      "DbPassword": "MYSQL_ROOT_PASSOWORD",
+      "DbHost": "",
+      "DbName": "DalalStreet",
+
+      "httpPort": 3000
+   }
 }
