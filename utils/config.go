@@ -74,7 +74,7 @@ func init() {
 	stage, exists := os.LookupEnv("DALAL_ENV")
 
 	if !exists {
-		log.Printf("Set environment variable DALAL_ENV to one of : Dev, Docker, Prod, Test. Taking Dev as default.")
+		os.Stderr.WriteString("Set environment variable DALAL_ENV to one of : Dev, Docker, Prod, Test. Taking Dev as default.")
 		stage = "Dev"
 	}
 
