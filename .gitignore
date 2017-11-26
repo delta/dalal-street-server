@@ -23,7 +23,13 @@ _testmain.go
 *.exe
 *.test
 *.prof
+*.log
 
+# dalal executable
 dalal-street-server
+
+# volume mapping for mysql
 docker/
+
+# env file for docker-compose
 .env
