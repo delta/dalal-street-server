@@ -2,7 +2,7 @@
 
 ## Setup instructions
 
-- You must have Go [installed](https://golang.org/doc/install) and [configured](https://golang.org/doc/install#testing).
+- You must have Go 1.7+ [installed](https://golang.org/doc/install) and [configured](https://golang.org/doc/install#testing).
 - Set your `$GOPATH` in your `.bashrc`. (Just a place where you want to keep all your Go code)
 - Append `$GOPATH/bin` to your `$PATH`.
 - Clone this repository.

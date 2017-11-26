@@ -39,8 +39,6 @@ services:
         environment:
             MYSQL_DATABASE: ${DB_NAME}
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
-        ports:
-            - "9030:3306"
     
     phpmyadmin:
         container_name: dalalstreet_pma_1

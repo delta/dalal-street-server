@@ -5,9 +5,7 @@ RUN apt-get update && \
     zip \
     unzip \
     vim \
-    curl \
-    git \
-    nslookup
+    curl
 
 WORKDIR  /go/src/github.com/thakkarparth007/dalal-street-server 
 

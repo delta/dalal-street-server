@@ -10,9 +10,9 @@
       "LogLevel": "info",
 
       "DbUser": "root",
-      "DbPassword": "MYSQL_ROOT_PASSOWORD",
+      "DbPassword": "MYSQL_ROOT_PASSWORD",
       "DbHost": "",
-      "DbName": "DalalStreet",
+      "DbName": "dalalstreet_dev",
 
       "httpPort": 3000
    },
@@ -28,9 +28,9 @@
       "LogLevel": "info",
 
       "DbUser": "root",
-      "DbPassword": "MYSQL_CONTAINER_ROOT_PASSOWORD",
+      "DbPassword": "MYSQL_CONTAINER_ROOT_PASSWORD",
       "DbHost": "tcp(db:3306)",
-      "DbName": "DalalStreet",
+      "DbName": "dalalstreet_docker",
 
       "httpPort": 3000
    },
@@ -46,9 +46,9 @@
       "LogLevel": "info",
 
       "DbUser": "root",
-      "DbPassword": "MYSQL_ROOT_PASSOWORD",
+      "DbPassword": "MYSQL_ROOT_PASSWORD",
       "DbHost": "",
-      "DbName": "DalalStreet",
+      "DbName": "dalalstreet",
 
       "httpPort": 3000
    },
@@ -64,9 +64,9 @@
       "LogLevel": "info",
 
       "DbUser": "root",
-      "DbPassword": "MYSQL_ROOT_PASSOWORD",
+      "DbPassword": "MYSQL_ROOT_PASSWORD",
       "DbHost": "",
-      "DbName": "DalalStreet",
+      "DbName": "dalalstreet_test",
 
       "httpPort": 3000
    }
