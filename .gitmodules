@@ -3,4 +3,4 @@
 	url = git@github.com:thakkarparth007/dalal-street-proto
 [submodule "frontend"]
 	path = frontend
-	url = git@github.com:lutir/Dalal-Front-End
+	url = git@github.com:thakkarparth007/Dalal-Front-End
