@@ -78,10 +78,11 @@ func init() {
 		stage = "Dev"
 	}
 
-	configFileName := *flag.String("config", "config.json", "Name of the config file")
-	configFile, err := os.Open(configFileName)
+	configFileName := flag.String("config", "config.json", "Name of the config file")
+	flag.Parse()
+	configFile, err := os.Open(*configFileName)
 	if err != nil {
-		log.Fatalf("Failed to open %s. Cannot proceed", configFileName)
+		log.Fatalf("Failed to open %s. Cannot proceed", *configFileName)
 		return
 	}
 	defer configFile.Close()
@@ -94,17 +95,17 @@ func init() {
 	}
 
 	switch stage {
-		case "Dev" :
-			Configuration = AllConfigurations.Dev
-		case "Docker" :
-			Configuration = AllConfigurations.Docker
-		case "Prod" :
-			Configuration = AllConfigurations.Prod
-		case "Test" :
-			Configuration = AllConfigurations.Test
-		default :
-			// Take Dev as default
-			Configuration = AllConfigurations.Dev
+	case "Dev":
+		Configuration = AllConfigurations.Dev
+	case "Docker":
+		Configuration = AllConfigurations.Docker
+	case "Prod":
+		Configuration = AllConfigurations.Prod
+	case "Test":
+		Configuration = AllConfigurations.Test
+	default:
+		// Take Dev as default
+		Configuration = AllConfigurations.Dev
 	}
 
 	log.Printf("Loaded configuration from %s: %+v\n", configFileName, Configuration)

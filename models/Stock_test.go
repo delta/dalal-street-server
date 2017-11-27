@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
 	"testing"
+
+	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func TestStockToProto(t *testing.T) {
@@ -20,6 +21,7 @@ func TestStockToProto(t *testing.T) {
 		StocksInMarket:   234,
 		UpOrDown:         true,
 		PreviousDayClose: 1000,
+		AvgLastPrice:     120,
 		CreatedAt:        "2017-02-09T00:00:00",
 		UpdatedAt:        "2017-02-09T00:00:00",
 	}
