@@ -64,7 +64,7 @@
       "LogLevel": "info",
 
       "DbUser": "root",
-      "DbPassword": "MYSQL_ROOT_PASSWORD",
+      "DbPassword": "",
       "DbHost": "",
       "DbName": "dalalstreet_test",
 
