@@ -33,3 +33,6 @@ docker/
 
 # env file for docker-compose
 .env
+
+# proto build
+proto_build/*

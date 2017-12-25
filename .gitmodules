@@ -1,5 +1,5 @@
 [submodule "socketapi/proto"]
-	path = socketapi/proto
+	path = proto
 	url = git@github.com:thakkarparth007/dalal-street-proto
 [submodule "frontend"]
 	path = frontend
