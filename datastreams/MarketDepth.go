@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 )
 
 type Trade struct {
@@ -16,8 +16,8 @@ type Trade struct {
 	TradeTime     string
 }
 
-func (t *Trade) ToProto() *datastreams_proto.Trade {
-	return &datastreams_proto.Trade{
+func (t *Trade) ToProto() *datastreams_pb.Trade {
+	return &datastreams_pb.Trade{
 		TradePrice:    t.TradePrice,
 		TradeQuantity: t.TradeQuantity,
 		TradeTime:     t.TradeTime,
@@ -83,7 +83,7 @@ func (md *MarketDepth) run() {
 		}
 		md.listenersLock.Unlock()
 
-		var mdUpdate = &datastreams_proto.MarketDepthUpdate{
+		var mdUpdate = &datastreams_pb.MarketDepthUpdate{
 			StockId: md.stockId,
 		}
 		var shouldSend = false
@@ -153,7 +153,7 @@ func (md *MarketDepth) AddListener(done <-chan struct{}, update chan interface{}
 		done,
 	}
 
-	var mdUpdate = &datastreams_proto.MarketDepthUpdate{
+	var mdUpdate = &datastreams_pb.MarketDepthUpdate{
 		StockId: md.stockId,
 	}
 

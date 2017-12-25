@@ -7,8 +7,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 var (
@@ -16,7 +16,7 @@ var (
 	marketEventsListeners      = make(map[string]listener)
 )
 
-func SendMarketEvent(meProto *models_proto.MarketEvent) {
+func SendMarketEvent(meProto *models_pb.MarketEvent) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "SendMarketEvent",
 		"param_meProto": meProto,
@@ -28,7 +28,7 @@ func SendMarketEvent(meProto *models_proto.MarketEvent) {
 		}
 	}()
 
-	updateProto := &datastreams_proto.MarketEventUpdate{
+	updateProto := &datastreams_pb.MarketEventUpdate{
 		meProto,
 	}
 

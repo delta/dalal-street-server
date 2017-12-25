@@ -6,8 +6,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 var transListenersLock sync.Mutex
@@ -19,7 +19,7 @@ type transListenersSingleUser struct {
 
 var transListeners = make(map[uint32]*transListenersSingleUser)
 
-func SendTransaction(n *models_proto.Transaction) {
+func SendTransaction(n *models_pb.Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "SendTransaction",
 		"param_n": fmt.Sprintf("%+v", n),
@@ -36,7 +36,7 @@ func SendTransaction(n *models_proto.Transaction) {
 	}
 	transListenersLock.Unlock()
 
-	transUpdateProto := &datastreams_proto.TransactionUpdate{
+	transUpdateProto := &datastreams_pb.TransactionUpdate{
 		n,
 	}
 

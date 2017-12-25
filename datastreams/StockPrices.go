@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 )
 
 var (
@@ -42,7 +42,7 @@ func InitStockPricesStream() {
 			continue
 		}
 		l.Debugf("Found dirty stock prices")
-		updateProto := &datastreams_proto.StockPricesUpdate{
+		updateProto := &datastreams_pb.StockPricesUpdate{
 			Prices: dirtyStocks,
 		}
 		dirtyStocks = make(map[uint32]uint32)

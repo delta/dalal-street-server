@@ -14,9 +14,9 @@ var logger *logrus.Entry
 
 func init() {
 	logger = utils.GetNewFileLogger("datastreams.log", 20, "debug", false).WithFields(logrus.Fields{
-		"module": "socketapi/datastreams",
+		"module": "datastreams",
 	})
-	logger.Debugf("Lol")
+
 	go InitStockExchangeStream()
 	go InitStockPricesStream()
 }
