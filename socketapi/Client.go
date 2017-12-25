@@ -4,12 +4,11 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
 	"github.com/satori/go.uuid"
 
 	"github.com/thakkarparth007/dalal-street-server/session"
-	socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
+	// socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
 	"github.com/thakkarparth007/dalal-street-server/socketapi/repl"
 )
 
@@ -100,7 +99,9 @@ func (c *client) ReadPump() {
 			continue
 		}
 
-		dm := &socketapi_proto.DalalMessage{}
+		c.conn.Close()
+
+		/*dm := &socketapi_proto.DalalMessage{}
 		err = proto.Unmarshal(bytes, dm)
 		if err != nil {
 			l.Errorf("Error in unmarshaling the message. Client: '%+v'", c)
@@ -113,7 +114,7 @@ func (c *client) ReadPump() {
 		default:
 			l.Errorf("Unmarshaled message has unexpected MessageType: %+v", dm)
 			return
-		}
+		}*/
 	}
 }
 
@@ -131,7 +132,7 @@ func (c *client) WritePump() {
 		close(c.done)
 	}()
 
-	var sendBinary = func(msg interface{}) error {
+	/*var sendBinary = func(msg interface{}) error {
 		w, err := c.conn.NextWriter(websocket.BinaryMessage)
 		if err != nil {
 			l.Errorf("Unable to get NextWriter. Stopping. '%+v'", err)
@@ -147,7 +148,7 @@ func (c *client) WritePump() {
 			return err
 		}
 		return nil
-	}
+	}*/
 
 	var sendText = func(msg interface{}) error {
 		w, err := c.conn.NextWriter(websocket.TextMessage)
@@ -181,12 +182,13 @@ func (c *client) WritePump() {
 				if err := sendText(msg); err != nil {
 					return
 				}
-			case []byte:
-				if err := sendBinary(msg); err != nil {
-					return
-				}
+			/*case []byte:
+			if err := sendBinary(msg); err != nil {
+				return
+			}*/
 			default:
-				l.Errorf("Message should be either string or []byte. Given %t", t)
+				//l.Errorf("Message should be either string or []byte. Given %t", t)
+				l.Errorf("Message should be a string. Given %t", t)
 				return
 			}
 

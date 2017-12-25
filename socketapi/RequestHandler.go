@@ -1,5 +1,6 @@
 package socketapi
 
+/*
 import (
 	"fmt"
 	"runtime/debug"
@@ -280,3 +281,4 @@ func handleRequest(c *client, reqwrap *socketapi_proto.RequestWrapper) {
 	}
 
 }
+*/

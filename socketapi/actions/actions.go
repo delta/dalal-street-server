@@ -1,5 +1,6 @@
 package actions
 
+/*
 import (
 	"fmt"
 	"strconv"
@@ -1246,3 +1247,4 @@ func GetLeaderboard(sess session.Session, req *actions_proto.GetLeaderboardReque
 
 	return resp
 }
+*/
