@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
 )
 
 var isMarketOpen = false

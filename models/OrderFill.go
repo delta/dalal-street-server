@@ -1,7 +1,7 @@
 package models
 
 import (
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type OrderFill struct {
@@ -14,8 +14,8 @@ func (OrderFill) TableName() string {
 	return "OrderFills"
 }
 
-func (gOrderFill *OrderFill) ToProto() *models_proto.OrderFill {
-	return &models_proto.OrderFill{
+func (gOrderFill *OrderFill) ToProto() *models_pb.OrderFill {
+	return &models_pb.OrderFill{
 		TransactionId: gOrderFill.TransactionId,
 		BidId:         gOrderFill.BidId,
 		AskId:         gOrderFill.AskId,

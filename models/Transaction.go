@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Sirupsen/logrus"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type TransactionType uint8
@@ -61,8 +61,8 @@ func (Transaction) TableName() string {
 	return "Transactions"
 }
 
-func (t *Transaction) ToProto() *models_proto.Transaction {
-	pTrans := &models_proto.Transaction{
+func (t *Transaction) ToProto() *models_pb.Transaction {
+	pTrans := &models_pb.Transaction{
 		Id:      t.Id,
 		UserId:  t.UserId,
 		StockId: t.StockId,
@@ -74,13 +74,13 @@ func (t *Transaction) ToProto() *models_proto.Transaction {
 	}
 
 	if t.Type == FromExchangeTransaction {
-		pTrans.Type = models_proto.TransactionType_FROM_EXCHANGE_TRANSACTION
+		pTrans.Type = models_pb.TransactionType_FROM_EXCHANGE_TRANSACTION
 	} else if t.Type == OrderFillTransaction {
-		pTrans.Type = models_proto.TransactionType_ORDER_FILL_TRANSACTION
+		pTrans.Type = models_pb.TransactionType_ORDER_FILL_TRANSACTION
 	} else if t.Type == MortgageTransaction {
-		pTrans.Type = models_proto.TransactionType_MORTGAGE_TRANSACTION
+		pTrans.Type = models_pb.TransactionType_MORTGAGE_TRANSACTION
 	} else if t.Type == DividendTransaction {
-		pTrans.Type = models_proto.TransactionType_DIVIDEND_TRANSACTION
+		pTrans.Type = models_pb.TransactionType_DIVIDEND_TRANSACTION
 	}
 
 	return pTrans

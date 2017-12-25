@@ -6,7 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type Bid struct {
@@ -26,13 +26,13 @@ func (Bid) TableName() string {
 	return "Bids"
 }
 
-func (gBid *Bid) ToProto() *models_proto.Bid {
-	m := make(map[OrderType]models_proto.OrderType)
-	m[Limit] = models_proto.OrderType_LIMIT
-	m[Market] = models_proto.OrderType_MARKET
-	m[StopLoss] = models_proto.OrderType_STOPLOSS
+func (gBid *Bid) ToProto() *models_pb.Bid {
+	m := make(map[OrderType]models_pb.OrderType)
+	m[Limit] = models_pb.OrderType_LIMIT
+	m[Market] = models_pb.OrderType_MARKET
+	m[StopLoss] = models_pb.OrderType_STOPLOSS
 
-	pBid := &models_proto.Bid{
+	pBid := &models_pb.Bid{
 		Id:                     gBid.Id,
 		UserId:                 gBid.UserId,
 		StockId:                gBid.StockId,
@@ -45,11 +45,11 @@ func (gBid *Bid) ToProto() *models_proto.Bid {
 		UpdatedAt:              gBid.UpdatedAt,
 	}
 	if gBid.OrderType == Limit {
-		pBid.OrderType = models_proto.OrderType_LIMIT
+		pBid.OrderType = models_pb.OrderType_LIMIT
 	} else if gBid.OrderType == Market {
-		pBid.OrderType = models_proto.OrderType_MARKET
+		pBid.OrderType = models_pb.OrderType_MARKET
 	} else if gBid.OrderType == StopLoss {
-		pBid.OrderType = models_proto.OrderType_STOPLOSS
+		pBid.OrderType = models_pb.OrderType_STOPLOSS
 	}
 	return pBid
 }

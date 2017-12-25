@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	models_pb "github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type LeaderboardRow struct {
@@ -22,8 +22,8 @@ func (LeaderboardRow) TableName() string {
 	return "Leaderboard"
 }
 
-func (l *LeaderboardRow) ToProto() *models_proto.LeaderboardRow {
-	return &models_proto.LeaderboardRow{
+func (l *LeaderboardRow) ToProto() *models_pb.LeaderboardRow {
+	return &models_pb.LeaderboardRow{
 		Id:         l.Id,
 		UserId:     l.UserId,
 		UserName:   l.UserName,

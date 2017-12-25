@@ -7,7 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type OrderType uint8
@@ -48,12 +48,12 @@ func (ot OrderType) String() string {
 	return orderTypes[ot]
 }
 
-func OrderTypeFromProto(pOt models_proto.OrderType) OrderType {
-	if pOt == models_proto.OrderType_LIMIT {
+func OrderTypeFromProto(pOt models_pb.OrderType) OrderType {
+	if pOt == models_pb.OrderType_LIMIT {
 		return Limit
-	} else if pOt == models_proto.OrderType_MARKET {
+	} else if pOt == models_pb.OrderType_MARKET {
 		return Market
-	} else if pOt == models_proto.OrderType_STOPLOSS {
+	} else if pOt == models_pb.OrderType_STOPLOSS {
 		return StopLoss
 	} else {
 		return StopLossActive
@@ -77,13 +77,13 @@ func (Ask) TableName() string {
 	return "Asks"
 }
 
-func (gAsk *Ask) ToProto() *models_proto.Ask {
-	m := make(map[OrderType]models_proto.OrderType)
-	m[Limit] = models_proto.OrderType_LIMIT
-	m[Market] = models_proto.OrderType_MARKET
-	m[StopLoss] = models_proto.OrderType_STOPLOSS
+func (gAsk *Ask) ToProto() *models_pb.Ask {
+	m := make(map[OrderType]models_pb.OrderType)
+	m[Limit] = models_pb.OrderType_LIMIT
+	m[Market] = models_pb.OrderType_MARKET
+	m[StopLoss] = models_pb.OrderType_STOPLOSS
 
-	pAsk := &models_proto.Ask{
+	pAsk := &models_pb.Ask{
 		Id:                     gAsk.Id,
 		UserId:                 gAsk.UserId,
 		StockId:                gAsk.StockId,
@@ -96,11 +96,11 @@ func (gAsk *Ask) ToProto() *models_proto.Ask {
 		UpdatedAt:              gAsk.UpdatedAt,
 	}
 	if gAsk.OrderType == Limit {
-		pAsk.OrderType = models_proto.OrderType_LIMIT
+		pAsk.OrderType = models_pb.OrderType_LIMIT
 	} else if gAsk.OrderType == Market {
-		pAsk.OrderType = models_proto.OrderType_MARKET
+		pAsk.OrderType = models_pb.OrderType_MARKET
 	} else if gAsk.OrderType == StopLoss {
-		pAsk.OrderType = models_proto.OrderType_STOPLOSS
+		pAsk.OrderType = models_pb.OrderType_STOPLOSS
 	}
 
 	return pAsk

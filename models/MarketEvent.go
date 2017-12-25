@@ -2,8 +2,8 @@ package models
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type MarketEvent struct {
@@ -20,8 +20,8 @@ func (MarketEvent) TableName() string {
 	return "MarketEvents"
 }
 
-func (gMarketEvent *MarketEvent) ToProto() *models_proto.MarketEvent {
-	pMarketEvent := &models_proto.MarketEvent{
+func (gMarketEvent *MarketEvent) ToProto() *models_pb.MarketEvent {
+	pMarketEvent := &models_pb.MarketEvent{
 		Id:           gMarketEvent.Id,
 		StockId:      gMarketEvent.StockId,
 		Headline:     gMarketEvent.Headline,
