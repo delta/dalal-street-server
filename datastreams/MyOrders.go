@@ -5,7 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 )
 
 var orderListenersLock sync.Mutex
@@ -37,7 +37,7 @@ func SendOrder(userId uint32, orderId uint32, isAsk bool, tradeQuantity uint32, 
 	}
 	orderListenersLock.Unlock()
 
-	orderUpdateProto := &datastreams_proto.MyOrderUpdate{
+	orderUpdateProto := &datastreams_pb.MyOrderUpdate{
 		Id:            orderId,
 		IsAsk:         isAsk,
 		TradeQuantity: tradeQuantity,

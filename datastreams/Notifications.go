@@ -6,8 +6,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 var notifListenersLock sync.Mutex
@@ -19,7 +19,7 @@ type notifListenersSingleUser struct {
 
 var notifListeners = make(map[uint32]*notifListenersSingleUser)
 
-func SendNotification(n *models_proto.Notification) {
+func SendNotification(n *models_pb.Notification) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "SendNotification",
 		"param_n": fmt.Sprintf("%+v", n),
@@ -44,7 +44,7 @@ func SendNotification(n *models_proto.Notification) {
 	}
 	notifListenersLock.Unlock()
 
-	notifUpdateProto := &datastreams_proto.NotificationUpdate{
+	notifUpdateProto := &datastreams_pb.NotificationUpdate{
 		n,
 	}
 

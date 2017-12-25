@@ -7,11 +7,11 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 )
 
 var (
-	dirtyStocksInExchange = make(map[uint32]*datastreams_proto.StockExchangeDataPoint) // list of stocks whose updates we haven't sent yet
+	dirtyStocksInExchange = make(map[uint32]*datastreams_pb.StockExchangeDataPoint) // list of stocks whose updates we haven't sent yet
 	stockExchangeMutex    sync.Mutex
 
 	stockExchangeListenersMutex sync.Mutex
@@ -43,10 +43,10 @@ func InitStockExchangeStream() {
 			continue
 		}
 		l.Debugf("Found dirtyStocks")
-		updateProto := &datastreams_proto.StockExchangeUpdate{
+		updateProto := &datastreams_pb.StockExchangeUpdate{
 			StocksInExchange: dirtyStocksInExchange,
 		}
-		dirtyStocksInExchange = make(map[uint32]*datastreams_proto.StockExchangeDataPoint)
+		dirtyStocksInExchange = make(map[uint32]*datastreams_pb.StockExchangeDataPoint)
 		stockExchangeMutex.Unlock()
 
 		sent := 0
@@ -83,7 +83,7 @@ func SendStockExchangeUpdate(stockId, price, stocksInExchange, stocksInMarket ui
 
 	stockExchangeMutex.Lock()
 	defer stockExchangeMutex.Unlock()
-	dirtyStocksInExchange[stockId] = &datastreams_proto.StockExchangeDataPoint{
+	dirtyStocksInExchange[stockId] = &datastreams_pb.StockExchangeDataPoint{
 		Price:            price,
 		StocksInExchange: stocksInExchange,
 		StocksInMarket:   stocksInMarket,
