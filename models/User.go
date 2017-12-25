@@ -14,8 +14,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
@@ -37,8 +37,8 @@ type User struct {
 	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
 }
 
-func (u *User) ToProto() *models_proto.User {
-	return &models_proto.User{
+func (u *User) ToProto() *models_pb.User {
+	return &models_pb.User{
 		Id:        u.Id,
 		Email:     u.Email,
 		Name:      u.Name,
@@ -491,10 +491,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Releasing lock for ask order threshold check with stock id : %v ", ask.StockId)
 
-	var upperLimit = uint32(1.2*float32(currentPrice))
-	var lowerLimit = uint32(0.8*float32(currentPrice))
+	var upperLimit = uint32(1.2 * float32(currentPrice))
+	var lowerLimit = uint32(0.8 * float32(currentPrice))
 
-	if(ask.Price > upperLimit || ask.Price < lowerLimit) {
+	if ask.Price > upperLimit || ask.Price < lowerLimit {
 		l.Debugf("Threshold price check failed for ask order")
 		return 0, AskLimitExceededError{}
 	}
@@ -580,10 +580,10 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Debugf("Releasing lock for bid order threshold check with stock id : %v ", bid.StockId)
 
-	var upperLimit = uint32(1.2*float32(currentPrice))
-	var lowerLimit = uint32(0.8*float32(currentPrice))
+	var upperLimit = uint32(1.2 * float32(currentPrice))
+	var lowerLimit = uint32(0.8 * float32(currentPrice))
 
-	if(bid.Price > upperLimit || bid.Price < lowerLimit) {
+	if bid.Price > upperLimit || bid.Price < lowerLimit {
 		l.Debugf("Threshold price check failed for bid order")
 		return 0, BidLimitExceededError{}
 	}

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	datastreams "github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type Stock struct {
@@ -24,7 +24,7 @@ type Stock struct {
 	StocksInMarket   uint32 `gorm:"column:stocksInMarket;not null" json:"stocks_in_market"`
 	PreviousDayClose uint32 `gorm:"column:previousDayClose;not null" json:"previous_day_close"`
 	UpOrDown         bool   `gorm:"column:upOrDown;not null" json:"up_or_down"`
-	AvgLastPrice     uint32	`gorm:"column:avgLastPrice;not null" json:"avg_last_price"`
+	AvgLastPrice     uint32 `gorm:"column:avgLastPrice;not null" json:"avg_last_price"`
 	CreatedAt        string `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt        string `gorm:"column:updatedAt;not null" json:"updated_at"`
 }
@@ -33,8 +33,8 @@ func (Stock) TableName() string {
 	return "Stocks"
 }
 
-func (gStock *Stock) ToProto() *models_proto.Stock {
-	return &models_proto.Stock{
+func (gStock *Stock) ToProto() *models_pb.Stock {
+	return &models_pb.Stock{
 		Id:               gStock.Id,
 		ShortName:        gStock.ShortName,
 		FullName:         gStock.FullName,
@@ -147,7 +147,7 @@ func UpdateStockPrice(stockId, price uint32) error {
 	}
 
 	avgLastPrice.Lock()
-	avgLastPrice.m[stock.Id] = avgLastPrice.m[stock.Id] - uint32((avgLastPrice.m[stock.Id] + stock.CurrentPrice)/20)
+	avgLastPrice.m[stock.Id] = avgLastPrice.m[stock.Id] - uint32((avgLastPrice.m[stock.Id]+stock.CurrentPrice)/20)
 	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
 	avgLastPrice.Unlock()
 

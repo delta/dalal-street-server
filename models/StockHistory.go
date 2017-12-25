@@ -1,7 +1,7 @@
 package models
 
 import (
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type StockHistory struct {
@@ -14,8 +14,8 @@ func (StockHistory) TableName() string {
 	return "StockHistory"
 }
 
-func (gStockHistory *StockHistory) ToProto() *models_proto.StockHistory {
-	return &models_proto.StockHistory{
+func (gStockHistory *StockHistory) ToProto() *models_pb.StockHistory {
+	return &models_pb.StockHistory{
 		StockId:    gStockHistory.StockId,
 		StockPrice: gStockHistory.StockPrice,
 		CreatedAt:  gStockHistory.CreatedAt,

@@ -3,7 +3,7 @@ package models
 import (
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
 )
 
 type StockDetails struct {

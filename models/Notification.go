@@ -2,8 +2,8 @@ package models
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type Notification struct {
@@ -18,8 +18,8 @@ func (Notification) TableName() string {
 	return "Notifications"
 }
 
-func (gNotification *Notification) ToProto() *models_proto.Notification {
-	return &models_proto.Notification{
+func (gNotification *Notification) ToProto() *models_pb.Notification {
+	return &models_pb.Notification{
 		Id:          gNotification.Id,
 		UserId:      gNotification.UserId,
 		Text:        gNotification.Text,
