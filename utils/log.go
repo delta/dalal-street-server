@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"os"
+
 	"github.com/Sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -41,6 +43,10 @@ func init() {
 			MaxSize:  maxSize, // MB
 		},
 		Level: level,
+	}
+	if fileName == "stdout" {
+		Logger.Out = os.Stdout
+		Logger.Formatter = &logrus.TextFormatter{}
 	}
 
 	Logger.Info("Logger started")

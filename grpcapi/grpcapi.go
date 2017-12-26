@@ -10,13 +10,16 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/actionservice"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/streamservice"
 	"github.com/thakkarparth007/dalal-street-server/proto_build"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
 	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 func authFunc(ctx context.Context) (context.Context, error) {
@@ -39,6 +42,11 @@ func authFunc(ctx context.Context) (context.Context, error) {
 func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	switch req.(type) {
 	case *actions_pb.LoginRequest:
+		newSess, err := session.New()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Internal error occurred")
+		}
+		ctx = context.WithValue(ctx, "session", newSess)
 		return handler(ctx, req)
 	}
 
@@ -46,17 +54,24 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 	if err != nil {
 		return nil, err
 	}
+
 	return handler(newCtx, req)
 }
 
-func StartServices() {
+func StartServices(crt, key string) {
+	creds, err := credentials.NewServerTLSFromFile(crt, key)
+	if err != nil {
+		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
+	}
+
 	grpcServer := grpc.NewServer(
+		grpc.Creds(creds),
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			grpc_auth.StreamServerInterceptor(authFunc), // all routes require authentication
 			grpc_recovery.StreamServerInterceptor(),
 		)),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-			unaryAuthInterceptor, // all routes except require authentication
+			unaryAuthInterceptor, // all routes except Login require authentication
 			grpc_recovery.UnaryServerInterceptor(),
 		)),
 	)
@@ -64,7 +79,7 @@ func StartServices() {
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService())
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService())
 
-	lis, err := net.Listen("tcp", ":8000")
+	lis, err := net.Listen("tcp", utils.Configuration.GrpcAddress)
 	if err != nil {
 		log.Fatalf("Failed while listening on port 8000. Error: %+v", err)
 	}

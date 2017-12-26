@@ -36,3 +36,5 @@ docker/
 
 # proto build
 proto_build/*
+
+tls_keys/prod/*

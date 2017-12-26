@@ -31,7 +31,7 @@ func getUserId(ctx context.Context) uint32 {
 
 func init() {
 	logger = utils.Logger.WithFields(logrus.Fields{
-		"module": "socketapi.actions",
+		"module": "grpcapi.actions",
 	})
 }
 
@@ -159,7 +159,7 @@ func (d *dalalStreamService) getSubscription(req *datastreams_pb.SubscriptionId,
 
 	d.subscriptionsMap[dataStreamType].RLock()
 	subscription, ok := d.subscriptionsMap[dataStreamType].m[id]
-	d.subscriptionsMap[dataStreamType].Unlock()
+	d.subscriptionsMap[dataStreamType].RUnlock()
 	if !ok {
 		return nil, grpc.Errorf(codes.InvalidArgument, "Invalid subscription id")
 	}

@@ -46,6 +46,15 @@ type Config struct {
 
 	// HttpPort is the port on which the http server will run
 	HttpPort int
+
+	// GRPC Server related options
+
+	// GrpcAddress is the address to which the gRPC server will bind
+	GrpcAddress string
+	// GrpcCert is the location of the TLS certificate to be used by the server
+	GrpcCert string
+	// GrpcKey is the location of the TLS private key to be used by the server
+	GrpcKey string
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
