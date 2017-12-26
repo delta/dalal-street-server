@@ -11,9 +11,9 @@ before_install:
     - unzip protoc-3.2.0rc2-linux-x86_64.zip
     - export PATH=$PATH:$(pwd)/bin
     - go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
-    - cd socketapi/
+    - go get -u golang.org/x/net/context
+    - go get -u google.golang.org/grpc
     - ./build_proto.sh
-    - cd ..
     - mysql -e 'CREATE DATABASE dalalstreet_test;'
     - go get github.com/gemnasium/migrate
     - migrate -url mysql://root:@/dalalstreet_test -path ./migrations up
