@@ -26,7 +26,7 @@ func RealMain() {
 	//utils.InitLogger()
 
 	models.InitMatchingEngine()
-	grpcapi.StartServices()
+	grpcapi.StartServices(utils.Configuration.GrpcCert, utils.Configuration.GrpcKey)
 	datastreams.StartStreams()
 	//models.InitModels()
 	//session.InitSession()

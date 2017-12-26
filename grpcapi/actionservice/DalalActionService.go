@@ -29,7 +29,7 @@ func getUserId(ctx context.Context) uint32 {
 
 func init() {
 	logger = utils.Logger.WithFields(logrus.Fields{
-		"module": "socketapi.actions",
+		"module": "grpcapi.actions",
 	})
 }
 
@@ -168,6 +168,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 	case err == models.NotRegisteredError:
 		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "You have not registered for Dalal Street on the Pragyan website")
 	case err != nil:
+		l.Errorln(err)
 		return makeError(actions_pb.LoginResponse_InternalServerError, "")
 	}
 
@@ -175,6 +176,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 
 	if !alreadyLoggedIn {
 		if err := sess.Set("userId", strconv.Itoa(int(user.Id))); err != nil {
+			l.Errorln(err)
 			return makeError(actions_pb.LoginResponse_InternalServerError, "")
 		}
 	}
@@ -183,6 +185,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 
 	stocksOwned, err := models.GetStocksOwned(user.Id)
 	if err != nil {
+		l.Errorln(err)
 		return makeError(actions_pb.LoginResponse_InternalServerError, "")
 	}
 
