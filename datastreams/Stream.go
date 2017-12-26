@@ -16,7 +16,9 @@ func init() {
 	logger = utils.GetNewFileLogger("datastreams.log", 20, "debug", false).WithFields(logrus.Fields{
 		"module": "datastreams",
 	})
+}
 
+func StartStreams() {
 	go InitStockExchangeStream()
 	go InitStockPricesStream()
 }

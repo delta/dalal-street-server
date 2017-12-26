@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/grpcapi"
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/socketapi"
 	"github.com/thakkarparth007/dalal-street-server/utils"
@@ -24,6 +26,8 @@ func RealMain() {
 	//utils.InitLogger()
 
 	models.InitMatchingEngine()
+	grpcapi.StartServices()
+	datastreams.StartStreams()
 	//models.InitModels()
 	//session.InitSession()
 	//socketapi.InitSocketApi()
