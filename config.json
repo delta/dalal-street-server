@@ -7,7 +7,7 @@
 
       "LogFileName": "stdout",
       "LogMaxSize": 50,
-      "LogLevel": "info",
+      "LogLevel": "debug",
 
       "DbUser": "root",
       "DbPassword": "MYSQL_ROOT_PASSWORD",
@@ -73,7 +73,7 @@
 
       "LogFileName": "stdout",
       "LogMaxSize": 50,
-      "LogLevel": "info",
+      "LogLevel": "debug",
 
       "DbUser": "root",
       "DbPassword": "",

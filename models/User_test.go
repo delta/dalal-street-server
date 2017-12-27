@@ -92,7 +92,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 	}
 
 	var user = &User{Id: 2}
-	var stock = &Stock{Id: 1}
+	var stock = &Stock{Id: 1, CurrentPrice: 200}
 
 	transactions := []*Transaction{
 		makeTrans(2, 1, FromExchangeTransaction, 10, 200, 2000),
@@ -108,6 +108,8 @@ func Test_PlaceAskOrder(t *testing.T) {
 		{makeAsk(2, 1, Limit, 2, 200), true},
 		{makeAsk(2, 1, Limit, 3, 200), true},
 		{makeAsk(2, 1, Limit, 11, 200), false},
+		{makeAsk(2, 1, Limit, 11, 2000), false}, // too high a price won't be allowed
+		{makeAsk(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
 	db, err := DbOpen()
@@ -135,6 +137,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 	if err := db.Create(stock).Error; err != nil {
 		t.Fatal(err)
 	}
+	LoadStocks()
 
 	for _, tr := range transactions {
 		if err := db.Create(tr).Error; err != nil {
@@ -202,7 +205,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 	}
 
 	var user = &User{Id: 2, Cash: 2000}
-	var stock = &Stock{Id: 1}
+	var stock = &Stock{Id: 1, CurrentPrice: 200}
 
 	transactions := []*Transaction{
 		makeTrans(2, 1, FromExchangeTransaction, 10, 200, 2000),
@@ -218,6 +221,8 @@ func Test_PlaceBidOrder(t *testing.T) {
 		{makeBid(2, 1, Limit, 2, 200), true},
 		{makeBid(2, 1, Limit, 3, 200), true},
 		{makeBid(2, 1, Limit, 11, 200), false},
+		{makeBid(2, 1, Limit, 11, 2000), false}, // too high a price won't be allowed
+		{makeBid(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
 	db, err := DbOpen()
@@ -245,6 +250,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 	if err := db.Create(stock).Error; err != nil {
 		t.Fatal(err)
 	}
+	LoadStocks()
 
 	for _, tr := range transactions {
 		if err := db.Create(tr).Error; err != nil {
@@ -643,6 +649,16 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 				if _, ok := err.(BuyLimitExceededError); ok {
 					t.Logf("Got buy limit exceeded error, current buy limit : %d, orderQuantity : %d, didExceed : %v", BUY_LIMIT, tc.stockQuantity, tc.buyLimitExceeded)
 					return
+				}
+				if _, ok := err.(NotEnoughStocksError); ok {
+					allStocks.m[tc.stockId].RLock()
+					sie := allStocks.m[tc.stockId].stock.StocksInExchange
+					allStocks.m[tc.stockId].RUnlock()
+
+					if sie == 0 {
+						t.Logf("Got Not enough stocks error, stocks in exchange got empty")
+						return
+					}
 				}
 				t.Fatalf("Did not expect error. Got %+v", err)
 			}

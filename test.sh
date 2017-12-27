@@ -7,6 +7,6 @@ export DALAL_ENV=Test
 go test -v -run="^(Test|Benchmark)[^_](.*)" ./... -args -config="$(pwd)/config.json"
 
 # Integration tests
-#migrate -url mysql://root:@/dalalstreet_test -path ./migrations up 
-#go test -race -v -p=1 -run="^(Test|Benchmark)_(.*)" ./... -args -config="$(pwd)/config.json"
-#migrate -url mysql://root:@/dalalstreet_test -path ./migrations down 
+migrate -url mysql://root:@/dalalstreet_test -path ./migrations up 
+go test -race -v -p=1 -run="^(Test|Benchmark)_(.*)" ./... -args -config="$(pwd)/config.json"
+migrate -url mysql://root:@/dalalstreet_test -path ./migrations down 
