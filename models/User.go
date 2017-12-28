@@ -819,11 +819,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 }
 
 /*
-*	NOTE: THIS FUNCTION ASSUMES BOTH THE USERS HAVE BEEN LOCKED BY THE CALLEE
-*
 *	PerformOrderFillTransaction performs the following function
-*		- Check if bidder has enough cash. If not, return NotEnoughcashError
-*		- Check if asker has enough stocks. If not, return NotEnoughStocksError
 *		- Set transaction price based on order type(Limit, Market). StopLoss needs to be handled separately
 *		- Calculate updated cash for biddingUser and askingUser
 *		- Calculate StockQuantityFulfilled and IsClosed for askOrder and bidOrder
@@ -837,7 +833,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 *		- if askDone is true, ask can be removed
 *		- if bidDone is true, bid can be removed
  */
-func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, bid *Bid) (bool, bool, *Transaction) {
+func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "PerformOrderFillTransaction",
 		"askingUserId":  ask.UserId,
@@ -936,35 +932,35 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	}
 
 	//Check if bidder has enough cash
-	var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice)*stockTradeQty
+	// var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice)*stockTradeQty
 
-	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debugf("Check1: Failed. Not enough cash.")
-		bid.IsClosed = true
-		go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
-		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
-		return false, true, nil
-	}
+	// if cashLeft < MINIMUM_CASH_LIMIT {
+	// 	l.Debugf("Check1: Failed. Not enough cash.")
+	// 	bid.IsClosed = true
+	// 	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
+	// 	go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
+	// 	return false, true, nil
+	// }
 
 	//Check if askingUser has enough stocks
-	numStocks, err := getSingleStockCount(askingUser, ask.StockId)
-	if err != nil {
-		return false, false, nil
-	}
+	// numStocks, err := getSingleStockCount(askingUser, ask.StockId)
+	// if err != nil {
+	// 	return false, false, nil
+	// }
 
-	var numStocksLeft = numStocks - int32(stockTradeQty)
+	// var numStocksLeft = numStocks - int32(stockTradeQty)
 
-	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
-		l.Debugf("Check2: Failed. Not enough stocks.")
-		currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
-		if currentAllowedQty > ASK_LIMIT {
-			currentAllowedQty = ASK_LIMIT
-		}
-		ask.IsClosed = true
-		go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
-		go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
-		return true, false, nil
-	}
+	// if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
+	// 	l.Debugf("Check2: Failed. Not enough stocks.")
+	// 	currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
+	// 	if currentAllowedQty > ASK_LIMIT {
+	// 		currentAllowedQty = ASK_LIMIT
+	// 	}
+	// 	ask.IsClosed = true
+	// 	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
+	// 	go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
+	// 	return true, false, nil
+	// }
 
 	//helper function to return a transaction object
 	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
@@ -984,6 +980,48 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -stockTradeQty, stockTradePrice, total)
 	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, stockTradeQty, stockTradePrice, -total)
 
+	l.Debugf("Acquiring lock in order of User Ids")
+
+	var firstUserId, secondUserId uint32
+
+	//look out for error!!!
+	if ask.UserId < bid.UserId {
+		firstUserId = ask.UserId
+		secondUserId = bid.UserId
+	} else {
+		firstUserId = bid.UserId
+		secondUserId = ask.UserId
+	}
+
+	l.Debugf("Want first and second as %d, %d for stockid: %d", firstUserId, secondUserId, ask.StockId)
+	defer l.Debugf("Closed channels of %d and %d for stockid: %d", firstUserId, secondUserId, ask.StockId)
+
+	firstLockChan, firstUser, err := getUser(firstUserId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return false, false, nil
+	}
+	defer close(firstLockChan)
+
+	secondLockChan, secondUser, err := getUser(secondUserId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return false, false, nil
+	}
+	defer close(secondLockChan)
+
+	l.Debugf("Acquired the locks on users %d and %d", firstUserId, secondUserId)
+
+	var askingUser, biddingUser *User
+
+	if ask.UserId == firstUserId {
+		askingUser = firstUser
+		biddingUser = secondUser
+	} else {
+		askingUser = secondUser
+		biddingUser = firstUser
+	}
+
 	//calculate user's updated cash
 	askingUserCash := askingUser.Cash + uint32(stockTradeQty)*stockTradePrice
 	biddingUserCash := biddingUser.Cash - uint32(stockTradeQty)*stockTradePrice
@@ -992,8 +1030,8 @@ func PerformOrderFillTransaction(askingUser *User, biddingUser *User, ask *Ask, 
 	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
 	bidStockQuantityFulfilled := bid.StockQuantityFulfilled + uint32(stockTradeQty)
 
-	var askIsClosed bool
-	var bidIsClosed bool
+	var askIsClosed, bidIsClosed bool
+
 	if ask.StockQuantity == askStockQuantityFulfilled {
 		askIsClosed = true
 	}
