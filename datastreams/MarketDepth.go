@@ -199,6 +199,10 @@ func (md *MarketDepth) RemoveListener(sessionId string) {
 }
 
 func (md *MarketDepth) AddOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
+	// Do not add Market orders to depth
+	if isMarket {
+		return
+	}
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "MarketDepth.AddOrder",
 		"param_stockId":       md.stockId,
@@ -254,6 +258,10 @@ func (md *MarketDepth) Trade(price, qty uint32, createdAt string) {
 }
 
 func (md *MarketDepth) CloseOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
+	// Market orders have not even been added to depth
+	if isMarket {
+		return
+	}
 	if isAsk {
 		md.askDepthLock.Lock()
 		md.askDepth[price] -= stockQuantity
