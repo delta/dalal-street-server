@@ -1,9 +1,8 @@
 package models
 
 import (
-	"testing"
-
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
+	"testing"
 )
 
 func TestStockToProto(t *testing.T) {
@@ -71,5 +70,50 @@ func Test_UpdateStockPrice(t *testing.T) {
 	}
 	if !testutils.AssertEqual(t, stock1, a) {
 		t.Fatalf("Expected %v but got %v", stock1, a)
+	}
+}
+func Test_GetCompanyDetails(t *testing.T) {
+	var stock = &Stock{Id: 1, CurrentPrice: 1000}
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatalf("Opening data base for inserting stocks failed %v", err)
+	}
+	defer db.Close()
+	db.Save(stock)
+	defer func() {
+		db.Exec("DELETE FROM StockHistory")
+		db.Delete(stock)
+	}()
+	LoadStocks()
+	testutils.Sleep(90)
+	_, b, _ := GetCompanyDetails(1)
+	var stkHistoryPoint = &StockHistory{
+		StockId:    1,
+		StockPrice: 1000,
+		CreatedAt:  b[0].CreatedAt,
+	}
+	if !testutils.AssertEqual(t, stkHistoryPoint, b[0]) {
+		t.Fatalf("Expected %v but got %v", stkHistoryPoint, b[0])
+	}
+}
+func Test_AddStocksToExchange(t *testing.T) {
+	var stock = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 234}
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatalf("Opening data base for inserting stocks failed %v", err)
+	}
+	defer db.Close()
+	db.Save(stock)
+	defer func() {
+		db.Exec("DELETE FROM StockHistory")
+		db.Delete(stock)
+	}()
+	LoadStocks()
+	AddStocksToExchange(1, 10)
+	var a = &Stock{Id: 1}
+	db.First(a)
+	var stockEqual = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 244}
+	if !testutils.AssertEqual(t, a, stockEqual) {
+		t.Fatalf("Expected %v but got %v", stockEqual, a)
 	}
 }
