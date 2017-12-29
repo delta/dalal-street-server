@@ -918,14 +918,14 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 	var stockTradePrice uint32
 
 	//set transaction price based on order type
-	if ask.OrderType == Market && bid.OrderType == Market {
+	if isMarket(ask.OrderType) && isMarket(bid.OrderType) {
 		allStocks.m[ask.StockId].RLock()
 		stock, _ := allStocks.m[ask.StockId]
 		stockTradePrice = stock.stock.CurrentPrice
 		allStocks.m[ask.StockId].RUnlock()
-	} else if ask.OrderType == Market {
+	} else if isMarket(ask.OrderType) {
 		stockTradePrice = bid.Price
-	} else if bid.OrderType == Market {
+	} else if isMarket(bid.OrderType) {
 		stockTradePrice = ask.Price
 	} else {
 		stockTradePrice = min(ask.Price, bid.Price)
