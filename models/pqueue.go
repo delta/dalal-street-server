@@ -2,6 +2,7 @@ package models
 
 import (
 	"sync"
+	"time"
 )
 
 // PQType represents a priority queue ordering kind (see MAXPQ and MINPQ)
@@ -31,14 +32,21 @@ type BidPQueue struct {
 	sync.RWMutex
 	items      []*bidItem
 	elemsCount int
-	comparator func(uint32, uint32, uint32, uint32) bool
+	comparator func(Factors, Factors) bool
 }
 
 type AskPQueue struct {
 	sync.RWMutex
 	items      []*askItem
 	elemsCount int
-	comparator func(uint32, uint32, uint32, uint32) bool
+	comparator func(Factors, Factors) bool
+}
+
+type Factors struct {
+	oType    OrderType
+	price    uint32
+	placedAt time.Time
+	quantity uint32
 }
 
 func newBidItem(value *Bid, price uint32, quantity uint32) *bidItem {
@@ -64,7 +72,7 @@ func newAskItem(value *Ask, price uint32, quantity uint32) *askItem {
 // NewPQueue creates a new priority queue with the provided pqtype
 // ordering type
 func NewBidPQueue(pqType PQType) *BidPQueue {
-	var cmp func(uint32, uint32, uint32, uint32) bool
+	var cmp func(Factors, Factors) bool
 
 	if pqType == MAXPQ {
 		cmp = bidComparator
@@ -83,7 +91,7 @@ func NewBidPQueue(pqType PQType) *BidPQueue {
 }
 
 func NewAskPQueue(pqType PQType) *AskPQueue {
-	var cmp func(uint32, uint32, uint32, uint32) bool
+	var cmp func(Factors, Factors) bool
 
 	if pqType == MAXPQ {
 		cmp = bidComparator
@@ -219,29 +227,91 @@ func (pq *AskPQueue) size() int {
 	return pq.elemsCount
 }
 
-func bidComparator(price1, quantity1, price2, quantity2 uint32) bool {
-	if price1 < price2 {
-		return true
-	} else if price1 > price2 {
+/*
+ *	bidComparator performs the following actions:
+ *		- If exactly one of them is Market/StopLossActive, it has priority
+ *		- If both are Market/StopLossActive, the older order has priority
+ *		- If both are Limit orders, higher price has priority
+ *		  If prices are equal, higher quantity has more priority
+ *		- If both are Stoploss orders, higher price has priority for ask.
+ */
+func bidComparator(order1, order2 Factors) bool {
+	if isMarket(order1.oType) && isMarket(order2.oType) {
+		return order2.placedAt.Before(order1.placedAt)
+	}
+	if isMarket(order1.oType) {
 		return false
 	}
-	return quantity2 > quantity1
+	if isMarket(order2.oType) {
+		return true
+	}
+	if order1.price == order2.price {
+		return order2.quantity > order1.quantity
+	}
+	return order1.price < order2.price
 }
 
-func askComparator(price1, quantity1, price2, quantity2 uint32) bool {
-	if price1 > price2 {
-		return true
-	} else if price1 < price2 {
+/*
+ *	askComparator performs the following actions:
+ *		- If exactly one of them is Market/StopLossActive, it has priority
+ *		- If both are Market/StopLossActive, the older order has priority
+ *		- If both are Limit orders, lower price has priority
+ *		  If prices are equal, higher quantity has more priority
+ *		- If both are Stoploss orders, lower price has priority for bid.
+ */
+func askComparator(order1, order2 Factors) bool {
+	if isMarket(order1.oType) && isMarket(order2.oType) {
+		return order2.placedAt.Before(order1.placedAt)
+	}
+	if isMarket(order1.oType) {
 		return false
 	}
-	return quantity2 > quantity1
+	if isMarket(order2.oType) {
+		return true
+	}
+	if order1.price == order2.price {
+		return order2.quantity > order1.quantity
+	}
+	return order1.price > order2.price
 }
 
 func (pq *BidPQueue) less(i, j int) bool {
-	return pq.comparator(pq.items[i].price, pq.items[i].quantity, pq.items[j].price, pq.items[j].quantity)
+	placedAt1, _ := time.Parse(time.RFC3339, pq.items[i].value.CreatedAt)
+	placedAt2, _ := time.Parse(time.RFC3339, pq.items[j].value.CreatedAt)
+
+	return pq.comparator(
+		Factors{
+			oType:    pq.items[i].value.OrderType,
+			price:    pq.items[i].price,
+			placedAt: placedAt1,
+			quantity: pq.items[i].quantity,
+		},
+		Factors{
+			oType:    pq.items[j].value.OrderType,
+			price:    pq.items[j].price,
+			placedAt: placedAt2,
+			quantity: pq.items[j].quantity,
+		},
+	)
 }
 func (pq *AskPQueue) less(i, j int) bool {
-	return pq.comparator(pq.items[i].price, pq.items[i].quantity, pq.items[j].price, pq.items[j].quantity)
+	placedAt1, _ := time.Parse(time.RFC3339, pq.items[i].value.CreatedAt)
+	placedAt2, _ := time.Parse(time.RFC3339, pq.items[j].value.CreatedAt)
+
+	return pq.comparator(
+		Factors{
+			oType:    pq.items[i].value.OrderType,
+			price:    pq.items[i].price,
+			placedAt: placedAt1,
+			quantity: pq.items[i].quantity,
+		},
+		Factors{
+			oType:    pq.items[j].value.OrderType,
+			price:    pq.items[j].price,
+			placedAt: placedAt2,
+			quantity: pq.items[j].quantity,
+		},
+	)
 }
 
 func (pq *BidPQueue) exch(i, j int) {
