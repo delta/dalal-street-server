@@ -1,10 +1,10 @@
 package models
 
 import (
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
-	"github.com/Sirupsen/logrus"
-	"time"
 	"testing"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func TestAskToProto(t *testing.T) {
@@ -28,67 +28,33 @@ func TestAskToProto(t *testing.T) {
 	}
 }
 
-func Test_GetMyAsks(t *testing.T) {
+func Test_GetMyOpenAsks(t *testing.T) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":   "Test_GetMyAsks",
+		"method": "Test_GetMyOpenAsks",
 	})
 
-	l.Infof("Attempting to get asks for user id %d", 3)
-
-	var makeUser = func(id uint32, email string, name string, cash uint32, total int32) *User {
-		return &User{
-			Id:        id,
-			Email:     email,
-			Name:      name,
-			Cash:      cash,
-			Total:     total,
-			CreatedAt: time.Now().Format(time.RFC3339),
-		}
-	}
-
-	var makeStock = func(id uint32, sName string, fName string, desc string, curPrice uint32, dayHigh uint32, dayLow uint32, allHigh uint32, allLow uint32, stocks uint32, upOrDown bool) *Stock {
-		return &Stock{
-			Id:               id,
-			ShortName:        sName,
-			FullName:         fName,
-			Description:      desc,
-			CurrentPrice:     curPrice,
-			DayHigh:          dayHigh,
-			DayLow:           dayLow,
-			AllTimeHigh:      allHigh,
-			AllTimeLow:       allLow,
-			StocksInExchange: stocks,
-			UpOrDown:         upOrDown,
-			CreatedAt:        time.Now().Format(time.RFC3339),
-			UpdatedAt:        time.Now().Format(time.RFC3339),
-		}
-	}
-
-	var makeAsk = func(userId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32, isClosed bool) *Ask {
+	var makeAsk = func(userId uint32, stockId uint32, isClosed bool) *Ask {
 		return &Ask{
-			UserId:        userId,
-			StockId:       stockId,
-			OrderType:     ot,
-			StockQuantity: stockQty,
-			Price:         price,
-			IsClosed:      isClosed,
+			UserId:   userId,
+			StockId:  stockId,
+			IsClosed: isClosed,
 		}
 	}
 
-	user := makeUser(3, "lol@lol.com", "LOL", 99999, 99999)
+	user := &User{Id: 3}
 
 	stocks := []*Stock{
-		makeStock(1, "FB", "Facebook", "Social", 100, 200, 60, 300, 10, 2000, true),
-		makeStock(2, "MS", "Microsoft", "MS Corp", 300, 450, 60, 600, 10, 2000, true),
+		{Id: 1},
+		{Id: 2},
 	}
 
 	asks := []*Ask{
-		makeAsk(3, 1, Limit, 10, 100, false),
-		makeAsk(3, 1, Limit, 20, 200, true),
-		makeAsk(3, 1, Limit, 30, 100, false),
-		makeAsk(3, 2, Limit, 50, 10, false),
-		makeAsk(3, 2, Limit, 5, 25, false),
-		makeAsk(3, 2, Limit, 75, 2, true),
+		makeAsk(3, 1, false),
+		makeAsk(3, 1, true),
+		makeAsk(3, 1, false),
+		makeAsk(3, 2, false),
+		makeAsk(3, 2, false),
+		makeAsk(3, 2, true),
 	}
 
 	db, err := DbOpen()
@@ -123,11 +89,121 @@ func Test_GetMyAsks(t *testing.T) {
 		}
 	}
 
-	moreExists, openAsks, closedAsks, err := GetMyAsks(3,0,0)
+	openAsks, err := GetMyOpenAsks(3)
 
 	if err != nil {
-		l.Errorf("Errored in GetMyAsks : %+v", err)
+		l.Errorf("Errored in GetMyOpenAsks : %+v", err)
 	}
 
-	l.Infof("Received from GetMyAsks : %v %+v %+v", moreExists, openAsks, closedAsks)
+	expectedReturnValue := []*Ask{
+		asks[0],
+		asks[2],
+		asks[3],
+		asks[4],
+	}
+
+	if !testutils.AssertEqual(t, openAsks, expectedReturnValue) {
+		t.Fatalf("Got %+v; want %+v", openAsks, expectedReturnValue)
+	}
+
+}
+
+func Test_GetMyClosedAsks(t *testing.T) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "Test_GetMyClosedAsks",
+	})
+
+	var makeAsk = func(userId uint32, stockId uint32, isClosed bool) *Ask {
+		return &Ask{
+			UserId:   userId,
+			StockId:  stockId,
+			IsClosed: isClosed,
+		}
+	}
+
+	user := &User{Id: 3}
+
+	stocks := []*Stock{
+		{Id: 1},
+		{Id: 2},
+	}
+
+	asks := []*Ask{
+		makeAsk(3, 1, false),
+		makeAsk(3, 1, true),
+		makeAsk(3, 1, false),
+		makeAsk(3, 2, false),
+		makeAsk(3, 2, false),
+		makeAsk(3, 2, true),
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+
+	defer func() {
+		for _, ask := range asks {
+			db.Delete(ask)
+		}
+		for _, stock := range stocks {
+			db.Delete(stock)
+		}
+		db.Delete(user)
+		db.Close()
+	}()
+
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, ask := range asks {
+		if err := db.Create(ask).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	moreExists, closedAsks, err := GetMyClosedAsks(3, 0, 0)
+
+	if err != nil {
+		l.Errorf("Errored in GetMyClosedAsks : %+v", err)
+	}
+
+	expectedReturnValue := []*Ask{
+		asks[5],
+		asks[1],
+	}
+
+	if !testutils.AssertEqual(t, closedAsks, expectedReturnValue) {
+		t.Fatalf("Got %+v; want %+v", closedAsks, expectedReturnValue)
+	}
+
+	if moreExists {
+		t.Fatalf("moreExists returned true but it should be false")
+	}
+
+	moreExists, closedAsks, err = GetMyClosedAsks(3, 0, 1)
+
+	if err != nil {
+		l.Errorf("Errored in GetMyClosedAsks : %+v", err)
+	}
+
+	expectedReturnValue = []*Ask{
+		asks[5],
+	}
+
+	if !testutils.AssertEqual(t, closedAsks, expectedReturnValue) {
+		t.Fatalf("Got %+v; want %+v", closedAsks, expectedReturnValue)
+	}
+
+	if !moreExists {
+		t.Fatalf("moreExists returned false but it should be true")
+	}
+
 }

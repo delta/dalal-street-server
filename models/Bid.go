@@ -213,29 +213,47 @@ func (bid *Bid) Close() error {
 	return nil
 }
 
-func GetMyBids(userId, lastId, count uint32) (bool, []*Bid, []*Bid, error) {
+func GetMyOpenBids(userId uint32) ([]*Bid, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "GetMyBids",
+		"method": "GetMyOpenBids",
+		"userId": userId,
+	})
+
+	l.Infof("Attempting to get open bid orders for userId : %v", userId)
+
+	db, err := DbOpen()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var myOpenBids []*Bid
+
+	if err := db.Where("userId = ? AND isClosed = ?", userId, 0).Find(&myOpenBids).Error; err != nil {
+		return nil, err
+	}
+
+	l.Infof("Successfully fetched open bid orders for userId : %v", userId)
+	return myOpenBids, nil
+}
+
+func GetMyClosedBids(userId, lastId, count uint32) (bool, []*Bid, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetMyClosedBids",
 		"userId": userId,
 		"lastId": lastId,
 		"count":  count,
 	})
 
-	l.Infof("Attempting to get bid orders for userId : %v", userId)
+	l.Infof("Attempting to get closed bid orders for userId : %v", userId)
 
 	db, err := DbOpen()
 	if err != nil {
-		return true, nil, nil, err
+		return true, nil, err
 	}
 	defer db.Close()
 
-	var myOpenBids []*Bid
 	var myClosedBids []*Bid
-
-	//get all open bids
-	if err := db.Where("userId = ? AND isClosed = ?", userId, 0).Find(&myOpenBids).Error; err != nil {
-		return true, nil, nil, err
-	}
 
 	//set default value of count if it is zero
 	if count == 0 {
@@ -249,10 +267,10 @@ func GetMyBids(userId, lastId, count uint32) (bool, []*Bid, []*Bid, error) {
 		db = db.Where("id <= ?", lastId)
 	}
 	if err := db.Where("userId = ? AND isClosed = ?", userId, 1).Order("id desc").Limit(count).Find(&myClosedBids).Error; err != nil {
-		return true, nil, nil, err
+		return true, nil, err
 	}
 
 	var moreExists = len(myClosedBids) >= int(count)
-	l.Infof("Successfully fetched bid orders for userId : %v", userId)
-	return moreExists, myOpenBids, myClosedBids, nil
+	l.Infof("Successfully fetched closed bid orders for userId : %v", userId)
+	return moreExists, myClosedBids, nil
 }
