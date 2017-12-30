@@ -448,6 +448,7 @@ func (d *dalalActionService) GetMarketEvents(ctx context.Context, req *actions_p
 	return resp, nil
 }
 
+//Returns open asks and open bids
 func (d *dalalActionService) GetMyOpenOrders(ctx context.Context, req *actions_pb.GetMyOpenOrdersRequest) (*actions_pb.GetMyOpenOrdersResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "GetMyOpenOrders",
@@ -457,47 +458,50 @@ func (d *dalalActionService) GetMyOpenOrders(ctx context.Context, req *actions_p
 	l.Infof("GetMyOpenOrders requested")
 
 	resp := &actions_pb.GetMyOpenOrdersResponse{}
-	/*makeError := func(st actions_pb.GetMyOpenOrdersResponse_StatusCode) (*actions_pb.GetMyOpenOrdersResponse, error) {
+	makeError := func(st actions_pb.GetMyOpenOrdersResponse_StatusCode, msg string) (*actions_pb.GetMyOpenOrdersResponse, error) {
 		resp.StatusCode = st
+		resp.StatusMessage = msg
 		return resp, nil
 	}
 
 	userId := getUserId(ctx)
-	lastId := req.LastAskId
-	count := req.Count
 
-	moreExists, myOpenAskOrders, myClosedAskOrders, err := models.GetMyAsks(userId, lastId, count)
+	//get open ask orders
+	myOpenAskOrders, err := models.GetMyOpenAsks(userId)
 
 	if err != nil {
-		return internalServerError(err)
+		return makeError(actions_pb.GetMyOpenOrdersResponse_InternalServerError, "")
 	}
 
-	//Convert to proto
-	myOpenAskOrdersMap := make(map[uint32]*models_pb.Ask)
-
+	//convert open ask orders to proto
+	var myOpenAskOrdersProto []*models_pb.Ask
 	for _, ask := range myOpenAskOrders {
-		myOpenAskOrdersMap[ask.Id] = ask.ToProto()
+		myOpenAskOrdersProto = append(myOpenAskOrdersProto, ask.ToProto())
 	}
 
-	myClosedAskOrdersMap := make(map[uint32]*models_pb.Ask)
+	//get open bid orders
+	myOpenBidOrders, err := models.GetMyOpenBids(userId)
 
-	for _, ask := range myClosedAskOrders {
-		myClosedAskOrdersMap[ask.Id] = ask.ToProto()
+	if err != nil {
+		return makeError(actions_pb.GetMyOpenOrdersResponse_InternalServerError, "")
 	}
 
-	resp.Response = &actions_pb.GetMyAsksResponse_Result{
-		&actions_pb.GetMyAsksResponse_GetMyAsksSuccessResponse{
-			OpenAskOrders:   myOpenAskOrdersMap,
-			ClosedAskOrders: myClosedAskOrdersMap,
-			MoreExists:      moreExists,
-		},
-	}*/
+	//convert open bid orders to proto
+	var myOpenBidOrdersProto []*models_pb.Bid
+
+	for _, bid := range myOpenBidOrders {
+		myOpenBidOrdersProto = append(myOpenBidOrdersProto, bid.ToProto())
+	}
+
+	resp.OpenAskOrders = myOpenAskOrdersProto
+	resp.OpenBidOrders = myOpenBidOrdersProto
 
 	l.Infof("Request completed successfully")
 
 	return resp, nil
 }
 
+//Returns closed asks
 func (d *dalalActionService) GetMyClosedAsks(ctx context.Context, req *actions_pb.GetMyClosedAsksRequest) (*actions_pb.GetMyClosedAsksResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "GetMyClosedAsks",
@@ -507,41 +511,31 @@ func (d *dalalActionService) GetMyClosedAsks(ctx context.Context, req *actions_p
 	l.Infof("GetMyClosedAsks requested")
 
 	resp := &actions_pb.GetMyClosedAsksResponse{}
-	/*makeError := func(st actions_pb.GetMyClosedAsksResponse_StatusCode) (*actions_pb.GetMyClosedAsksResponse, error) {
+	makeError := func(st actions_pb.GetMyClosedAsksResponse_StatusCode, msg string) (*actions_pb.GetMyClosedAsksResponse, error) {
 		resp.StatusCode = st
+		resp.StatusMessage = msg
 		return resp, nil
 	}
 
 	userId := getUserId(ctx)
-	lastId := req.LastAskId
+	lastId := req.LastOrderId
 	count := req.Count
 
-	moreExists, myOpenAskOrders, myClosedAskOrders, err := models.GetMyAsks(userId, lastId, count)
+	moreExists, myClosedAskOrders, err := models.GetMyClosedAsks(userId, lastId, count)
 
 	if err != nil {
-		return internalServerError(err)
+		return makeError(actions_pb.GetMyClosedAsksResponse_InternalServerError, "")
 	}
 
 	//Convert to proto
-	myOpenAskOrdersMap := make(map[uint32]*models_pb.Ask)
-
-	for _, ask := range myOpenAskOrders {
-		myOpenAskOrdersMap[ask.Id] = ask.ToProto()
-	}
-
-	myClosedAskOrdersMap := make(map[uint32]*models_pb.Ask)
+	var myClosedAskOrdersProto []*models_pb.Ask
 
 	for _, ask := range myClosedAskOrders {
-		myClosedAskOrdersMap[ask.Id] = ask.ToProto()
+		myClosedAskOrdersProto = append(myClosedAskOrdersProto, ask.ToProto())
 	}
 
-	resp.Response = &actions_pb.GetMyAsksResponse_Result{
-		&actions_pb.GetMyAsksResponse_GetMyAsksSuccessResponse{
-			OpenAskOrders:   myOpenAskOrdersMap,
-			ClosedAskOrders: myClosedAskOrdersMap,
-			MoreExists:      moreExists,
-		},
-	}*/
+	resp.MoreExists = moreExists
+	resp.ClosedAskOrders = myClosedAskOrdersProto
 
 	l.Infof("Request completed successfully")
 
@@ -557,41 +551,31 @@ func (d *dalalActionService) GetMyClosedBids(ctx context.Context, req *actions_p
 	l.Infof("GetMyClosedBids requested")
 
 	resp := &actions_pb.GetMyClosedBidsResponse{}
-	/*makeError := func(st actions_pb.GetMyClosedBidsResponse_StatusCode) (*actions_pb.GetMyClosedBidsResponse, error) {
+	makeError := func(st actions_pb.GetMyClosedBidsResponse_StatusCode, msg string) (*actions_pb.GetMyClosedBidsResponse, error) {
 		resp.StatusCode = st
+		resp.StatusMessage = msg
 		return resp, nil
 	}
 
 	userId := getUserId(ctx)
-	lastId := req.LastAskId
+	lastId := req.LastOrderId
 	count := req.Count
 
-	moreExists, myOpenAskOrders, myClosedAskOrders, err := models.GetMyAsks(userId, lastId, count)
+	moreExists, myClosedBidOrders, err := models.GetMyClosedBids(userId, lastId, count)
 
 	if err != nil {
-		return internalServerError(err)
+		return makeError(actions_pb.GetMyClosedBidsResponse_InternalServerError, "")
 	}
 
 	//Convert to proto
-	myOpenAskOrdersMap := make(map[uint32]*models_pb.Ask)
+	var myClosedBidOrdersProto []*models_pb.Bid
 
-	for _, ask := range myOpenAskOrders {
-		myOpenAskOrdersMap[ask.Id] = ask.ToProto()
+	for _, bid := range myClosedBidOrders {
+		myClosedBidOrdersProto = append(myClosedBidOrdersProto, bid.ToProto())
 	}
 
-	myClosedAskOrdersMap := make(map[uint32]*models_pb.Ask)
-
-	for _, ask := range myClosedAskOrders {
-		myClosedAskOrdersMap[ask.Id] = ask.ToProto()
-	}
-
-	resp.Response = &actions_pb.GetMyAsksResponse_Result{
-		&actions_pb.GetMyAsksResponse_GetMyAsksSuccessResponse{
-			OpenAskOrders:   myOpenAskOrdersMap,
-			ClosedAskOrders: myClosedAskOrdersMap,
-			MoreExists:      moreExists,
-		},
-	}*/
+	resp.MoreExists = moreExists
+	resp.ClosedBidOrders = myClosedBidOrdersProto
 
 	l.Infof("Request completed successfully")
 

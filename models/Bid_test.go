@@ -1,10 +1,10 @@
 package models
 
 import (
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
-	"github.com/Sirupsen/logrus"
-	"time"
 	"testing"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func TestBidToProto(t *testing.T) {
@@ -28,67 +28,33 @@ func TestBidToProto(t *testing.T) {
 	}
 }
 
-func Test_GetMyBids(t *testing.T) {
+func Test_GetMyOpenBids(t *testing.T) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":   "Test_GetMyBids",
+		"method": "Test_GetMyOpenBids",
 	})
 
-	l.Infof("Attempting to get bids for user id %d", 3)
-
-	var makeUser = func(id uint32, email string, name string, cash uint32, total int32) *User {
-		return &User{
-			Id:        id,
-			Email:     email,
-			Name:      name,
-			Cash:      cash,
-			Total:     total,
-			CreatedAt: time.Now().Format(time.RFC3339),
-		}
-	}
-
-	var makeStock = func(id uint32, sName string, fName string, desc string, curPrice uint32, dayHigh uint32, dayLow uint32, allHigh uint32, allLow uint32, stocks uint32, upOrDown bool) *Stock {
-		return &Stock{
-			Id:               id,
-			ShortName:        sName,
-			FullName:         fName,
-			Description:      desc,
-			CurrentPrice:     curPrice,
-			DayHigh:          dayHigh,
-			DayLow:           dayLow,
-			AllTimeHigh:      allHigh,
-			AllTimeLow:       allLow,
-			StocksInExchange: stocks,
-			UpOrDown:         upOrDown,
-			CreatedAt:        time.Now().Format(time.RFC3339),
-			UpdatedAt:        time.Now().Format(time.RFC3339),
-		}
-	}
-
-	var makeBid = func(userId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32, isClosed bool) *Bid {
+	var makeBid = func(userId uint32, stockId uint32, isClosed bool) *Bid {
 		return &Bid{
-			UserId:        userId,
-			StockId:       stockId,
-			OrderType:     ot,
-			StockQuantity: stockQty,
-			Price:         price,
-			IsClosed:      isClosed,
+			UserId:   userId,
+			StockId:  stockId,
+			IsClosed: isClosed,
 		}
 	}
 
-	user := makeUser(3, "lol@lol.com", "LOL", 99999, 99999)
+	user := &User{Id: 3}
 
 	stocks := []*Stock{
-		makeStock(1, "FB", "Facebook", "Social", 100, 200, 60, 300, 10, 2000, true),
-		makeStock(2, "MS", "Microsoft", "MS Corp", 300, 450, 60, 600, 10, 2000, true),
+		{Id: 1},
+		{Id: 2},
 	}
 
 	bids := []*Bid{
-		makeBid(3, 1, Limit, 10, 100, false),
-		makeBid(3, 1, Limit, 20, 200, true),
-		makeBid(3, 1, Limit, 30, 100, false),
-		makeBid(3, 2, Limit, 50, 10, false),
-		makeBid(3, 2, Limit, 5, 25, false),
-		makeBid(3, 2, Limit, 75, 2, true),
+		makeBid(3, 1, false),
+		makeBid(3, 1, true),
+		makeBid(3, 1, false),
+		makeBid(3, 2, false),
+		makeBid(3, 2, false),
+		makeBid(3, 2, true),
 	}
 
 	db, err := DbOpen()
@@ -123,12 +89,121 @@ func Test_GetMyBids(t *testing.T) {
 		}
 	}
 
-	moreExists, openBids, closedBids, err := GetMyBids(3,0,0)
+	openBids, err := GetMyOpenBids(3)
 
 	if err != nil {
-		l.Errorf("Errored in GetMyBids : %+v", err)
+		l.Errorf("Errored in GetMyOpenBids : %+v", err)
 	}
 
-	l.Infof("Received from GetMyBids : %v %+v %+v", moreExists, openBids, closedBids)
+	expectedReturnValue := []*Bid{
+		bids[0],
+		bids[2],
+		bids[3],
+		bids[4],
+	}
+
+	if !testutils.AssertEqual(t, openBids, expectedReturnValue) {
+		t.Fatalf("Got %+v; want %+v", openBids, expectedReturnValue)
+	}
+
 }
 
+func Test_GetMyClosedBids(t *testing.T) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "Test_GetMyClosedBids",
+	})
+
+	var makeBid = func(userId uint32, stockId uint32, isClosed bool) *Bid {
+		return &Bid{
+			UserId:   userId,
+			StockId:  stockId,
+			IsClosed: isClosed,
+		}
+	}
+
+	user := &User{Id: 3}
+
+	stocks := []*Stock{
+		{Id: 1},
+		{Id: 2},
+	}
+
+	bids := []*Bid{
+		makeBid(3, 1, false),
+		makeBid(3, 1, true),
+		makeBid(3, 1, false),
+		makeBid(3, 2, false),
+		makeBid(3, 2, false),
+		makeBid(3, 2, true),
+	}
+
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatal("Failed opening DB to insert dummy data")
+	}
+
+	defer func() {
+		for _, bid := range bids {
+			db.Delete(bid)
+		}
+		for _, stock := range stocks {
+			db.Delete(stock)
+		}
+		db.Delete(user)
+		db.Close()
+	}()
+
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, bid := range bids {
+		if err := db.Create(bid).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	moreExists, closedBids, err := GetMyClosedBids(3, 0, 0)
+
+	if err != nil {
+		l.Errorf("Errored in GetMyClosedBids : %+v", err)
+	}
+
+	expectedReturnValue := []*Bid{
+		bids[5],
+		bids[1],
+	}
+
+	if !testutils.AssertEqual(t, closedBids, expectedReturnValue) {
+		t.Fatalf("Got %+v; want %+v", closedBids, expectedReturnValue)
+	}
+
+	if moreExists {
+		t.Fatalf("moreExists returned true but it should be false")
+	}
+
+	moreExists, closedBids, err = GetMyClosedBids(3, 0, 1)
+
+	if err != nil {
+		l.Errorf("Errored in GetMyClosedBids : %+v", err)
+	}
+
+	expectedReturnValue = []*Bid{
+		bids[5],
+	}
+
+	if !testutils.AssertEqual(t, closedBids, expectedReturnValue) {
+		t.Fatalf("Got %+v; want %+v", closedBids, expectedReturnValue)
+	}
+
+	if !moreExists {
+		t.Fatalf("moreExists returned false but it should be true")
+	}
+
+}

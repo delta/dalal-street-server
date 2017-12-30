@@ -264,29 +264,47 @@ func (ask *Ask) Close() error {
 	return nil
 }
 
-func GetMyAsks(userId, lastId, count uint32) (bool, []*Ask, []*Ask, error) {
+func GetMyOpenAsks(userId uint32) ([]*Ask, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "GetMyAsks",
+		"method": "GetMyOpenAsks",
+		"userId": userId,
+	})
+
+	l.Infof("Attempting to get open ask orders for userId : %v", userId)
+
+	db, err := DbOpen()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var myOpenAsks []*Ask
+
+	if err := db.Where("userId = ? and isClosed = ?", userId, 0).Find(&myOpenAsks).Error; err != nil {
+		return nil, err
+	}
+
+	l.Infof("Successfully fetched open ask orders for userId : %v", userId)
+	return myOpenAsks, nil
+}
+
+func GetMyClosedAsks(userId, lastId, count uint32) (bool, []*Ask, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetMyClosedAsks",
 		"userId": userId,
 		"lastId": lastId,
 		"count":  count,
 	})
 
-	l.Infof("Attempting to get ask orders for userId : %v", userId)
+	l.Infof("Attempting to get closed ask orders for userId : %v", userId)
 
 	db, err := DbOpen()
 	if err != nil {
-		return true, nil, nil, err
+		return true, nil, err
 	}
 	defer db.Close()
 
 	var myClosedAsks []*Ask
-	var myOpenAsks []*Ask
-
-	//get all open asks
-	if err := db.Where("userId = ? and isClosed = ?", userId, 0).Find(&myOpenAsks).Error; err != nil {
-		return true, nil, nil, err
-	}
 
 	//set default value of count if it is zero
 	if count == 0 {
@@ -301,10 +319,10 @@ func GetMyAsks(userId, lastId, count uint32) (bool, []*Ask, []*Ask, error) {
 	}
 	//get closed asks
 	if err := db.Where("userId = ? and isClosed = ?", userId, 1).Order("id desc").Limit(count).Find(&myClosedAsks).Error; err != nil {
-		return true, nil, nil, err
+		return true, nil, err
 	}
 
 	var moreExists = len(myClosedAsks) >= int(count)
-	l.Infof("Successfully fetched ask orders for userId : %v", userId)
-	return moreExists, myOpenAsks, myClosedAsks, nil
+	l.Infof("Successfully fetched closed ask orders for userId : %v", userId)
+	return moreExists, myClosedAsks, nil
 }
