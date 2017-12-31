@@ -56,8 +56,8 @@ func Test_UpdateStockPrice(t *testing.T) {
 	LoadStocks()
 	UpdateStockPrice(1, 2000)
 
-	a := &Stock{}
-	db.First(a, 1)
+	retrievedStock := &Stock{}
+	db.First(retrievedStock, 1)
 	var stock1 = &Stock{
 		Id:               1,
 		CurrentPrice:     2000,
@@ -68,8 +68,8 @@ func Test_UpdateStockPrice(t *testing.T) {
 		AvgLastPrice:     850,
 		PreviousDayClose: 1000,
 	}
-	if !testutils.AssertEqual(t, stock1, a) {
-		t.Fatalf("Expected %v but got %v", stock1, a)
+	if !testutils.AssertEqual(t, stock1, retrievedStock) {
+		t.Fatalf("Expected %v but got %v", stock1, retrievedStock)
 	}
 }
 func Test_GetCompanyDetails(t *testing.T) {
@@ -86,14 +86,14 @@ func Test_GetCompanyDetails(t *testing.T) {
 	}()
 	LoadStocks()
 	testutils.Sleep(90)
-	_, b, _ := GetCompanyDetails(1)
+	_, retrievedStockList, _ := GetCompanyDetails(1)
 	var stkHistoryPoint = &StockHistory{
 		StockId:    1,
 		StockPrice: 1000,
-		CreatedAt:  b[0].CreatedAt,
+		CreatedAt:  retrievedStockList[0].CreatedAt,
 	}
-	if !testutils.AssertEqual(t, stkHistoryPoint, b[0]) {
-		t.Fatalf("Expected %v but got %v", stkHistoryPoint, b[0])
+	if !testutils.AssertEqual(t, stkHistoryPoint, retrievedStockList[0]) {
+		t.Fatalf("Expected %v but got %v", stkHistoryPoint, retrievedStockList[0])
 	}
 }
 func Test_AddStocksToExchange(t *testing.T) {
@@ -110,10 +110,10 @@ func Test_AddStocksToExchange(t *testing.T) {
 	}()
 	LoadStocks()
 	AddStocksToExchange(1, 10)
-	var a = &Stock{Id: 1}
-	db.First(a)
+	var retrievedStock = &Stock{Id: 1}
+	db.First(retrievedStock)
 	var stockEqual = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 244}
-	if !testutils.AssertEqual(t, a, stockEqual) {
-		t.Fatalf("Expected %v but got %v", stockEqual, a)
+	if !testutils.AssertEqual(t, retrievedStock, stockEqual) {
+		t.Fatalf("Expected %v but got %v", stockEqual, retrievedStock)
 	}
 }

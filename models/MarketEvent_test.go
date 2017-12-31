@@ -25,7 +25,7 @@ func TestMarketEventToProto(t *testing.T) {
 }
 
 func Test_GetMarketEvents(t *testing.T) {
-	o := &MarketEvent{
+	marketEvent := &MarketEvent{
 		Id:           1,
 		StockId:      3,
 		Headline:     "Hello",
@@ -38,41 +38,42 @@ func Test_GetMarketEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Opening Database for inserting MarketEvents failed with error %v", err)
 	}
-	defer db.Close()
-	defer db.Exec("DELETE FROM MarketEvents")
+	defer func() {
+		db.Exec("DELETE FROM MarketEvents")
+		db.Close()
+	}()
 	count := 0
-	for ; o.Id <= MARKET_EVENT_COUNT+1; o.Id++ {
-		db.Save(o)
+	for ; marketEvent.Id <= MARKET_EVENT_COUNT+1; marketEvent.Id++ {
+		db.Save(marketEvent)
 		count++
 	}
 	var lastId uint32 = 0
-	for d := true; d; {
-		a, b, err := GetMarketEvents(lastId, 13)
+	for hasMore := true; hasMore; {
+		dbHasMore, retrievedEvents, err := GetMarketEvents(lastId, 13)
 		if err != nil {
 			t.Fatalf("GetMarketEvents returned an error %v", err)
 		}
 
-		for _, v := range b {
+		for _, v := range retrievedEvents {
 			lastId = v.Id - 1
 			count--
 		}
-		t.Logf("%v", d)
-		d = a
+		hasMore = dbHasMore
 	}
 	if count != 0 {
 		t.Fatalf("Inserted and Recovered events not equal. Added-Recieved = %v", count)
 	}
-	_, v, err := GetMarketEvents(2, 1)
+	_, single, err := GetMarketEvents(2, 1)
 	if err != nil {
 		t.Fatalf("GetMarketEvents returned an error %v", err)
 	}
-	o.Id = 2
-	if !testutils.AssertEqual(t, o, v[0]) {
-		t.Fatalf("Expected %v but got %v", o, v[0])
+	marketEvent.Id = 2
+	if !testutils.AssertEqual(t, marketEvent, single[0]) {
+		t.Fatalf("Expected %v but got %v", marketEvent, single[0])
 	}
 }
 func Test_AddMarketEvent(t *testing.T) {
-	o := &MarketEvent{
+	marketEvent := &MarketEvent{
 		Id:       1,
 		StockId:  3,
 		Headline: "Hello",
@@ -83,20 +84,23 @@ func Test_AddMarketEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error Opening the Db")
 	}
-	defer db.Close()
+	defer func() {
+		db.Exec("DELETE FROM MarketEvents")
+		db.Close()
+	}()
 	if err != nil {
 		t.Fatalf("GetMarketEvents returned an error %v", err)
 	}
 
 	AddMarketEvent(3, "Hello", "Hello World", true)
-	b := &MarketEvent{}
-	db.First(b)
-	if b == nil {
+	retrievedEvent := &MarketEvent{}
+	db.First(retrievedEvent)
+	if retrievedEvent == nil {
 		t.Fatalf("Added Event Not Found")
 	}
-	o.CreatedAt = b.CreatedAt
-	o.Id = b.Id
-	if !testutils.AssertEqual(t, b, o) {
-		t.Fatalf("Expected %v but got %v", b, o)
+	marketEvent.CreatedAt = retrievedEvent.CreatedAt
+	marketEvent.Id = retrievedEvent.Id
+	if !testutils.AssertEqual(t, retrievedEvent, marketEvent) {
+		t.Fatalf("Expected %v but got %v", marketEvent, retrievedEvent)
 	}
 }
