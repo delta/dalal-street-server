@@ -53,17 +53,17 @@ func Test_GetMarketEvents(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetMarketEvents returned an error %v", err)
 		}
-
-		for _, v := range retrievedEvents {
-			lastId = v.Id - 1
-			count--
-		}
+		count -= len(retrievedEvents)
+		lastId = retrievedEvents[len(retrievedEvents)-1].Id - 1
 		hasMore = dbHasMore
 	}
 	if count != 0 {
 		t.Fatalf("Inserted and Recovered events not equal. Added-Recieved = %v", count)
 	}
 	_, single, err := GetMarketEvents(2, 1)
+	if len(single) != 1 {
+		t.Fatalf("More than 1 Event Obtained")
+	}
 	if err != nil {
 		t.Fatalf("GetMarketEvents returned an error %v", err)
 	}

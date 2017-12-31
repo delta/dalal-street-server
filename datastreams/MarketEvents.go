@@ -3,7 +3,6 @@ package datastreams
 import (
 	"runtime/debug"
 	"sync"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 
@@ -50,7 +49,6 @@ func SendMarketEvent(meProto *models_pb.MarketEvent) {
 
 	l.Debugf("Sent to %d listeners!. Sleeping for 15 seconds", sent)
 
-	time.Sleep(time.Minute / 4)
 }
 
 func RegMarketEventsListener(done <-chan struct{}, update chan interface{}, sessionId string) {
