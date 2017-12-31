@@ -27,10 +27,10 @@ func authFunc(ctx context.Context) (context.Context, error) {
 	if !ok {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Missing context metadata")
 	}
-	if len(md["sessionId"]) != 1 {
+	if len(md["sessionid"]) != 1 {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
-	sess, err := session.Load(md["sessionId"][0])
+	sess, err := session.Load(md["sessionid"][0])
 	if err != nil {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
