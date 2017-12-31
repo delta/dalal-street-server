@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -181,7 +180,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	l.Debugf("Pragyan API call response: '%s'", string(body))
 
 	type message_t struct {
-		Id   string `json:"user_id"`
+		Id   uint32 `json:"user_id"`
 		Name string `json:"user_fullname"`
 	}
 	r := struct {
@@ -192,9 +191,8 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 
 	switch r.StatusCode {
 	case 200:
-		uid, _ := strconv.ParseUint(r.Message.Id, 10, 32)
 		pu := pragyanUser{
-			Id:   uint32(uid),
+			Id:   r.Message.Id,
 			Name: r.Message.Name,
 		}
 
