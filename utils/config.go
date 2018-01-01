@@ -55,6 +55,8 @@ type Config struct {
 	GrpcCert string
 	// GrpcKey is the location of the TLS private key to be used by the server
 	GrpcKey string
+	//CacheSize is the size of the LRU Cache for sessions(As of Now)
+	CacheSize int
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
