@@ -7,6 +7,12 @@ export DALAL_ENV=Test
 go test -v -run="^(Test|Benchmark)[^_](.*)" ./... -args -config="$(pwd)/config.json"
 
 # Integration tests
-migrate -url mysql://root:@/dalalstreet_test -path ./migrations up 
+
+# Get db password from "Test" section of config.json
+dbPass=$(egrep "Test|DbPassword" config.json \
+	| grep -C1 "Test" | tail -n1 \
+	| awk '{print substr($2,2,length($2)-3)}')
+
+migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations up 
 go test -race -v -p=1 -run="^(Test|Benchmark)_(.*)" ./... -args -config="$(pwd)/config.json"
-migrate -url mysql://root:@/dalalstreet_test -path ./migrations down 
+migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations down 
