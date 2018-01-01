@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/thakkarparth007/dalal-street-server/utils"
@@ -24,6 +25,8 @@ var (
 
 	logger *logrus.Entry
 )
+
+var cache *lru.Cache = nil
 
 type Session interface {
 	GetId() string
@@ -48,7 +51,11 @@ func Load(id string) (Session, error) {
 		"method": "Load",
 		"id":     id,
 	})
-
+	if cache.Contains(id) {
+		var cachedInterface, _ = cache.Get(id)
+		cachedSession, _ := cachedInterface.(*session)
+		return cachedSession, nil
+	}
 	var (
 		sess    = &session{}
 		results map[string]string
@@ -82,6 +89,7 @@ func Load(id string) (Session, error) {
 	sess.m = results
 
 	l.Debugf("Loaded session: %+v", sess)
+	cache.Add(id, sess)
 	return sess, nil
 }
 
@@ -102,6 +110,7 @@ func New() (Session, error) {
 	sess.m = make(map[string]string)
 
 	l.Debugf("Created session: %+v", sess)
+	cache.Add(sess.Id, sess)
 	return sess, nil
 }
 
@@ -221,4 +230,5 @@ func init() {
 	dbPass = utils.Configuration.DbPassword
 	dbName = utils.Configuration.DbName
 	dbHost = utils.Configuration.DbHost
+	cache, _ = lru.New(utils.Configuration.CacheSize)
 }
