@@ -326,13 +326,13 @@ func (e InvalidBidIdError) Error() string {
 // Methods
 //
 
-// getUser() gets a user by his id.
+// getUserExclusively() gets a user by his id.
 // u method returns a channel and a pointer to the user object. The callee
 // is guaranteed to get exclusive write access to the user object. Once the callee
 // is done using the object, he must close the channel.
-func getUser(id uint32) (chan struct{}, *User, error) {
+func getUserExclusively(id uint32) (chan struct{}, *User, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":   "getUser",
+		"method":   "getUserExclusively",
 		"param_id": id,
 	})
 
@@ -400,6 +400,57 @@ func getUser(id uint32) (chan struct{}, *User, error) {
 	l.Debugf("User: %+v", u.user)
 
 	return ch, u.user, nil
+}
+
+func getUserPairExclusive(id1, id2 uint32) (chan struct{}, *User, *User, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":    "getUserExclusively",
+		"param_id1": id1,
+		"param_id2": id2,
+	})
+
+	l.Debugf("Acquiring lock in order of User Ids")
+
+	var firstUserId, secondUserId uint32
+
+	//look out for error!!!
+	if id1 < id2 {
+		firstUserId = id1
+		secondUserId = id2
+	} else {
+		firstUserId = id2
+		secondUserId = id1
+	}
+
+	l.Debugf("Want first and second as %d, %d", firstUserId, secondUserId)
+	defer l.Debugf("Closed channels of %d and %d", firstUserId, secondUserId)
+
+	firstLockChan, firstUser, err := getUserExclusively(firstUserId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return nil, nil, nil, err
+	}
+
+	secondLockChan, secondUser, err := getUserExclusively(secondUserId)
+	if err != nil {
+		close(firstLockChan)
+		l.Errorf("Errored: %+v", err)
+		return nil, nil, nil, err
+	}
+
+	l.Debugf("Acquired the locks on users %d and %d", firstUserId, secondUserId)
+
+	done := make(chan struct{})
+	go func() {
+		<-done
+		close(secondLockChan)
+		close(firstLockChan)
+	}()
+
+	if firstUserId == id1 {
+		return done, firstUser, secondUser, nil
+	}
+	return done, secondUser, firstUser, nil
 }
 
 // GetUserCopy() gets a copy of user by his id.
@@ -499,7 +550,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Acquiring exclusive write on user")
 
-	ch, user, err := getUser(userId)
+	ch, user, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return 0, err
@@ -548,8 +599,6 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
 
-	go AddAskOrder(ask)
-
 	return ask.Id, nil
 }
 
@@ -587,7 +636,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	}
 
 	l.Debugf("Acquiring exclusive write on user")
-	ch, user, err := getUser(userId)
+	ch, user, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return 0, err
@@ -628,8 +677,6 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Infof("Created Bid order. BidId: %d", bid.Id)
 
-	go AddBidOrder(bid)
-
 	return bid.Id, nil
 
 }
@@ -646,7 +693,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 
 	l.Debugf("Acquiring exclusive write on user")
 
-	ch, _, err := getUser(userId)
+	ch, _, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return err
@@ -710,7 +757,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	}
 
 	l.Debugf("Acquiring exclusive write on user")
-	ch, user, err := getUser(userId)
+	ch, user, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return nil, err
@@ -833,7 +880,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 *		- if askDone is true, ask can be removed
 *		- if bidDone is true, bid can be removed
  */
-func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) {
+func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, stockTradeQty uint32) (bool, bool, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "PerformOrderFillTransaction",
 		"askingUserId":  ask.UserId,
@@ -846,19 +893,6 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 	/*
 		if ask.isclosed() return askDone, bidNotDone
 		if bid.isClosed() return askNotDone, bidDone
-
-		stkTradeQty = min(ask.StQtyUnf.., bid.StkQtyUNfi)
-		stkTradePrice = min(ask.Price, bid.price)
-		if both marketorder:
-			allstocks.m[stkid].RLock()
-			stkTradePrice = allStocks.m[stkid].stock.CurrentPrice
-			allstks.msdfsd.Runlock()
-
-		condition1: bidder has enough money
-			no: return (bidDone, askNotDone)
-
-		condition2: asker has enough stocks
-			no: return (bidNotDone, askDone)
 
 		IN DB:
 			transact( askingUser, -stkTradeQty, stkTradePrice, +stkTradeQty*stkTradePrice )
@@ -890,45 +924,15 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 		return false, true, nil
 	}
 
-	var updateDataStreams = func(askingUserId, biddingUserId uint32, askTrans, bidTrans *Transaction, ask *Ask, bid *Bid) {
-		var stockTradeQty uint32
-		if askTrans != nil {
-			datastreams.SendTransaction(askTrans.ToProto())
-			stockTradeQty = uint32(bidTrans.StockQuantity)
-		}
-		if bidTrans != nil {
-			datastreams.SendTransaction(bidTrans.ToProto())
-			stockTradeQty = uint32(bidTrans.StockQuantity)
-		}
-
+	var updateDataStreams = func(askTrans, bidTrans *Transaction) {
 		if stockTradeQty != 0 || ask.IsClosed {
-			datastreams.SendOrder(askingUserId, ask.Id, true, stockTradeQty, ask.IsClosed)
+			datastreams.SendOrder(ask.UserId, ask.Id, true, stockTradeQty, ask.IsClosed)
 		}
 		if stockTradeQty != 0 || bid.IsClosed {
-			datastreams.SendOrder(biddingUserId, bid.Id, false, stockTradeQty, bid.IsClosed)
+			datastreams.SendOrder(bid.UserId, bid.Id, false, stockTradeQty, bid.IsClosed)
 		}
 
 		l.Infof("Sent through the datastreams")
-	}
-
-	var bidUnfulfilledStockQuantity = bid.StockQuantity - bid.StockQuantityFulfilled
-	var askUnfulfilledStockQuantity = ask.StockQuantity - ask.StockQuantityFulfilled
-
-	stockTradeQty := int32(min(askUnfulfilledStockQuantity, bidUnfulfilledStockQuantity))
-	var stockTradePrice uint32
-
-	//set transaction price based on order type
-	if isMarket(ask.OrderType) && isMarket(bid.OrderType) {
-		allStocks.m[ask.StockId].RLock()
-		stock, _ := allStocks.m[ask.StockId]
-		stockTradePrice = stock.stock.CurrentPrice
-		allStocks.m[ask.StockId].RUnlock()
-	} else if isMarket(ask.OrderType) {
-		stockTradePrice = bid.Price
-	} else if isMarket(bid.OrderType) {
-		stockTradePrice = ask.Price
-	} else {
-		stockTradePrice = min(ask.Price, bid.Price)
 	}
 
 	//Check if bidder has enough cash
@@ -975,52 +979,16 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 		}
 	}
 
-	total := int32(stockTradePrice) * stockTradeQty
-
-	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -stockTradeQty, stockTradePrice, total)
-	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, stockTradeQty, stockTradePrice, -total)
-
-	l.Debugf("Acquiring lock in order of User Ids")
-
-	var firstUserId, secondUserId uint32
-
-	//look out for error!!!
-	if ask.UserId < bid.UserId {
-		firstUserId = ask.UserId
-		secondUserId = bid.UserId
-	} else {
-		firstUserId = bid.UserId
-		secondUserId = ask.UserId
-	}
-
-	l.Debugf("Want first and second as %d, %d for stockid: %d", firstUserId, secondUserId, ask.StockId)
-	defer l.Debugf("Closed channels of %d and %d for stockid: %d", firstUserId, secondUserId, ask.StockId)
-
-	firstLockChan, firstUser, err := getUser(firstUserId)
+	done, askingUser, biddingUser, err := getUserPairExclusive(ask.UserId, bid.UserId)
 	if err != nil {
-		l.Errorf("Errored: %+v", err)
 		return false, false, nil
 	}
-	defer close(firstLockChan)
+	defer close(done)
 
-	secondLockChan, secondUser, err := getUser(secondUserId)
-	if err != nil {
-		l.Errorf("Errored: %+v", err)
-		return false, false, nil
-	}
-	defer close(secondLockChan)
+	total := int32(stockTradePrice * stockTradeQty)
 
-	l.Debugf("Acquired the locks on users %d and %d", firstUserId, secondUserId)
-
-	var askingUser, biddingUser *User
-
-	if ask.UserId == firstUserId {
-		askingUser = firstUser
-		biddingUser = secondUser
-	} else {
-		askingUser = secondUser
-		biddingUser = firstUser
-	}
+	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -int32(stockTradeQty), stockTradePrice, total)
+	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, int32(stockTradeQty), stockTradePrice, -total)
 
 	//calculate user's updated cash
 	askingUserCash := askingUser.Cash + uint32(stockTradeQty)*stockTradePrice
@@ -1029,15 +997,8 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
 	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
 	bidStockQuantityFulfilled := bid.StockQuantityFulfilled + uint32(stockTradeQty)
-
-	var askIsClosed, bidIsClosed bool
-
-	if ask.StockQuantity == askStockQuantityFulfilled {
-		askIsClosed = true
-	}
-	if bid.StockQuantity == bidStockQuantityFulfilled {
-		bidIsClosed = true
-	}
+	askIsClosed := (ask.StockQuantity == askStockQuantityFulfilled)
+	bidIsClosed := (bid.StockQuantity == bidStockQuantityFulfilled)
 
 	//Committing to database
 	db, err := DbOpen()
@@ -1050,50 +1011,42 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 	//Begin transaction
 	tx := db.Begin()
 
-	//save askTransaction
-	if err := tx.Save(askTransaction).Error; err != nil {
-		l.Errorf("Error creating the askTransaction. Rolling back. Error: %+v", err)
+	var errorHelper = func(fmt string, args ...interface{}) (bool, bool, *Transaction) {
+		l.Errorf(fmt, args...)
 		tx.Rollback()
 		return false, false, nil
 	}
 
+	//save askTransaction
+	if err := tx.Save(askTransaction).Error; err != nil {
+		return errorHelper("Error creating the askTransaction. Rolling back. Error: %+v", err)
+	}
 	l.Debugf("Added askTransaction to Transactions table")
 
 	//save bidTransaction
 	if err := tx.Save(bidTransaction).Error; err != nil {
-		l.Errorf("Error creating the bidTransaction. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return false, false, nil
+		return errorHelper("Error creating the bidTransaction. Rolling back. Error: %+v", err)
 	}
-
 	l.Debugf("Added bidTransaction to Transactions table")
 
 	//update askingUser
 	if err := tx.Model(askingUser).Update("cash", askingUserCash).Error; err != nil {
-		l.Errorf("Error updating askingUser.Cash Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return false, false, nil
+		return errorHelper("Error updating askingUser.Cash Rolling back. Error: %+v", err)
 	}
 
 	//update biddingUserCash
 	if err := tx.Model(biddingUser).Update("cash", biddingUserCash).Error; err != nil {
-		l.Errorf("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return false, false, nil
+		return errorHelper("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
 	}
 
 	//update StockQuantityFulfilled and IsClosed for ask order
 	if err := tx.Model(ask).Updates(Ask{StockQuantityFulfilled: askStockQuantityFulfilled, IsClosed: askIsClosed}).Error; err != nil {
-		l.Errorf("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return false, false, nil
+		return errorHelper("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 	}
 
 	//update StockQuantityFulfilled and IsClosed for bid order
 	if err := tx.Model(bid).Updates(Bid{StockQuantityFulfilled: bidStockQuantityFulfilled, IsClosed: bidIsClosed}).Error; err != nil {
-		l.Errorf("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return false, false, nil
+		return errorHelper("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 	}
 
 	// insert an OrderFill
@@ -1103,9 +1056,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 		TransactionId: askTransaction.Id, // We'll always store Ask
 	}
 	if err := tx.Save(of).Error; err != nil {
-		l.Errorf("Error saving an orderfill. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return false, false, nil
+		return errorHelper("Error saving an orderfill. Rolling back. Error: %+v", err)
 	}
 
 	//Commit transaction
@@ -1114,14 +1065,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid) (bool, bool, *Transaction) 
 		return false, false, nil
 	}
 
-	askingUser.Cash = askingUserCash
-	biddingUser.Cash = biddingUserCash
-	ask.IsClosed = askIsClosed
-	ask.StockQuantityFulfilled = askStockQuantityFulfilled
-	bid.IsClosed = bidIsClosed
-	bid.StockQuantityFulfilled = bidStockQuantityFulfilled
-
-	go updateDataStreams(askingUser.Id, biddingUser.Id, askTransaction, bidTransaction, ask, bid)
+	go updateDataStreams(askTransaction, bidTransaction)
 
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
@@ -1144,7 +1088,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	l.Infof("PerformMortgageTransaction requested")
 
 	l.Debugf("Acquiring exclusive write on user")
-	ch, user, err := getUser(userId)
+	ch, user, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return nil, err
@@ -1285,7 +1229,7 @@ func PerformDividendTransaction(stockId, dividendPercent uint32) (err error) {
 	l.Info("PerformDividendTransaction requested")
 
 	l.Debug("Acquiring exclusive write on user")
-	ch, user, err := getUser(userId)
+	ch, user, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return err
@@ -1372,7 +1316,7 @@ func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 
 	l.Debugf("Acquiring lock on user")
 
-	ch, _, err := getUser(userId)
+	ch, _, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return nil, err

@@ -6,6 +6,7 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi"
+	"github.com/thakkarparth007/dalal-street-server/matchingengine"
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/socketapi"
 	"github.com/thakkarparth007/dalal-street-server/utils"
@@ -25,8 +26,8 @@ func RealMain() {
 
 	//utils.InitLogger()
 
-	models.InitMatchingEngine()
-	grpcapi.StartServices(utils.Configuration.GrpcCert, utils.Configuration.GrpcKey)
+	matchingEngine := matchingengine.NewMatchingEngine()
+	grpcapi.StartServices(utils.Configuration.GrpcCert, utils.Configuration.GrpcKey, matchingEngine)
 	datastreams.StartStreams()
 	//models.InitModels()
 	//session.InitSession()

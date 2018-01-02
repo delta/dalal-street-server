@@ -4,6 +4,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 type Notification struct {
@@ -50,7 +51,7 @@ func GetNotifications(userId, lastId, count uint32) (bool, []*Notification, erro
 	if count == 0 {
 		count = GET_NOTIFICATION_COUNT
 	} else {
-		count = min(count, GET_NOTIFICATION_COUNT)
+		count = utils.MinInt(count, GET_NOTIFICATION_COUNT)
 	}
 
 	//get latest events if lastId is zero

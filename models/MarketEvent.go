@@ -4,6 +4,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 type MarketEvent struct {
@@ -54,7 +55,7 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	if count == 0 {
 		count = MARKET_EVENT_COUNT
 	} else {
-		count = min(count, MARKET_EVENT_COUNT)
+		count = utils.MinInt(count, MARKET_EVENT_COUNT)
 	}
 
 	//get latest events if lastId is zero

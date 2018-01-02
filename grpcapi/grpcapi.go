@@ -16,6 +16,7 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/actionservice"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/streamservice"
+	"github.com/thakkarparth007/dalal-street-server/matchingengine"
 	"github.com/thakkarparth007/dalal-street-server/proto_build"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
 	"github.com/thakkarparth007/dalal-street-server/session"
@@ -58,7 +59,7 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 	return handler(newCtx, req)
 }
 
-func StartServices(crt, key string) {
+func StartServices(crt, key string, matchingEngine matchingengine.MatchingEngine) {
 	creds, err := credentials.NewServerTLSFromFile(crt, key)
 	if err != nil {
 		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
@@ -76,7 +77,7 @@ func StartServices(crt, key string) {
 		)),
 	)
 
-	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService())
+	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService())
 
 	lis, err := net.Listen("tcp", utils.Configuration.GrpcAddress)

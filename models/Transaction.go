@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 type TransactionType uint8
@@ -108,7 +109,7 @@ func GetTransactions(userId, lastId, count uint32) (bool, []*Transaction, error)
 	if count == 0 {
 		count = GET_TRANSACTION_COUNT
 	} else {
-		count = min(count, GET_TRANSACTION_COUNT)
+		count = utils.MinInt(count, GET_TRANSACTION_COUNT)
 	}
 
 	//get latest events if lastId is zero

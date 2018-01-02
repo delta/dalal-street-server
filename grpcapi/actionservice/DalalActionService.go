@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/thakkarparth007/dalal-street-server/matchingengine"
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/session"
 
@@ -34,10 +35,13 @@ func init() {
 }
 
 type dalalActionService struct {
+	matchingEngine matchingengine.MatchingEngine
 }
 
-func NewDalalActionService() pb.DalalActionServiceServer {
-	return &dalalActionService{}
+func NewDalalActionService(me matchingengine.MatchingEngine) pb.DalalActionServiceServer {
+	return &dalalActionService{
+		matchingEngine: me,
+	}
 }
 
 func (d *dalalActionService) BuyStocksFromExchange(ctx context.Context, req *actions_pb.BuyStocksFromExchangeRequest) (*actions_pb.BuyStocksFromExchangeResponse, error) {
@@ -309,21 +313,29 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 	var err error
 
 	if req.IsAsk {
-		orderId, err = models.PlaceAskOrder(userId, &models.Ask{
+		ask := &models.Ask{
 			UserId:        userId,
 			StockId:       req.StockId,
 			OrderType:     models.OrderTypeFromProto(req.OrderType),
 			Price:         req.Price,
 			StockQuantity: req.StockQuantity,
-		})
+		}
+		orderId, err = models.PlaceAskOrder(userId, ask)
+		if err != nil {
+			go d.matchingEngine.AddAskOrder(ask)
+		}
 	} else {
-		orderId, err = models.PlaceBidOrder(userId, &models.Bid{
+		bid := &models.Bid{
 			UserId:        userId,
 			StockId:       req.StockId,
 			OrderType:     models.OrderTypeFromProto(req.OrderType),
 			Price:         req.Price,
 			StockQuantity: req.StockQuantity,
-		})
+		}
+		orderId, err = models.PlaceBidOrder(userId, bid)
+		if err != nil {
+			go d.matchingEngine.AddBidOrder(bid)
+		}
 	}
 
 	switch e := err.(type) {
