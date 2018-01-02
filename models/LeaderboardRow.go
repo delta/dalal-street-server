@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	models_pb "github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 type LeaderboardRow struct {
@@ -51,7 +52,7 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 	if count == 0 {
 		count = LEADERBOARD_COUNT
 	} else {
-		count = min(count, LEADERBOARD_COUNT)
+		count = utils.MinInt(count, LEADERBOARD_COUNT)
 	}
 
 	db, err := DbOpen()

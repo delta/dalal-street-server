@@ -1,8 +1,10 @@
-package models
+package matchingengine
 
 import (
 	"sync"
 	"time"
+
+	"github.com/thakkarparth007/dalal-street-server/models"
 )
 
 // PQType represents a priority queue ordering kind (see MAXPQ and MINPQ)
@@ -14,13 +16,13 @@ const (
 )
 
 type bidItem struct {
-	value    *Bid
+	value    *models.Bid
 	price    uint32
 	quantity uint32
 }
 
 type askItem struct {
-	value    *Ask
+	value    *models.Ask
 	price    uint32
 	quantity uint32
 }
@@ -32,24 +34,24 @@ type BidPQueue struct {
 	sync.RWMutex
 	items      []*bidItem
 	elemsCount int
-	comparator func(Factors, Factors) bool
+	comparator func(factors, factors) bool
 }
 
 type AskPQueue struct {
 	sync.RWMutex
 	items      []*askItem
 	elemsCount int
-	comparator func(Factors, Factors) bool
+	comparator func(factors, factors) bool
 }
 
-type Factors struct {
-	oType    OrderType
+type factors struct {
+	oType    models.OrderType
 	price    uint32
 	placedAt time.Time
 	quantity uint32
 }
 
-func newBidItem(value *Bid, price uint32, quantity uint32) *bidItem {
+func newBidItem(value *models.Bid, price uint32, quantity uint32) *bidItem {
 	return &bidItem{
 		value:    value,
 		price:    price,
@@ -57,7 +59,7 @@ func newBidItem(value *Bid, price uint32, quantity uint32) *bidItem {
 	}
 }
 
-func newAskItem(value *Ask, price uint32, quantity uint32) *askItem {
+func newAskItem(value *models.Ask, price uint32, quantity uint32) *askItem {
 	return &askItem{
 		value:    value,
 		price:    price,
@@ -72,7 +74,7 @@ func newAskItem(value *Ask, price uint32, quantity uint32) *askItem {
 // NewPQueue creates a new priority queue with the provided pqtype
 // ordering type
 func NewBidPQueue(pqType PQType) *BidPQueue {
-	var cmp func(Factors, Factors) bool
+	var cmp func(factors, factors) bool
 
 	if pqType == MAXPQ {
 		cmp = bidComparator
@@ -91,7 +93,7 @@ func NewBidPQueue(pqType PQType) *BidPQueue {
 }
 
 func NewAskPQueue(pqType PQType) *AskPQueue {
-	var cmp func(Factors, Factors) bool
+	var cmp func(factors, factors) bool
 
 	if pqType == MAXPQ {
 		cmp = bidComparator
@@ -110,7 +112,7 @@ func NewAskPQueue(pqType PQType) *AskPQueue {
 }
 
 // Push the value item into the priority queue with provided priority.
-func (pq *BidPQueue) Push(value *Bid, price uint32, quantity uint32) {
+func (pq *BidPQueue) Push(value *models.Bid, price uint32, quantity uint32) {
 	item := newBidItem(value, price, quantity)
 
 	pq.Lock()
@@ -120,7 +122,7 @@ func (pq *BidPQueue) Push(value *Bid, price uint32, quantity uint32) {
 	pq.Unlock()
 }
 
-func (pq *AskPQueue) Push(value *Ask, price uint32, quantity uint32) {
+func (pq *AskPQueue) Push(value *models.Ask, price uint32, quantity uint32) {
 	item := newAskItem(value, price, quantity)
 
 	pq.Lock()
@@ -132,7 +134,7 @@ func (pq *AskPQueue) Push(value *Ask, price uint32, quantity uint32) {
 
 // Pop and returns the highest/lowest priority item (depending on whether
 // you're using a MINPQ or MAXPQ) from the priority queue
-func (pq *BidPQueue) Pop() *Bid {
+func (pq *BidPQueue) Pop() *models.Bid {
 	pq.Lock()
 	defer pq.Unlock()
 
@@ -150,7 +152,7 @@ func (pq *BidPQueue) Pop() *Bid {
 	return max.value
 }
 
-func (pq *AskPQueue) Pop() *Ask {
+func (pq *AskPQueue) Pop() *models.Ask {
 	pq.Lock()
 	defer pq.Unlock()
 
@@ -170,7 +172,7 @@ func (pq *AskPQueue) Pop() *Ask {
 
 // Head returns the highest/lowest priority item (depending on whether
 // you're using a MINPQ or MAXPQ) from the priority queue
-func (pq *BidPQueue) Head() *Bid {
+func (pq *BidPQueue) Head() *models.Bid {
 	pq.RLock()
 	defer pq.RUnlock()
 
@@ -183,7 +185,7 @@ func (pq *BidPQueue) Head() *Bid {
 	return headValue
 }
 
-func (pq *AskPQueue) Head() *Ask {
+func (pq *AskPQueue) Head() *models.Ask {
 	pq.RLock()
 	defer pq.RUnlock()
 
@@ -235,7 +237,7 @@ func (pq *AskPQueue) size() int {
  *		  If prices are equal, higher quantity has more priority
  *		- If both are Stoploss orders, higher price has priority for ask.
  */
-func bidComparator(order1, order2 Factors) bool {
+func bidComparator(order1, order2 factors) bool {
 	if isMarket(order1.oType) && isMarket(order2.oType) {
 		return order2.placedAt.Before(order1.placedAt)
 	}
@@ -259,7 +261,7 @@ func bidComparator(order1, order2 Factors) bool {
  *		  If prices are equal, higher quantity has more priority
  *		- If both are Stoploss orders, lower price has priority for bid.
  */
-func askComparator(order1, order2 Factors) bool {
+func askComparator(order1, order2 factors) bool {
 	if isMarket(order1.oType) && isMarket(order2.oType) {
 		return order2.placedAt.Before(order1.placedAt)
 	}
@@ -280,13 +282,13 @@ func (pq *BidPQueue) less(i, j int) bool {
 	placedAt2, _ := time.Parse(time.RFC3339, pq.items[j].value.CreatedAt)
 
 	return pq.comparator(
-		Factors{
+		factors{
 			oType:    pq.items[i].value.OrderType,
 			price:    pq.items[i].price,
 			placedAt: placedAt1,
 			quantity: pq.items[i].quantity,
 		},
-		Factors{
+		factors{
 			oType:    pq.items[j].value.OrderType,
 			price:    pq.items[j].price,
 			placedAt: placedAt2,
@@ -299,13 +301,13 @@ func (pq *AskPQueue) less(i, j int) bool {
 	placedAt2, _ := time.Parse(time.RFC3339, pq.items[j].value.CreatedAt)
 
 	return pq.comparator(
-		Factors{
+		factors{
 			oType:    pq.items[i].value.OrderType,
 			price:    pq.items[i].price,
 			placedAt: placedAt1,
 			quantity: pq.items[i].quantity,
 		},
-		Factors{
+		factors{
 			oType:    pq.items[j].value.OrderType,
 			price:    pq.items[j].price,
 			placedAt: placedAt2,

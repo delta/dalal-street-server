@@ -27,3 +27,10 @@ func RandString(n int) string {
 
 	return string(b)
 }
+
+func MinInt(a, b uint32) uint32 {
+	if a < b {
+		return a
+	}
+	return b
+}

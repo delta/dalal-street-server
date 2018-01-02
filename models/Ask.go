@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 type OrderType uint8
@@ -310,7 +311,7 @@ func GetMyClosedAsks(userId, lastId, count uint32) (bool, []*Ask, error) {
 	if count == 0 {
 		count = MY_ASK_COUNT
 	} else {
-		count = min(count, MY_ASK_COUNT)
+		count = utils.MinInt(count, MY_ASK_COUNT)
 	}
 
 	//get latest events if lastId is zero

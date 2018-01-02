@@ -17,7 +17,7 @@ import (
 )
 
 func init() {
-	StartServices("../tls_keys/test/server.crt", "../tls_keys/test/server.key")
+	StartServices("../tls_keys/test/server.crt", "../tls_keys/test/server.key", nil)
 }
 
 func getConnection(t *testing.T) *grpc.ClientConn {

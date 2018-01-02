@@ -10,7 +10,7 @@
       "LogLevel": "debug",
 
       "DbUser": "root",
-      "DbPassword": "MYSQL_ROOT_PASSWORD",
+      "DbPassword": "",
       "DbHost": "",
       "DbName": "dalalstreet_dev",
 
@@ -56,7 +56,7 @@
       "LogLevel": "info",
 
       "DbUser": "root",
-      "DbPassword": "MYSQL_ROOT_PASSWORD",
+      "DbPassword": "",
       "DbHost": "",
       "DbName": "dalalstreet",
 
@@ -76,7 +76,7 @@
 
       "LogFileName": "stdout",
       "LogMaxSize": 50,
-      "LogLevel": "debug",
+      "LogLevel": "info",
 
       "DbUser": "root",
       "DbPassword": "",

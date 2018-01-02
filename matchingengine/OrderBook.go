@@ -1,14 +1,31 @@
-package models
+package matchingengine
 
 import (
 	"github.com/Sirupsen/logrus"
+
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/models"
 )
 
-type OrderBook struct {
+// FillOrder is a type definition for a function that fills an order with given ask, bid, stockPrice and stockQty
+type FillOrder func(ask *models.Ask, bid *models.Bid, stockTradePrice uint32, stockTradeQty uint32) (askDone bool, bidDone bool, tr *models.Transaction)
+
+// fillOrderFn is the actual function that filles an order.
+// It has been separated from implementation to ease testing.
+var fillOrderFn FillOrder = models.PerformOrderFillTransaction
+
+// OrderBook stores the order book for a given stock
+type OrderBook interface {
+	AddAskOrder(*models.Ask)
+	AddBidOrder(*models.Bid)
+	StartStockMatching()
+}
+
+// orderBook implements the OrderBook interface
+type orderBook struct {
 	stockId     uint32
-	askChan     chan *Ask
-	bidChan     chan *Bid
+	askChan     chan *models.Ask
+	bidChan     chan *models.Bid
 	asks        *AskPQueue
 	bids        *BidPQueue
 	askStoploss *AskPQueue
@@ -16,43 +33,79 @@ type OrderBook struct {
 	depth       *datastreams.MarketDepth
 }
 
-/*
- *	Function to return the minimum of two numbers
- */
-func min(i, j uint32) uint32 {
-	if i < j {
-		return i
+// NewOrderBook returns a new OrderBook instance for a given stockId.
+func NewOrderBook(stockId uint32) OrderBook {
+	return &orderBook{
+		stockId:     stockId,
+		askChan:     make(chan *models.Ask),
+		bidChan:     make(chan *models.Bid),
+		asks:        NewAskPQueue(MINPQ), //lower price has higher priority
+		bids:        NewBidPQueue(MAXPQ), //higher price has higher priority
+		askStoploss: NewAskPQueue(MAXPQ), // stoplosses work like opposite of limit/market.
+		bidStoploss: NewBidPQueue(MINPQ), // They sell when price goes below a certain trigger price.
+		depth:       datastreams.NewMarketDepth(stockId),
 	}
-	return j
+}
+
+// AddAskOrder adds an ask order to the book. It will take care of adding stopLoss, or partially filled orders automatically
+func (ob *orderBook) AddAskOrder(ask *models.Ask) {
+	if ask.IsClosed {
+		return
+	}
+
+	if ask.OrderType == models.StopLoss {
+		ob.askStoploss.Push(ask, ask.Price, 0)
+	} else {
+		bidUnfulfilledQuantity := ask.StockQuantity - ask.StockQuantityFulfilled
+		ob.asks.Push(ask, ask.Price, bidUnfulfilledQuantity)
+	}
+}
+
+// AddBidOrder adds an bid order to the book. It will take care of adding stopLoss, or partially filled orders automatically
+func (ob *orderBook) AddBidOrder(bid *models.Bid) {
+	if bid.IsClosed {
+		return
+	}
+
+	if bid.OrderType == models.StopLoss {
+		ob.bidStoploss.Push(bid, bid.Price, 0)
+	} else {
+		bidUnfulfilledQuantity := bid.StockQuantity - bid.StockQuantityFulfilled
+		ob.bids.Push(bid, bid.Price, bidUnfulfilledQuantity)
+	}
 }
 
 /*
- *	Helper function to check if it's a Market order
+ *	StartStockMatching listens for incoming orders for a particular stock and process them
  */
-func isMarket(oType OrderType) bool {
-	return oType == Market || oType == StopLossActive
-}
+func (ob *orderBook) StartStockMatching() {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "startStockMatching",
+		"stockId": ob.stockId,
+	})
 
-/*
- *	Helper function to check if a transaction is possible
- */
-func isOrderMatching(askTop *Ask, bidTop *Bid) bool {
-	if isMarket(bidTop.OrderType) || isMarket(askTop.OrderType) {
-		return true
+	l.Infof("Started with ask_count = %d, bid_count = %d", ob.asks.Size(), ob.bids.Size())
+
+	// Clear the existing orders first
+	ob.processOrder()
+
+	// run infinite loop
+	for {
+		ob.waitForOrder()
+		ob.processOrder()
 	}
-	return bidTop.Price >= askTop.Price
 }
 
 /*
  *	Method to check and trigger(if possible) StopLoss orders whenever a transaction occurs
  */
-func (ob *OrderBook) triggerStopLosses(tr *Transaction) {
+func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "triggerStopLosses",
 		"stockId": ob.stockId,
 	})
 
-	db, err := DbOpen()
+	db, err := models.DbOpen()
 	if err != nil {
 		l.Errorf("Error while opening DB to trigger stoplosses. Not triggering them.")
 		return
@@ -67,7 +120,7 @@ func (ob *OrderBook) triggerStopLosses(tr *Transaction) {
 		l.Debugf("Triggering ask %+v", topAskStoploss)
 
 		topAskStoploss = ob.askStoploss.Pop()
-		topAskStoploss.OrderType = StopLossActive
+		topAskStoploss.OrderType = models.StopLossActive
 		if err := db.Save(topAskStoploss).Error; err != nil {
 			l.Errorf("Error while changing state of %+v from StopLoss to StopLossActive", topAskStoploss)
 		}
@@ -85,7 +138,7 @@ func (ob *OrderBook) triggerStopLosses(tr *Transaction) {
 		l.Debugf("Triggering bid %+v", topBidStoploss)
 
 		topBidStoploss = ob.bidStoploss.Pop()
-		topBidStoploss.OrderType = StopLossActive
+		topBidStoploss.OrderType = models.StopLossActive
 		if err := db.Save(topBidStoploss).Error; err != nil {
 			l.Errorf("Error while changing state of %+v from StopLoss to StopLossActive", topBidStoploss)
 		}
@@ -99,7 +152,7 @@ func (ob *OrderBook) triggerStopLosses(tr *Transaction) {
 /*
  *	Method to return a matching ask and bid belonging to distinct users
  */
-func (ob *OrderBook) getTopMatchingOrders() (*Ask, *Bid, func()) {
+func (ob *orderBook) getTopMatchingOrders() (*models.Ask, *models.Bid, func()) {
 	askTop, bidTop := ob.asks.Head(), ob.bids.Head()
 
 	// If either one is nil, there are no matching orders
@@ -108,7 +161,7 @@ func (ob *OrderBook) getTopMatchingOrders() (*Ask, *Bid, func()) {
 	}
 
 	// Store the same user's bids in a slice
-	var sameUserBids []*Bid
+	var sameUserBids []*models.Bid
 	for bidTop != nil && bidTop.UserId == askTop.UserId {
 		sameUserBids = append(sameUserBids, ob.bids.Pop())
 		bidTop = ob.bids.Head()
@@ -134,7 +187,7 @@ func (ob *OrderBook) getTopMatchingOrders() (*Ask, *Bid, func()) {
 /*
  *	Method to process the orders for a particular stock and carry out transactions
  */
-func (ob *OrderBook) processOrder() {
+func (ob *orderBook) processOrder() {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "processOrder",
 		"stockId": ob.stockId,
@@ -143,7 +196,7 @@ func (ob *OrderBook) processOrder() {
 	var (
 		askDone bool
 		bidDone bool
-		tr      *Transaction
+		tr      *models.Transaction
 	)
 
 	askTop, bidTop, addBackOrders := ob.getTopMatchingOrders()
@@ -153,12 +206,13 @@ func (ob *OrderBook) processOrder() {
 		l.Debugf("Performing OrderFill transaction")
 
 		/*
-		 *	PerformOrderFillTransaction should
+		 *	fillOrderFn should
 		 *		- acquire locks on the users
 		 *		- update StockQuantityFulfilled and IsClosed
 		 *		- record the transaction in the database
 		 */
-		askDone, bidDone, tr = PerformOrderFillTransaction(askTop, bidTop)
+		stockTradePrice, stockTradeQty := getTradePriceAndQty(askTop, bidTop)
+		askDone, bidDone, tr = fillOrderFn(askTop, bidTop, stockTradePrice, stockTradeQty)
 
 		if tr != nil {
 			l.Infof("Trade made between ask_id %d and bid %d", askTop.Id, bidTop.Id)
@@ -206,7 +260,7 @@ func (ob *OrderBook) processOrder() {
 /*
  *	Method to wait for an incoming order on the channels
  */
-func (ob *OrderBook) waitForOrder() {
+func (ob *orderBook) waitForOrder() {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "waitForOrder",
 	})
@@ -214,7 +268,7 @@ func (ob *OrderBook) waitForOrder() {
 	select {
 	case askOrder := <-ob.askChan:
 		l.Debugf("Got ask %+v. Processing", askOrder)
-		if askOrder.OrderType == StopLoss {
+		if askOrder.OrderType == models.StopLoss {
 			l.Debugf("Adding stopLoss with ask_id %d to the list", askOrder.Id)
 			ob.askStoploss.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
 			break
@@ -223,11 +277,10 @@ func (ob *OrderBook) waitForOrder() {
 		// If control reaches here, it's not a StopLoss order
 		ob.asks.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
 		ob.depth.AddOrder(isMarket(askOrder.OrderType), true, askOrder.Price, askOrder.StockQuantity)
-		ob.processOrder()
 
 	case bidOrder := <-ob.bidChan:
 		l.Debugf("Got bid %+v. Processing", bidOrder)
-		if bidOrder.OrderType == StopLoss {
+		if bidOrder.OrderType == models.StopLoss {
 			l.Debugf("Adding stopLoss with bid_id %d to the list", bidOrder.Id)
 			ob.bidStoploss.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
 			break
@@ -236,121 +289,5 @@ func (ob *OrderBook) waitForOrder() {
 		// If control reaches here, it's not a StopLoss order
 		ob.bids.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
 		ob.depth.AddOrder(isMarket(bidOrder.OrderType), true, bidOrder.Price, bidOrder.StockQuantity)
-		ob.processOrder()
-	}
-}
-
-/*
- *	Method to listen for incoming orders for a particular stock and process them
- */
-func (ob *OrderBook) startStockMatching() {
-	var l = logger.WithFields(logrus.Fields{
-		"method":  "startStockMatching",
-		"stockId": ob.stockId,
-	})
-
-	l.Infof("Started with ask_count = %d, bid_count = %d", ob.asks.Size(), ob.bids.Size())
-
-	// Clear the existing orders first
-	ob.processOrder()
-
-	// run infinite loop
-	for {
-		ob.waitForOrder()
-	}
-}
-
-/*
- *	Store details of the placed orders. Each entry in orderBooks corresponds to a particular stock
- */
-var orderBooks = make(map[uint32]OrderBook)
-
-/*
- *	method to add the placed ask order to the ask channel. Called from method PlaceAskOrder
- */
-func AddAskOrder(askOrder *Ask) {
-	orderBooks[askOrder.StockId].askChan <- askOrder
-}
-
-/*
- *	method to add the placed bid order to the bid channel. Called from method PlaceBidOrder
- */
-func AddBidOrder(bidOrder *Bid) {
-	orderBooks[bidOrder.StockId].bidChan <- bidOrder
-}
-
-/*
- *	Init will be run once when server is started
- *	It calls StartStockmatching for all the stocks in concurrent goroutines
- */
-func InitMatchingEngine() {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "InitMatchingEngine",
-	})
-	db, err := DbOpen()
-	if err != nil {
-		l.Errorf("Errored : %+v", err)
-		panic("Error opening database for matching engine")
-	}
-	defer db.Close()
-
-	var (
-		openAskOrders          []*Ask
-		openBidOrders          []*Bid
-		stockIds               []uint32
-		askUnfulfilledQuantity uint32
-		bidUnfulfilledQuantity uint32
-	)
-
-	//Load stock ids from database
-	if err := db.Model(&Stock{}).Pluck("id", &stockIds).Error; err != nil {
-		panic("Failed to load stock ids in matching engine: " + err.Error())
-	}
-
-	//Load open ask orders from database
-	if err := db.Where("isClosed = ?", 0).Find(&openAskOrders).Error; err != nil {
-		panic("Error loading open ask orders in matching engine: " + err.Error())
-	}
-
-	//Load open bid orders from database
-	if err := db.Where("isClosed = ?", 0).Find(&openBidOrders).Error; err != nil {
-		panic("Error loading open bid orders in matching engine: " + err.Error())
-	}
-
-	for _, stockId := range stockIds {
-		orderBooks[stockId] = OrderBook{
-			stockId:     stockId,
-			askChan:     make(chan *Ask),
-			bidChan:     make(chan *Bid),
-			asks:        NewAskPQueue(MINPQ), //lower price has higher priority
-			bids:        NewBidPQueue(MAXPQ), //higher price has higher priority
-			askStoploss: NewAskPQueue(MAXPQ), // stoplosses work like opposite of limit/market.
-			bidStoploss: NewBidPQueue(MINPQ), // They sell when price goes below a certain trigger price.
-			depth:       datastreams.NewMarketDepth(stockId),
-		}
-	}
-
-	//Load open ask orders into priority queue
-	for _, openAskOrder := range openAskOrders {
-		if openAskOrder.OrderType == StopLoss {
-			orderBooks[openAskOrder.StockId].askStoploss.Push(openAskOrder, openAskOrder.Price, 0)
-		} else {
-			askUnfulfilledQuantity = openAskOrder.StockQuantity - openAskOrder.StockQuantityFulfilled
-			orderBooks[openAskOrder.StockId].asks.Push(openAskOrder, openAskOrder.Price, askUnfulfilledQuantity)
-		}
-	}
-
-	//Load open bid orders into priority queue
-	for _, openBidOrder := range openBidOrders {
-		if openBidOrder.OrderType == StopLoss {
-			orderBooks[openBidOrder.StockId].bids.Push(openBidOrder, openBidOrder.Price, 0)
-		} else {
-			bidUnfulfilledQuantity = openBidOrder.StockQuantity - openBidOrder.StockQuantityFulfilled
-			orderBooks[openBidOrder.StockId].bids.Push(openBidOrder, openBidOrder.Price, bidUnfulfilledQuantity)
-		}
-	}
-
-	for _, ob := range orderBooks {
-		go ob.startStockMatching()
 	}
 }

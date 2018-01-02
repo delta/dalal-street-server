@@ -7,6 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 type Bid struct {
@@ -259,7 +260,7 @@ func GetMyClosedBids(userId, lastId, count uint32) (bool, []*Bid, error) {
 	if count == 0 {
 		count = MY_BID_COUNT
 	} else {
-		count = min(count, MY_BID_COUNT)
+		count = utils.MinInt(count, MY_BID_COUNT)
 	}
 
 	//get latest events if lastId is zero
