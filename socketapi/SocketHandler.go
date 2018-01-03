@@ -7,25 +7,30 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/thakkarparth007/dalal-street-server/socketapi/repl"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 var socketApiLogger *logrus.Entry
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return utils.Configuration.Stage == "test" || utils.Configuration.Stage == "dev"
-	},
-}
+var upgrader websocket.Upgrader
 
-func init() {
+// Init configures the socketapi package
+func Init(config *utils.Config) {
 	socketApiLogger = utils.Logger.WithFields(logrus.Fields{
 		"module": "socketapi/SocketHandler",
 	})
+
+	upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return config.Stage == "test" || config.Stage == "dev"
+		},
+	}
 	//actions.InitActions()
 	//datastreams.InitDataStreams()
-	//repl.InitREPL()
+	repl.InitREPL()
 }
 
+// loadSession loads a given session from the http request using the sid cookie
 func loadSession(r *http.Request) (session.Session, error) {
 	var l = socketApiLogger.WithFields(logrus.Fields{
 		"method": "loadSession",
@@ -39,10 +44,10 @@ func loadSession(r *http.Request) (session.Session, error) {
 		if err != nil {
 			l.Errorf("Error loading session data: '%s'", err)
 			return nil, err
-		} else {
-			l.Debugf("Loaded session")
-			return s, nil
 		}
+
+		l.Debugf("Loaded session")
+		return s, nil
 	}
 
 	s, err := session.New()
@@ -55,6 +60,7 @@ func loadSession(r *http.Request) (session.Session, error) {
 	return s, nil
 }
 
+// Handle handles an HTTP request meant for a websocket connection
 func Handle(w http.ResponseWriter, r *http.Request) {
 	var l = socketApiLogger.WithFields(logrus.Fields{
 		"method": "Handle",

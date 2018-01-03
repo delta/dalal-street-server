@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
 	"testing"
+
+	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func TestOrderFillToProto(t *testing.T) {

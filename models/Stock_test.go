@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
 	"testing"
+
+	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func TestStockToProto(t *testing.T) {
@@ -54,7 +55,10 @@ func Test_UpdateStockPrice(t *testing.T) {
 	}()
 
 	LoadStocks()
-	UpdateStockPrice(1, 2000)
+	err = UpdateStockPrice(1, 2000)
+	if err != nil {
+		t.Fatalf("UpdateStockPrice failed with %+v", err)
+	}
 
 	retrievedStock := &Stock{}
 	db.First(retrievedStock, 1)

@@ -29,12 +29,6 @@ func getUserId(ctx context.Context) uint32 {
 	return uint32(userIdInt)
 }
 
-func init() {
-	logger = utils.Logger.WithFields(logrus.Fields{
-		"module": "grpcapi.actions",
-	})
-}
-
 type subscription struct {
 	subscribeReq *datastreams_pb.SubscribeRequest
 	doneChan     chan struct{}
@@ -48,6 +42,10 @@ type dalalStreamService struct {
 }
 
 func NewDalalStreamService() pb.DalalStreamServiceServer {
+	logger = utils.Logger.WithFields(logrus.Fields{
+		"module": "grpcapi.actions",
+	})
+
 	dss := &dalalStreamService{
 		subscriptionsMap: make(map[datastreams_pb.DataStreamType]*perStreamTypeSubscriptionMap),
 	}

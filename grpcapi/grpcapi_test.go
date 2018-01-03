@@ -3,7 +3,11 @@ package grpcapi
 import (
 	"testing"
 
+	"github.com/thakkarparth007/dalal-street-server/models"
+	"github.com/thakkarparth007/dalal-street-server/session"
+
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	"google.golang.org/grpc/credentials"
@@ -12,12 +16,20 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/proto_build"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-
-	"google.golang.org/grpc"
+	"github.com/thakkarparth007/dalal-street-server/utils"
+	_ "github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 func init() {
-	StartServices("../tls_keys/test/server.crt", "../tls_keys/test/server.key", nil)
+	config := utils.GetConfiguration()
+	config.GrpcCert = "../tls_keys/test/server.crt"
+	config.GrpcKey = "../tls_keys/test/server.key"
+
+	utils.Init(config)
+	session.Init(config)
+	models.Init(config)
+	Init(config)
+	StartServices(nil)
 }
 
 func getConnection(t *testing.T) *grpc.ClientConn {
@@ -55,7 +67,7 @@ func Test_Authentication(t *testing.T) {
 		t.Fatalf("Unexpected: Login request gave Unauthenticated error %+v", err)
 	}
 	if loginRes.GetStatusCode() != actions_pb.LoginResponse_InvalidCredentialsError {
-		t.Fatalf("Unexpected: Login request failed with %+v", loginRes)
+		t.Fatalf("Unexpected: Login request failed with %+v %+v", loginRes, err)
 	}
 
 	buyStocksFromExchangeReq := &actions_pb.BuyStocksFromExchangeRequest{1, 1}

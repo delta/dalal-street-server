@@ -15,7 +15,6 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
-	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 var (
@@ -160,8 +159,8 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	form := url.Values{
 		"user_email":   {email},
 		"user_pass":    {password},
-		"event_id":     {utils.Configuration.EventId},
-		"event_secret": {utils.Configuration.EventSecret},
+		"event_id":     {config.EventId},
+		"event_secret": {config.EventSecret},
 	}
 
 	l.Debugf("Attempting login to Pragyan")

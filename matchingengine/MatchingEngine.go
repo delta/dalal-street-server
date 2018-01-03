@@ -9,12 +9,6 @@ import (
 
 var logger *logrus.Entry
 
-func init() {
-	logger = utils.Logger.WithFields(logrus.Fields{
-		"module": "matchingengine",
-	})
-}
-
 // MatchingEngine represents a collection of OrderBooks for all stocks in the exchange.
 type MatchingEngine interface {
 	AddAskOrder(*models.Ask)
@@ -26,6 +20,13 @@ type matchingEngine struct {
 	// orderBooks stores details of placed orders.
 	// Each entry in orderBooks corresponds to a particular stock.
 	orderBooks map[uint32]OrderBook
+}
+
+// Init configures the matching engine
+func Init(config *utils.Config) {
+	logger = utils.Logger.WithFields(logrus.Fields{
+		"module": "matchingengine",
+	})
 }
 
 // NewMatchingEngine returns an instance of MatchingEngine

@@ -3,6 +3,7 @@ package models
 import (
 	"testing"
 	"time"
+
 	"github.com/Sirupsen/logrus"
 	//"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
@@ -22,6 +23,7 @@ import (
 // 	}
 // }
 
+// TODO: fix this test!
 func Test_GetMortgageDetails(t *testing.T) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "Test_GetMortgageDetails",
@@ -40,33 +42,32 @@ func Test_GetMortgageDetails(t *testing.T) {
 
 	var makeUser = func(id uint32, email string, name string, cash uint32, total int32) *User {
 		return &User{
-		  	Id : id,
-			Email : email,
-			Name : name,
-			Cash : cash,
-			Total : total,
-			CreatedAt : time.Now().Format(time.RFC3339),
+			Id:        id,
+			Email:     email,
+			Name:      name,
+			Cash:      cash,
+			Total:     total,
+			CreatedAt: time.Now().Format(time.RFC3339),
 		}
 	}
 
 	var makeStock = func(id uint32, sName string, fName string, desc string, curPrice uint32, dayHigh uint32, dayLow uint32, allHigh uint32, allLow uint32, stocks uint32, upOrDown bool) *Stock {
 		return &Stock{
-		  	Id: id,
-			ShortName: sName,
-			FullName: fName,
-			Description: desc,
-			CurrentPrice: curPrice,
-			DayHigh: dayHigh,
-			DayLow: dayLow,
-			AllTimeHigh: allHigh,
-			AllTimeLow: allLow,
+			Id:               id,
+			ShortName:        sName,
+			FullName:         fName,
+			Description:      desc,
+			CurrentPrice:     curPrice,
+			DayHigh:          dayHigh,
+			DayLow:           dayLow,
+			AllTimeHigh:      allHigh,
+			AllTimeLow:       allLow,
 			StocksInExchange: stocks,
-			UpOrDown: upOrDown,
-			CreatedAt: time.Now().Format(time.RFC3339),
-			UpdatedAt: time.Now().Format(time.RFC3339),
+			UpOrDown:         upOrDown,
+			CreatedAt:        time.Now().Format(time.RFC3339),
+			UpdatedAt:        time.Now().Format(time.RFC3339),
 		}
 	}
-
 
 	users := []*User{
 		makeUser(2, "test@testmail.com", "Test", 100000, 100000),
@@ -124,7 +125,7 @@ func Test_GetMortgageDetails(t *testing.T) {
 		}
 	}
 
-	mortgageDetailsTestResponse, err := GetMortgageDetails(2);
+	mortgageDetailsTestResponse, err := GetMortgageDetails(2)
 
 	l.Infof("Response : %+v", mortgageDetailsTestResponse)
 }

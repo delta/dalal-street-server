@@ -5,6 +5,7 @@ import (
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 // FillOrder is a type definition for a function that fills an order with given ask, bid, stockPrice and stockQty
@@ -105,7 +106,7 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		"stockId": ob.stockId,
 	})
 
-	db, err := models.DbOpen()
+	db, err := utils.DbOpen()
 	if err != nil {
 		l.Errorf("Error while opening DB to trigger stoplosses. Not triggering them.")
 		return

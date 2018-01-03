@@ -2,9 +2,10 @@ package testutils
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func AssertEqual(t *testing.T, o1, o2 interface{}) bool {
