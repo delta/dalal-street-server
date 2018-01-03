@@ -5,6 +5,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -23,6 +25,7 @@ func Init(conf *utils.Config) {
 
 	lookupIsMarketOpenFromDb()
 	LoadStocks()
+	go startStockHistoryRecorder(time.Minute)
 	//OpenMarket()
 	//CloseMarket()
 }
