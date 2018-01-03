@@ -72,6 +72,7 @@ func Test_GetMarketEvents(t *testing.T) {
 		t.Fatalf("Expected %v but got %v", marketEvent, single[0])
 	}
 }
+
 func Test_AddMarketEvent(t *testing.T) {
 	marketEvent := &MarketEvent{
 		Id:       1,

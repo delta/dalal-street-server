@@ -11,23 +11,23 @@ import (
 // Logger is to be used for all logging
 var Logger *logrus.Logger
 
-// InitLogger initializes the logger with apropriate configuration options
-func init() {
+// initLogger initializes the logger with apropriate configuration options
+func initLogger(config *Config) {
 	var (
-		fileName string = Configuration.LogFileName
-		maxSize  int    = Configuration.LogMaxSize
-		logLevel string = Configuration.LogLevel
+		fileName = config.LogFileName
+		maxSize  = config.LogMaxSize
+		logLevel = config.LogLevel
 	)
 
-	if Configuration.LogFileName == "" {
+	if config.LogFileName == "" {
 		fileName = "./log.log"
 	}
 
-	if Configuration.LogMaxSize == 0 {
+	if config.LogMaxSize == 0 {
 		maxSize = 50
 	}
 
-	if Configuration.LogLevel == "" {
+	if config.LogLevel == "" {
 		logLevel = "info"
 	}
 
@@ -52,6 +52,7 @@ func init() {
 	Logger.Info("Logger started")
 }
 
+// GetNewFileLogger returns a logger that writes to a file of the given name
 func GetNewFileLogger(fileName string, maxSize int, logLevel string, json bool) *logrus.Logger {
 	if fileName == "" {
 		fileName = "./log1.log"

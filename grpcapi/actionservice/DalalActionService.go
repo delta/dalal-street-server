@@ -28,17 +28,15 @@ func getUserId(ctx context.Context) uint32 {
 	return uint32(userIdInt)
 }
 
-func init() {
-	logger = utils.Logger.WithFields(logrus.Fields{
-		"module": "grpcapi.actions",
-	})
-}
-
 type dalalActionService struct {
 	matchingEngine matchingengine.MatchingEngine
 }
 
 func NewDalalActionService(me matchingengine.MatchingEngine) pb.DalalActionServiceServer {
+	logger = utils.Logger.WithFields(logrus.Fields{
+		"module": "grpcapi.actions",
+	})
+
 	return &dalalActionService{
 		matchingEngine: me,
 	}

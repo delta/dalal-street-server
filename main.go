@@ -8,26 +8,34 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/grpcapi"
 	"github.com/thakkarparth007/dalal-street-server/matchingengine"
 	"github.com/thakkarparth007/dalal-street-server/models"
+	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/socketapi"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 func RealMain() {
-	//utils.InitConfiguration("config.json")
+	config := utils.GetConfiguration()
+
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("Error: '%+v'\n", r)
 		}
 	}()
 
-	if utils.Configuration.Stage != "prod" {
+	if config.Stage != "prod" {
 		fmt.Println("WARNING: Server not running in prod stage.")
 	}
 
-	//utils.InitLogger()
+	utils.Init(config)
+	datastreams.Init(config)
+	grpcapi.Init(config)
+	matchingengine.Init(config)
+	models.Init(config)
+	session.Init(config)
+	socketapi.Init(config)
 
 	matchingEngine := matchingengine.NewMatchingEngine()
-	grpcapi.StartServices(utils.Configuration.GrpcCert, utils.Configuration.GrpcKey, matchingEngine)
+	grpcapi.StartServices(matchingEngine)
 	datastreams.StartStreams()
 	//models.InitModels()
 	//session.InitSession()
@@ -38,7 +46,7 @@ func RealMain() {
 	http.Handle("/", http.FileServer(http.Dir("./public")))
 	http.HandleFunc("/ws", socketapi.Handle)
 
-	port := fmt.Sprintf(":%d", utils.Configuration.HttpPort)
+	port := fmt.Sprintf(":%d", config.HttpPort)
 	utils.Logger.Fatal(http.ListenAndServe(port, nil))
 
 	for {

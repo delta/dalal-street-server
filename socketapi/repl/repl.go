@@ -269,7 +269,7 @@ var replCmds = map[string]replCmdFn{
 	},
 }
 
-func init() {
+func InitREPL() {
 	logger := utils.Logger.WithFields(logrus.Fields{
 		"module": "socketapi/repl",
 	})

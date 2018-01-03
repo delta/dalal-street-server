@@ -11,12 +11,17 @@ import (
 
 var logger *logrus.Entry
 var DbOpen = utils.DbOpen
+var config *utils.Config
 
-func init() {
+// Init configures the models package
+func Init(conf *utils.Config) {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "models",
 	})
 
+	config = conf
+
+	lookupIsMarketOpenFromDb()
 	LoadStocks()
 	//OpenMarket()
 	//CloseMarket()

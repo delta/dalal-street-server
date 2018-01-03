@@ -23,6 +23,8 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
+var config *utils.Config
+
 func authFunc(ctx context.Context) (context.Context, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -59,8 +61,15 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 	return handler(newCtx, req)
 }
 
-func StartServices(crt, key string, matchingEngine matchingengine.MatchingEngine) {
-	creds, err := credentials.NewServerTLSFromFile(crt, key)
+// Init configures the grpcapi package
+func Init(conf *utils.Config) {
+	config = conf
+}
+
+// StartServices starts the Action and Stream services
+// It passes on the Matching Engine to Action service.
+func StartServices(matchingEngine matchingengine.MatchingEngine) {
+	creds, err := credentials.NewServerTLSFromFile(config.GrpcCert, config.GrpcKey)
 	if err != nil {
 		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
 	}
@@ -80,7 +89,7 @@ func StartServices(crt, key string, matchingEngine matchingengine.MatchingEngine
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService())
 
-	lis, err := net.Listen("tcp", utils.Configuration.GrpcAddress)
+	lis, err := net.Listen("tcp", config.GrpcAddress)
 	if err != nil {
 		log.Fatalf("Failed while listening on port 8000. Error: %+v", err)
 	}

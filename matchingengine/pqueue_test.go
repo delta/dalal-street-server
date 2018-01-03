@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/thakkarparth007/dalal-street-server/models"
+	_ "github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 //helper function to return an Ask object

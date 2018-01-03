@@ -61,7 +61,7 @@ type Config struct {
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
 // Only one of them will be selected based on the environment variable DALAL_ENV
-var AllConfigurations = struct {
+var allConfigurations = struct {
 
 	// Configuration for environment : dev
 	Dev Config
@@ -76,48 +76,86 @@ var AllConfigurations = struct {
 	Test Config
 }{}
 
-// To store the selected configuration based on the env variable DALAL_ENV
-var Configuration Config
+// setting config defaults for test, because when running tests
+// config.json won't get loaded correctly unless specified by flags
+// that gets painful when running individual tests
+var config = &Config{
+	Stage:       "test",
+	EventId:     "22",
+	EventSecret: "21ed246e8da1e8535bc29e1bd8e7e3c4",
+	LogFileName: "stdout",
+	LogMaxSize:  50,
+	LogLevel:    "debug",
+	DbUser:      "root",
+	DbPassword:  "",
+	DbHost:      "",
+	DbName:      "dalalstreet_test",
+	HttpPort:    3000,
+	GrpcAddress: ":8000",
+	GrpcCert:    "./tls_keys/test/server.crt",
+	GrpcKey:     "./tls_keys/test/server.key",
+	CacheSize:   1000,
+}
 
-// InitConfiguration reads the config.json file and loads the
-// config options into Configuration
+var configFileName *string
+
+// init reads the config.json file and loads the
+// config options into config
 func init() {
+	configFileName = flag.String("config", "config.json", "Name of the config file")
+	flag.Parse()
+
 	stage, exists := os.LookupEnv("DALAL_ENV")
 
 	if !exists {
-		os.Stderr.WriteString("Set environment variable DALAL_ENV to one of : Dev, Docker, Prod, Test. Taking Dev as default.")
-		stage = "Dev"
+		if flag.Lookup("test.v") != nil {
+			stage = "Test"
+		} else {
+			os.Stderr.WriteString("Set environment variable DALAL_ENV to one of : Dev, Docker, Prod, Test. Taking Dev as default.")
+			stage = "Dev"
+		}
 	}
 
-	configFileName := flag.String("config", "config.json", "Name of the config file")
-	flag.Parse()
 	configFile, err := os.Open(*configFileName)
 	if err != nil {
+		if stage == "Test" {
+			return // config is already set to default value for test. nothing to do.
+		}
 		log.Fatalf("Failed to open %s. Cannot proceed", *configFileName)
-		return
 	}
 	defer configFile.Close()
 
 	decoder := json.NewDecoder(configFile)
-	err = decoder.Decode(&AllConfigurations)
+	err = decoder.Decode(&allConfigurations)
 
 	if err != nil {
-		log.Fatalf("Failed to load configuration. Cannot proceed. Error: ", err)
+		log.Fatalf("Failed to load configuration. Cannot proceed. Error: %+v", err)
 	}
 
 	switch stage {
 	case "Dev":
-		Configuration = AllConfigurations.Dev
+		config = &allConfigurations.Dev
 	case "Docker":
-		Configuration = AllConfigurations.Docker
+		config = &allConfigurations.Docker
 	case "Prod":
-		Configuration = AllConfigurations.Prod
+		config = &allConfigurations.Prod
 	case "Test":
-		Configuration = AllConfigurations.Test
+		config = &allConfigurations.Test
 	default:
 		// Take Dev as default
-		Configuration = AllConfigurations.Dev
+		config = &allConfigurations.Dev
 	}
 
-	log.Printf("Loaded configuration from %s: %+v\n", configFileName, Configuration)
+	log.Printf("Loaded configuration from %s: %+v\n", *configFileName, config)
+}
+
+// GetConfiguration returns the configuration loaded from config.json
+func GetConfiguration() *Config {
+	return config
+}
+
+// Init intializes the utils package. The config is accepted as a parameter for helping with testing.
+func Init(config *Config) {
+	initDbHelper(config)
+	initLogger(config)
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // mysql package needs to be included like this as required by sqlx
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/jmoiron/sqlx"
 
@@ -17,17 +17,9 @@ import (
 
 const sidLen = 32
 
-var (
-	dbUser string
-	dbPass string
-	dbHost string
-	dbName string
+var logger *logrus.Entry
 
-	logger *logrus.Entry
-)
-
-var cache *lru.Cache = nil
-
+// Session provides an interface to access a session of a user
 type Session interface {
 	GetId() string
 	Get(string) (string, bool)
@@ -36,16 +28,23 @@ type Session interface {
 	Destroy() error
 }
 
+// cache is a cache of sessions
+var cache *lru.Cache
+
+// variables to store the db credentials
+var dbUser string
+var dbPass string
+var dbName string
+var dbHost string
+
+// session implements the Session interface
 type session struct {
 	Id    string
 	mutex sync.RWMutex
 	m     map[string]string
 }
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
+// Load returns a session from database given the session id
 func Load(id string) (Session, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "Load",
@@ -93,6 +92,7 @@ func Load(id string) (Session, error) {
 	return sess, nil
 }
 
+// New returns a new session
 func New() (Session, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "New",
@@ -114,11 +114,12 @@ func New() (Session, error) {
 	return sess, nil
 }
 
+// GetId returns the Id of the session
 func (sess *session) GetId() string {
 	return sess.Id
 }
 
-// Set a key value pair in the map
+// Set sets a key value pair in the map
 func (sess *session) Set(k string, v string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "Set",
@@ -148,7 +149,7 @@ func (sess *session) Set(k string, v string) error {
 	return nil
 }
 
-// Get the value providing key to the get function
+// Get returns the value of the key provided
 func (sess *session) Get(str string) (string, bool) {
 	sess.mutex.RLock()
 	value, ok := sess.m[str] // return value if found or ok=false if not found
@@ -156,6 +157,7 @@ func (sess *session) Get(str string) (string, bool) {
 	return value, ok
 }
 
+// Delete deletes a particular key in a given session
 func (sess *session) Delete(str string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "Delete",
@@ -184,7 +186,7 @@ func (sess *session) Delete(str string) error {
 	return nil
 }
 
-// Delete the entire session from database
+// Destroy deletes the entire session from database
 func (sess *session) Destroy() error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "Delete",
@@ -222,13 +224,18 @@ func dbConn() (*sqlx.DB, error) {
 	return db, err
 }
 
-func init() {
+// Init initializes the session package
+func Init(config *utils.Config) {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "session",
 	})
-	dbUser = utils.Configuration.DbUser
-	dbPass = utils.Configuration.DbPassword
-	dbName = utils.Configuration.DbName
-	dbHost = utils.Configuration.DbHost
-	cache, _ = lru.New(utils.Configuration.CacheSize)
+
+	dbUser = config.DbUser
+	dbPass = config.DbPassword
+	dbName = config.DbName
+	dbHost = config.DbHost
+
+	cache, _ = lru.New(config.CacheSize)
+
+	rand.Seed(time.Now().UnixNano())
 }

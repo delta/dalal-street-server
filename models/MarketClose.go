@@ -46,7 +46,7 @@ func IsMarketOpen() bool {
 	return isMarketOpen
 }
 
-func init() {
+func lookupIsMarketOpenFromDb() {
 	db, err := DbOpen()
 	if err != nil {
 		return
