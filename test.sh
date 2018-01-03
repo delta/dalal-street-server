@@ -15,4 +15,7 @@ dbPass=$(egrep "Test|DbPassword" config.json \
 
 migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations up 
 go test -race -v -p=1 -run="^(Test|Benchmark)_(.*)" ./... -args -config="$(pwd)/config.json"
+code=$?
 migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations down 
+
+exit $code
