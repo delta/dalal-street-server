@@ -200,39 +200,6 @@ func LoadStocks() error {
 
 	l.Infof("Loaded %+v", allStocks)
 
-	go func() {
-		for {
-			db, err := DbOpen()
-			if err != nil {
-				l.Error(err)
-				return
-			}
-			defer db.Close()
-
-			var prices = make(map[uint32]uint32)
-			for _, stock := range stocks {
-				allStocks.m[stock.Id].RLock()
-				prices[stock.Id] = allStocks.m[stock.Id].stock.CurrentPrice
-				allStocks.m[stock.Id].RUnlock()
-			}
-
-			currentTime := time.Now().UTC().Format(time.RFC3339)
-			for stkId, price := range prices {
-				stkHistoryPoint := &StockHistory{
-					StockId:    stkId,
-					StockPrice: price,
-					CreatedAt:  currentTime,
-				}
-				err := db.Save(stkHistoryPoint).Error
-				if err != nil {
-					l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
-				}
-			}
-
-			time.Sleep(3 * time.Minute) // Stock history updates every 3 minutes
-		}
-	}()
-
 	return nil
 }
 
@@ -306,5 +273,67 @@ func AddStocksToExchange(stockId, count uint32) error {
 	l.Infof("Done")
 
 	return nil
+}
 
+var stopStockHistoryRecorderChan chan struct{}
+
+func stopStockHistoryRecorder() {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "stopStockHistoryRecorder",
+	})
+
+	l.Info("Stopping")
+
+	close(stopStockHistoryRecorderChan)
+
+	l.Info("Stopped")
+}
+
+func startStockHistoryRecorder(interval time.Duration) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "startStockHistoryRecorder",
+	})
+
+	l.Info("Starting")
+
+	tickerChan := time.NewTicker(interval).C
+	stopStockHistoryRecorderChan = make(chan struct{})
+
+	for {
+		select {
+		case <-stopStockHistoryRecorderChan:
+			break
+		case <-tickerChan:
+			db, err := DbOpen()
+			if err != nil {
+				l.Error(err)
+				return
+			}
+			defer db.Close()
+
+			var prices = make(map[uint32]uint32)
+			allStocks.RLock()
+			for stockId := range allStocks.m {
+				allStocks.m[stockId].RLock()
+				prices[stockId] = allStocks.m[stockId].stock.CurrentPrice
+				allStocks.m[stockId].RUnlock()
+			}
+			allStocks.RUnlock()
+
+			currentTime := time.Now().UTC().Format(time.RFC3339)
+			for stkId, price := range prices {
+				stkHistoryPoint := &StockHistory{
+					StockId:    stkId,
+					StockPrice: price,
+					CreatedAt:  currentTime,
+				}
+				err := db.Save(stkHistoryPoint).Error
+				if err != nil {
+					l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
+				}
+			}
+
+			l.Info("Recorded history")
+		}
+	}
 }

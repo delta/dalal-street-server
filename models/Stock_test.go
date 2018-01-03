@@ -2,6 +2,7 @@ package models
 
 import (
 	"testing"
+	"time"
 
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
@@ -89,15 +90,21 @@ func Test_GetCompanyDetails(t *testing.T) {
 		db.Delete(stock)
 	}()
 	LoadStocks()
-	testutils.Sleep(90)
+	go startStockHistoryRecorder(time.Millisecond * 1000)
+	testutils.Sleep(2500)
 	_, retrievedStockList, _ := GetCompanyDetails(1)
 	var stkHistoryPoint = &StockHistory{
 		StockId:    1,
 		StockPrice: 1000,
 		CreatedAt:  retrievedStockList[0].CreatedAt,
 	}
+	stopStockHistoryRecorder()
 	if !testutils.AssertEqual(t, stkHistoryPoint, retrievedStockList[0]) {
 		t.Fatalf("Expected %v but got %v", stkHistoryPoint, retrievedStockList[0])
+	}
+	stkHistoryPoint.CreatedAt = retrievedStockList[1].CreatedAt
+	if !testutils.AssertEqual(t, stkHistoryPoint, retrievedStockList[1]) {
+		t.Fatalf("Expected %v but got %v", stkHistoryPoint, retrievedStockList[1])
 	}
 }
 func Test_AddStocksToExchange(t *testing.T) {
