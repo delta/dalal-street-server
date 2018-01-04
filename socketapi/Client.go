@@ -37,12 +37,13 @@ type Client interface {
 }
 
 func NewClient(done chan struct{}, send chan interface{}, conn *websocket.Conn, sess session.Session) Client {
+	uuid, _ := uuid.NewV4()
 	return &client{
 		conn: conn,
 		sess: sess,
 		send: send,
 		done: done,
-		id:   uuid.NewV4(),
+		id:   uuid,
 	}
 }
 
