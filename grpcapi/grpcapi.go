@@ -31,6 +31,18 @@ func authFunc(ctx context.Context) (context.Context, error) {
 	if !ok {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Missing context metadata")
 	}
+	if len(md["bot_secret"]) == 1 {
+		if md["bot_secret"] == config.BotSecret && len(md["bot_userid"]) == 1 {
+			sess, err := session.Fake()
+			if err != nil {
+				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
+			}
+			ctx = context.WithValue(ctx, "session", sess)
+			return ctx, nil
+		} else {
+			return nil, grpc.Errorf(codes.Unauthenticated, "bot Secret not set")
+		}
+	}
 	if len(md["sessionid"]) != 1 {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
