@@ -1,112 +1,73 @@
 package datastreams
 
 import (
-	"fmt"
-	"sync"
-
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
-var transListenersLock sync.Mutex
-
-type transListenersSingleUser struct {
-	sync.Mutex
-	l map[string]*listener
+// TransactionsStream defines the interface to interact with a Transactions stream
+type TransactionsStream interface {
+	SendTransaction(t *models_pb.Transaction)
+	AddListener(done <-chan struct{}, updates chan interface{}, userId uint32, sessionId string)
+	RemoveListener(userId uint32, sessionId string)
 }
 
-var transListeners = make(map[uint32]*transListenersSingleUser)
+// transactionsStream implements the TransactionsStream
+type transactionsStream struct {
+	logger          *logrus.Entry
+	multicastStream MulticastStream
+}
 
-func SendTransaction(n *models_pb.Transaction) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":  "SendTransaction",
-		"param_n": fmt.Sprintf("%+v", n),
+// newTransactionsStream creates a new TransactionsStream
+func newTransactionsStream() TransactionsStream {
+	return &transactionsStream{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module": "datastreams.TransactionsStream",
+		}),
+		multicastStream: NewMulticastStream(),
+	}
+}
+
+// SendOrderUpdate sends an order update to a given user
+func (os *transactionsStream) SendTransaction(t *models_pb.Transaction) {
+	var l = os.logger.WithFields(logrus.Fields{
+		"method":       "SendTransaction",
+		"param_userId": t.UserId,
+		"param_t":      t,
 	})
 
-	l.Debugf("Attempting")
+	os.multicastStream.BroadcastUpdateToGroup(t.UserId, t)
 
-	transListenersLock.Lock()
-	listeners, ok := transListeners[n.UserId]
-	if !ok {
-		l.Debugf("No listener found. Done.")
-		transListenersLock.Unlock()
-		return
-	}
-	transListenersLock.Unlock()
-
-	transUpdateProto := &datastreams_pb.TransactionUpdate{
-		n,
-	}
-
-	listeners.Lock()
-	l.Debugf("Sending to %d listeners", listeners)
-	sent := 0
-	for sessId, listener := range listeners.l {
-		select {
-		case <-listener.done:
-			l.Debugf("One has already left. Removing him.")
-			delete(listeners.l, sessId)
-			if len(listeners.l) == 0 {
-				transListenersLock.Lock()
-				delete(transListeners, n.UserId)
-				transListenersLock.Unlock()
-			}
-		case listener.update <- transUpdateProto:
-			sent++
-		}
-	}
-	listeners.Unlock()
-
-	l.Debugf("Sent to %d listeners", listeners)
+	l.Infof("Sent")
 }
 
-func RegTransactionsListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":       "RegTransactionListener",
-		"param_userId": userId,
+// AddListener adds a listener to the Transactions stream
+func (os *transactionsStream) AddListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
+	var l = os.logger.WithFields(logrus.Fields{
+		"method":          "AddListener",
+		"param_userId":    userId,
+		"param_sessionId": sessionId,
 	})
 
-	l.Debugf("Attempting")
+	os.multicastStream.AddListener(userId, sessionId, &listener{
+		update: update,
+		done:   done,
+	})
 
-	transListenersLock.Lock()
-	tlu, ok := transListeners[userId]
-	if !ok {
-		transListeners[userId] = &transListenersSingleUser{
-			l: make(map[string]*listener),
-		}
-		tlu = transListeners[userId]
-	}
-	transListenersLock.Unlock()
-
-	tlu.Lock()
-	tlu.l[sessionId] = &listener{
-		update,
-		done,
-	}
-	tlu.Unlock()
-
-	l.Debugf("Appended to listeners")
-
-	go func() {
-		<-done
-		UnregTransactionsListener(userId, sessionId)
-		l.Debugf("Removed dead listener")
-	}()
+	l.Infof("Added")
 }
 
-func UnregTransactionsListener(userId uint32, sessionId string) {
-	transListenersLock.Lock()
-	defer transListenersLock.Unlock()
-	listeners, ok := transListeners[userId]
-	if !ok {
-		return
-	}
-	listeners.Lock()
-	delete(listeners.l, sessionId)
-	if len(listeners.l) == 0 {
-		delete(transListeners, userId)
-	}
-	listeners.Unlock()
+// RemoveListener removes a listener from the Transactions stream
+func (os *transactionsStream) RemoveListener(userId uint32, sessionId string) {
+	var l = os.logger.WithFields(logrus.Fields{
+		"method":          "RemoveListener",
+		"param_userId":    userId,
+		"param_sessionId": sessionId,
+	})
+
+	os.multicastStream.RemoveListener(userId, sessionId)
+
+	l.Infof("Removed")
 }

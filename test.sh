@@ -6,7 +6,7 @@ export DALAL_ENV=Test
 # Unit tests
 go test -v -run="^(Test|Benchmark)[^_](.*)" ./... -args -config="$(pwd)/config.json"
 code=$?
-if [ $code -neq 0 ]; then
+if [ $code -ne 0 ]; then
     exit $code
 fi
 

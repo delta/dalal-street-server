@@ -2,7 +2,6 @@ package models
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -95,7 +94,8 @@ func SendNotification(userId uint32, text string, isBroadcast bool) error {
 		return err
 	}
 
-	datastreams.SendNotification(n.ToProto())
+	notificationsStream := datastreamsManager.GetNotificationsStream()
+	notificationsStream.SendNotification(n.ToProto())
 
 	l.Infof("Done")
 

@@ -30,13 +30,18 @@ func RealMain() {
 	datastreams.Init(config)
 	grpcapi.Init(config)
 	matchingengine.Init(config)
-	models.Init(config)
 	session.Init(config)
 	socketapi.Init(config)
 
-	matchingEngine := matchingengine.NewMatchingEngine()
-	grpcapi.StartServices(matchingEngine)
-	datastreams.StartStreams()
+	// handle streams
+	datastreamsManager := datastreams.GetManager()
+	go datastreamsManager.GetStockExchangeStream().Run()
+	go datastreamsManager.GetStockPricesStream().Run()
+
+	models.Init(config, datastreamsManager)
+
+	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
+	grpcapi.StartServices(matchingEngine, datastreamsManager)
 	//models.InitModels()
 	//session.InitSession()
 	//socketapi.InitSocketApi()

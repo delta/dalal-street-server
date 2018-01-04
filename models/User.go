@@ -11,9 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
@@ -856,8 +857,16 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
 
 	go func(inExchange, inMarket uint32) {
-		datastreams.SendStockExchangeUpdate(stockId, price, inExchange, inMarket)
-		datastreams.SendTransaction(transaction.ToProto())
+		stockExchangeStream := datastreamsManager.GetStockExchangeStream()
+		transactionsStream := datastreamsManager.GetTransactionsStream()
+
+		stockExchangeStream.SendStockExchangeUpdate(stockId, &datastreams_pb.StockExchangeDataPoint{
+			Price:            price,
+			StocksInExchange: inExchange,
+			StocksInMarket:   inMarket,
+		})
+		transactionsStream.SendTransaction(transaction.ToProto())
+
 		l.Infof("Sent through the datastreams")
 	}(stock.StocksInExchange, stock.StocksInMarket)
 
@@ -924,11 +933,23 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	}
 
 	var updateDataStreams = func(askTrans, bidTrans *Transaction) {
+		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+
 		if stockTradeQty != 0 || ask.IsClosed {
-			datastreams.SendOrder(ask.UserId, ask.Id, true, stockTradeQty, ask.IsClosed)
+			myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
+				Id:            ask.Id,
+				IsAsk:         true,
+				TradeQuantity: stockTradeQty,
+				IsClosed:      ask.IsClosed,
+			})
 		}
 		if stockTradeQty != 0 || bid.IsClosed {
-			datastreams.SendOrder(bid.UserId, bid.Id, false, stockTradeQty, bid.IsClosed)
+			myOrdersStream.SendOrder(bid.UserId, &datastreams_pb.MyOrderUpdate{
+				Id:            bid.Id,
+				IsAsk:         false,
+				TradeQuantity: stockTradeQty,
+				IsClosed:      bid.IsClosed,
+			})
 		}
 
 		l.Infof("Sent through the datastreams")
@@ -1209,7 +1230,8 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	l.Debugf("Committed transaction. Success.")
 
 	go func(transaction Transaction) {
-		datastreams.SendTransaction(transaction.ToProto())
+		transactionsStream := datastreamsManager.GetTransactionsStream()
+		transactionsStream.SendTransaction(transaction.ToProto())
 		l.Infof("Sent through the datastreams")
 	}(*transaction)
 

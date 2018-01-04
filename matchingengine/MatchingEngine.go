@@ -3,6 +3,7 @@ package matchingengine
 import (
 	"github.com/Sirupsen/logrus"
 
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -17,27 +18,30 @@ type MatchingEngine interface {
 
 // matchingEngine implements the MatchingEngine interface
 type matchingEngine struct {
+	logger *logrus.Entry
+
 	// orderBooks stores details of placed orders.
 	// Each entry in orderBooks corresponds to a particular stock.
 	orderBooks map[uint32]OrderBook
+
+	// datastreamsManager is used to manage datastreams
+	datastreamsManager datastreams.Manager
 }
 
 // Init configures the matching engine
 func Init(config *utils.Config) {
-	logger = utils.Logger.WithFields(logrus.Fields{
-		"module": "matchingengine",
-	})
+	// nothing to do here
 }
 
 // NewMatchingEngine returns an instance of MatchingEngine
 // It calls StartStockmatching for all the stocks in concurrent goroutines.
-func NewMatchingEngine() MatchingEngine {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "NewMatchingEngine",
-	})
-
+func NewMatchingEngine(dsm datastreams.Manager) MatchingEngine {
 	engine := &matchingEngine{
-		orderBooks: make(map[uint32]OrderBook),
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module": "matchingengine",
+		}),
+		orderBooks:         make(map[uint32]OrderBook),
+		datastreamsManager: dsm,
 	}
 
 	engine.loadOldOrders()
@@ -46,7 +50,7 @@ func NewMatchingEngine() MatchingEngine {
 		go ob.StartStockMatching()
 	}
 
-	l.Info("Started matching engine")
+	engine.logger.Info("Started matching engine")
 	return engine
 }
 
@@ -62,7 +66,7 @@ func (m *matchingEngine) AddBidOrder(bidOrder *models.Bid) {
 
 // loadOldOrders() loads old unfulfilled orders from database
 func (m *matchingEngine) loadOldOrders() {
-	var l = logger.WithFields(logrus.Fields{
+	var l = m.logger.WithFields(logrus.Fields{
 		"method": "loadOldOrders",
 	})
 
@@ -95,7 +99,8 @@ func (m *matchingEngine) loadOldOrders() {
 	}
 
 	for _, stockId := range stockIds {
-		m.orderBooks[stockId] = NewOrderBook(stockId)
+		marketDepth := m.datastreamsManager.GetMarketDepthStream(stockId)
+		m.orderBooks[stockId] = NewOrderBook(stockId, marketDepth)
 	}
 
 	//Load open ask orders into priority queue

@@ -2,8 +2,6 @@ package models
 
 import (
 	"fmt"
-
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
 )
 
 var isMarketOpen = false
@@ -22,7 +20,8 @@ func OpenMarket() {
 	notif := &Notification{
 		Text: MARKET_IS_OPEN_HACKY_NOTIF,
 	}
-	datastreams.SendNotification(notif.ToProto())
+	notificationsStream := datastreamsManager.GetNotificationsStream()
+	notificationsStream.SendNotification(notif.ToProto())
 }
 
 func CloseMarket() {
@@ -39,7 +38,9 @@ func CloseMarket() {
 	notif := &Notification{
 		Text: MARKET_IS_CLOSED_HACKY_NOTIF,
 	}
-	datastreams.SendNotification(notif.ToProto())
+
+	notificationsStream := datastreamsManager.GetNotificationsStream()
+	notificationsStream.SendNotification(notif.ToProto())
 }
 
 func IsMarketOpen() bool {

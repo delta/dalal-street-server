@@ -2,126 +2,72 @@ package datastreams
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
-var notifListenersLock sync.Mutex
-
-type notifListenersSingleUser struct {
-	sync.Mutex
-	l map[string]*listener
+// NotificationsStream represents the interface for handling a notifications data stream
+type NotificationsStream interface {
+	SendNotification(n *models_pb.Notification)
+	AddListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string)
+	RemoveListener(userId uint32, sessionId string)
 }
 
-var notifListeners = make(map[uint32]*notifListenersSingleUser)
+// notificationsStream implements the NotificationsStream interface
+type notificationsStream struct {
+	logger          *logrus.Entry
+	multicastStream MulticastStream
+}
 
-func SendNotification(n *models_pb.Notification) {
-	var l = logger.WithFields(logrus.Fields{
+// newNotificationsStream creates a new NotificationStream
+func newNotificationsStream() NotificationsStream {
+	return &notificationsStream{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module": "datastreams.NotificationsStream",
+		}),
+		multicastStream: NewMulticastStream(),
+	}
+}
+
+// SendNotification sends a notification to all connections of a given user
+func (ns *notificationsStream) SendNotification(n *models_pb.Notification) {
+	var l = ns.logger.WithFields(logrus.Fields{
 		"method":  "SendNotification",
 		"param_n": fmt.Sprintf("%+v", n),
 	})
 
-	l.Debugf("Attempting")
-
-	var userIds []uint32
-
-	notifListenersLock.Lock()
-	if n.UserId != 0 {
-		if _, ok := notifListeners[n.UserId]; !ok {
-			l.Debugf("No listener found. Done.")
-			notifListenersLock.Unlock()
-			return
-		}
-		userIds = append(userIds, n.UserId)
-	} else {
-		for userId := range notifListeners {
-			userIds = append(userIds, userId)
-		}
-	}
-	notifListenersLock.Unlock()
-
-	notifUpdateProto := &datastreams_pb.NotificationUpdate{
-		n,
-	}
-
-	sent := 0
-	l.Debugf("Sending to %d listeners", len(userIds))
-	for _, userId := range userIds {
-		notifListenersLock.Lock()
-		listeners := notifListeners[userId]
-		notifListenersLock.Unlock()
-
-		listeners.Lock()
-		for sessId, listener := range listeners.l {
-			select {
-			case <-listener.done:
-				l.Debugf("One has already left. Removing him.")
-				delete(listeners.l, sessId)
-				if len(listeners.l) == 0 {
-					notifListenersLock.Lock()
-					delete(notifListeners, n.UserId)
-					notifListenersLock.Unlock()
-				}
-			case listener.update <- notifUpdateProto:
-				sent++
-			}
-		}
-		listeners.Unlock()
-	}
-
-	l.Debugf("Sent to %d listeners", sent)
+	ns.multicastStream.BroadcastUpdateToGroup(n.GetUserId(), n)
+	l.Infof("Sent notification to %d", n.GetUserId())
 }
 
-func RegNotificationsListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":          "RegNotificationListener",
+// AddListener adds a listener for a given user and connection
+func (ns *notificationsStream) AddListener(done <-chan struct{}, update chan interface{}, userId uint32, sessionId string) {
+	var l = ns.logger.WithFields(logrus.Fields{
+		"method":          "AddListener",
 		"param_userId":    userId,
 		"param_sessionId": sessionId,
 	})
 
-	l.Debugf("Attempting")
+	ns.multicastStream.AddListener(userId, sessionId, &listener{
+		update: update,
+		done:   done,
+	})
 
-	notifListenersLock.Lock()
-	defer notifListenersLock.Unlock()
-	nlu, ok := notifListeners[userId]
-	if !ok {
-		notifListeners[userId] = &notifListenersSingleUser{
-			l: make(map[string]*listener),
-		}
-		nlu = notifListeners[userId]
-	}
-
-	nlu.Lock()
-	nlu.l[sessionId] = &listener{
-		update,
-		done,
-	}
-	nlu.Unlock()
-
-	l.Debugf("Appended to listeners")
-
-	go func() {
-		<-done
-		UnregNotificationsListener(userId, sessionId)
-		l.Debugf("Removed dead listener")
-	}()
+	l.Infof("Added")
 }
 
-func UnregNotificationsListener(userId uint32, sessionId string) {
-	notifListenersLock.Lock()
-	defer notifListenersLock.Unlock()
-	listeners, ok := notifListeners[userId]
-	if !ok {
-		return
-	}
-	listeners.Lock()
-	delete(listeners.l, sessionId)
-	if len(listeners.l) == 0 {
-		delete(notifListeners, userId)
-	}
-	listeners.Unlock()
+// RemoveListener removes a given listener from the subscribers list
+func (ns *notificationsStream) RemoveListener(userId uint32, sessionId string) {
+	var l = ns.logger.WithFields(logrus.Fields{
+		"method":          "RemoveListener",
+		"param_userId":    userId,
+		"param_sessionId": sessionId,
+	})
+
+	ns.multicastStream.RemoveListener(userId, sessionId)
+
+	l.Infof("Removed")
 }

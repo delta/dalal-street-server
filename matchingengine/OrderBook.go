@@ -24,6 +24,7 @@ type OrderBook interface {
 
 // orderBook implements the OrderBook interface
 type orderBook struct {
+	logger      *logrus.Entry
 	stockId     uint32
 	askChan     chan *models.Ask
 	bidChan     chan *models.Bid
@@ -31,12 +32,16 @@ type orderBook struct {
 	bids        *BidPQueue
 	askStoploss *AskPQueue
 	bidStoploss *BidPQueue
-	depth       *datastreams.MarketDepth
+	depth       datastreams.MarketDepthStream
 }
 
 // NewOrderBook returns a new OrderBook instance for a given stockId.
-func NewOrderBook(stockId uint32) OrderBook {
+func NewOrderBook(stockId uint32, mds datastreams.MarketDepthStream) OrderBook {
 	return &orderBook{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module":        "matchingengine.OrderBook",
+			"param_stockId": stockId,
+		}),
 		stockId:     stockId,
 		askChan:     make(chan *models.Ask),
 		bidChan:     make(chan *models.Bid),
@@ -44,45 +49,26 @@ func NewOrderBook(stockId uint32) OrderBook {
 		bids:        NewBidPQueue(MAXPQ), //higher price has higher priority
 		askStoploss: NewAskPQueue(MAXPQ), // stoplosses work like opposite of limit/market.
 		bidStoploss: NewBidPQueue(MINPQ), // They sell when price goes below a certain trigger price.
-		depth:       datastreams.NewMarketDepth(stockId),
+		depth:       mds,
 	}
 }
 
 // AddAskOrder adds an ask order to the book. It will take care of adding stopLoss, or partially filled orders automatically
 func (ob *orderBook) AddAskOrder(ask *models.Ask) {
-	if ask.IsClosed {
-		return
-	}
-
-	if ask.OrderType == models.StopLoss {
-		ob.askStoploss.Push(ask, ask.Price, 0)
-	} else {
-		bidUnfulfilledQuantity := ask.StockQuantity - ask.StockQuantityFulfilled
-		ob.asks.Push(ask, ask.Price, bidUnfulfilledQuantity)
-	}
+	ob.askChan <- ask
 }
 
 // AddBidOrder adds an bid order to the book. It will take care of adding stopLoss, or partially filled orders automatically
 func (ob *orderBook) AddBidOrder(bid *models.Bid) {
-	if bid.IsClosed {
-		return
-	}
-
-	if bid.OrderType == models.StopLoss {
-		ob.bidStoploss.Push(bid, bid.Price, 0)
-	} else {
-		bidUnfulfilledQuantity := bid.StockQuantity - bid.StockQuantityFulfilled
-		ob.bids.Push(bid, bid.Price, bidUnfulfilledQuantity)
-	}
+	ob.bidChan <- bid
 }
 
 /*
  *	StartStockMatching listens for incoming orders for a particular stock and process them
  */
 func (ob *orderBook) StartStockMatching() {
-	var l = logger.WithFields(logrus.Fields{
-		"method":  "startStockMatching",
-		"stockId": ob.stockId,
+	var l = ob.logger.WithFields(logrus.Fields{
+		"method": "startStockMatching",
 	})
 
 	l.Infof("Started with ask_count = %d, bid_count = %d", ob.asks.Size(), ob.bids.Size())
@@ -101,9 +87,8 @@ func (ob *orderBook) StartStockMatching() {
  *	Method to check and trigger(if possible) StopLoss orders whenever a transaction occurs
  */
 func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":  "triggerStopLosses",
-		"stockId": ob.stockId,
+	var l = ob.logger.WithFields(logrus.Fields{
+		"method": "triggerStopLosses",
 	})
 
 	db, err := utils.DbOpen()
@@ -189,9 +174,8 @@ func (ob *orderBook) getTopMatchingOrders() (*models.Ask, *models.Bid, func()) {
  *	Method to process the orders for a particular stock and carry out transactions
  */
 func (ob *orderBook) processOrder() {
-	var l = logger.WithFields(logrus.Fields{
-		"method":  "processOrder",
-		"stockId": ob.stockId,
+	var l = ob.logger.WithFields(logrus.Fields{
+		"method": "processOrder",
 	})
 
 	var (
@@ -218,7 +202,7 @@ func (ob *orderBook) processOrder() {
 		if tr != nil {
 			l.Infof("Trade made between ask_id %d and bid %d", askTop.Id, bidTop.Id)
 			// tr is always AskTransaction. So its StockQty < 0. Make it positive.
-			ob.depth.Trade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
+			ob.depth.AddTrade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 
 			ob.depth.CloseOrder(isMarket(askTop.OrderType), true, askTop.Price, uint32(-tr.StockQuantity))
 			ob.depth.CloseOrder(isMarket(bidTop.OrderType), false, bidTop.Price, uint32(-tr.StockQuantity))
@@ -262,7 +246,7 @@ func (ob *orderBook) processOrder() {
  *	Method to wait for an incoming order on the channels
  */
 func (ob *orderBook) waitForOrder() {
-	var l = logger.WithFields(logrus.Fields{
+	var l = ob.logger.WithFields(logrus.Fields{
 		"method": "waitForOrder",
 	})
 
@@ -276,7 +260,8 @@ func (ob *orderBook) waitForOrder() {
 		}
 
 		// If control reaches here, it's not a StopLoss order
-		ob.asks.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
+		askUnfulfilledQuantity := askOrder.StockQuantity - askOrder.StockQuantityFulfilled
+		ob.asks.Push(askOrder, askOrder.Price, askUnfulfilledQuantity)
 		ob.depth.AddOrder(isMarket(askOrder.OrderType), true, askOrder.Price, askOrder.StockQuantity)
 
 	case bidOrder := <-ob.bidChan:
@@ -288,7 +273,8 @@ func (ob *orderBook) waitForOrder() {
 		}
 
 		// If control reaches here, it's not a StopLoss order
-		ob.bids.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
+		bidUnfulfilledQuantity := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
+		ob.bids.Push(bidOrder, bidOrder.Price, bidUnfulfilledQuantity)
 		ob.depth.AddOrder(isMarket(bidOrder.OrderType), true, bidOrder.Price, bidOrder.StockQuantity)
 	}
 }
