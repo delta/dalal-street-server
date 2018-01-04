@@ -306,10 +306,11 @@ func startStockHistoryRecorder(interval time.Duration) {
 	tickerChan := time.NewTicker(interval).C
 	stopStockHistoryRecorderChan = make(chan struct{})
 
+loop:
 	for {
 		select {
 		case <-stopStockHistoryRecorderChan:
-			break
+			break loop
 		case <-tickerChan:
 			db, err := DbOpen()
 			if err != nil {
