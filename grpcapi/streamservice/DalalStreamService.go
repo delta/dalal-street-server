@@ -10,7 +10,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build"
@@ -42,6 +41,7 @@ type dalalStreamService struct {
 	subscriptionsMap   map[datastreams_pb.DataStreamType]*perStreamTypeSubscriptionMap
 }
 
+// NewDalalStreamService creates a new DalalStreamServer instnance
 func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "grpcapi.actions",
@@ -70,22 +70,6 @@ func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer 
 	}
 
 	return dss
-}
-
-func (d *dalalStreamService) AuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, grpc.Errorf(codes.Unauthenticated, "Missing context metadata")
-	}
-	if len(md["sessionId"]) != 1 {
-		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
-	}
-	sess, err := session.Load(md["sessionId"][0])
-	if err != nil {
-		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
-	}
-	ctx = context.WithValue(ctx, "session", sess)
-	return handler(ctx, req)
 }
 
 func (d *dalalStreamService) Unsubscribe(ctx context.Context, req *datastreams_pb.UnsubscribeRequest) (*datastreams_pb.UnsubscribeResponse, error) {
@@ -189,10 +173,11 @@ func (d *dalalStreamService) GetMarketDepthUpdates(req *datastreams_pb.Subscript
 	depthStream := d.datastreamsManager.GetMarketDepthStream(uint32(stockId))
 	depthStream.AddListener(done, updates, req.Id)
 
+loop:
 	for {
 		select {
 		case <-done:
-			break
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketDepthUpdate))
 			if err != nil {
@@ -225,10 +210,11 @@ func (d *dalalStreamService) GetMarketEventUpdates(req *datastreams_pb.Subscript
 	marketEventsStream := d.datastreamsManager.GetMarketEventsStream()
 	marketEventsStream.AddListener(done, updates, req.Id)
 
+loop:
 	for {
 		select {
 		case <-done:
-			break
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketEventUpdate))
 			if err != nil {
@@ -262,10 +248,11 @@ func (d *dalalStreamService) GetMyOrderUpdates(req *datastreams_pb.SubscriptionI
 	myOrdersStream := d.datastreamsManager.GetMyOrdersStream()
 	myOrdersStream.AddListener(done, updates, userId, req.Id)
 
+loop:
 	for {
 		select {
 		case <-done:
-			break
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MyOrderUpdate))
 			if err != nil {
@@ -299,10 +286,11 @@ func (d *dalalStreamService) GetNotificationUpdates(req *datastreams_pb.Subscrip
 	notificationsStream := d.datastreamsManager.GetNotificationsStream()
 	notificationsStream.AddListener(done, updates, userId, req.Id)
 
+loop:
 	for {
 		select {
 		case <-done:
-			break
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.NotificationUpdate))
 			if err != nil {
@@ -335,10 +323,11 @@ func (d *dalalStreamService) GetStockExchangeUpdates(req *datastreams_pb.Subscri
 	stockExchangeStream := d.datastreamsManager.GetStockExchangeStream()
 	stockExchangeStream.AddListener(done, updates, req.Id)
 
+loop:
 	for {
 		select {
 		case <-done:
-			break
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockExchangeUpdate))
 			if err != nil {
@@ -372,10 +361,11 @@ func (d *dalalStreamService) GetStockPricesUpdates(req *datastreams_pb.Subscript
 	stockPricesStream := d.datastreamsManager.GetStockPricesStream()
 	stockPricesStream.AddListener(done, updates, req.Id)
 
+loop:
 	for {
 		select {
 		case <-done:
-			break
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockPricesUpdate))
 			if err != nil {
@@ -410,10 +400,11 @@ func (d *dalalStreamService) GetTransactionUpdates(req *datastreams_pb.Subscript
 	transactionsStream := d.datastreamsManager.GetTransactionsStream()
 	transactionsStream.AddListener(done, updates, userId, req.Id)
 
+loop:
 	for {
 		select {
 		case <-done:
-			break
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.TransactionUpdate))
 			if err != nil {
