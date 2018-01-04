@@ -38,16 +38,18 @@ type perStreamTypeSubscriptionMap struct {
 	m map[string]*subscription
 }
 type dalalStreamService struct {
-	subscriptionsMap map[datastreams_pb.DataStreamType]*perStreamTypeSubscriptionMap
+	datastreamsManager datastreams.Manager
+	subscriptionsMap   map[datastreams_pb.DataStreamType]*perStreamTypeSubscriptionMap
 }
 
-func NewDalalStreamService() pb.DalalStreamServiceServer {
+func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "grpcapi.actions",
 	})
 
 	dss := &dalalStreamService{
-		subscriptionsMap: make(map[datastreams_pb.DataStreamType]*perStreamTypeSubscriptionMap),
+		datastreamsManager: dsm,
+		subscriptionsMap:   make(map[datastreams_pb.DataStreamType]*perStreamTypeSubscriptionMap),
 	}
 
 	types := []datastreams_pb.DataStreamType{
@@ -183,7 +185,9 @@ func (d *dalalStreamService) GetMarketDepthUpdates(req *datastreams_pb.Subscript
 	updates := make(chan interface{})
 
 	stockId, _ := strconv.ParseUint(subscribeReq.DataStreamId, 10, 32)
-	datastreams.RegMarketDepthListener(done, updates, req.Id, uint32(stockId))
+
+	depthStream := d.datastreamsManager.GetMarketDepthStream(uint32(stockId))
+	depthStream.AddListener(done, updates, req.Id)
 
 	for {
 		select {
@@ -218,7 +222,8 @@ func (d *dalalStreamService) GetMarketEventUpdates(req *datastreams_pb.Subscript
 	done := subscription.doneChan
 	updates := make(chan interface{})
 
-	datastreams.RegMarketEventsListener(done, updates, req.Id)
+	marketEventsStream := d.datastreamsManager.GetMarketEventsStream()
+	marketEventsStream.AddListener(done, updates, req.Id)
 
 	for {
 		select {
@@ -254,7 +259,8 @@ func (d *dalalStreamService) GetMyOrderUpdates(req *datastreams_pb.SubscriptionI
 	updates := make(chan interface{})
 
 	userId := getUserId(stream.Context())
-	datastreams.RegOrdersListener(done, updates, userId, req.Id)
+	myOrdersStream := d.datastreamsManager.GetMyOrdersStream()
+	myOrdersStream.AddListener(done, updates, userId, req.Id)
 
 	for {
 		select {
@@ -290,7 +296,8 @@ func (d *dalalStreamService) GetNotificationUpdates(req *datastreams_pb.Subscrip
 	updates := make(chan interface{})
 
 	userId := getUserId(stream.Context())
-	datastreams.RegNotificationsListener(done, updates, userId, req.Id)
+	notificationsStream := d.datastreamsManager.GetNotificationsStream()
+	notificationsStream.AddListener(done, updates, userId, req.Id)
 
 	for {
 		select {
@@ -325,7 +332,8 @@ func (d *dalalStreamService) GetStockExchangeUpdates(req *datastreams_pb.Subscri
 	done := subscription.doneChan
 	updates := make(chan interface{})
 
-	datastreams.RegStockExchangeListener(done, updates, req.Id)
+	stockExchangeStream := d.datastreamsManager.GetStockExchangeStream()
+	stockExchangeStream.AddListener(done, updates, req.Id)
 
 	for {
 		select {
@@ -339,6 +347,7 @@ func (d *dalalStreamService) GetStockExchangeUpdates(req *datastreams_pb.Subscri
 			}
 		}
 	}
+
 	l.Infof("Request completed successfully")
 
 	return nil
@@ -360,7 +369,8 @@ func (d *dalalStreamService) GetStockPricesUpdates(req *datastreams_pb.Subscript
 	done := subscription.doneChan
 	updates := make(chan interface{})
 
-	datastreams.RegStockPricesListener(done, updates, req.Id)
+	stockPricesStream := d.datastreamsManager.GetStockPricesStream()
+	stockPricesStream.AddListener(done, updates, req.Id)
 
 	for {
 		select {
@@ -374,6 +384,7 @@ func (d *dalalStreamService) GetStockPricesUpdates(req *datastreams_pb.Subscript
 			}
 		}
 	}
+
 	l.Infof("Request completed successfully")
 
 	return nil
@@ -396,7 +407,8 @@ func (d *dalalStreamService) GetTransactionUpdates(req *datastreams_pb.Subscript
 	updates := make(chan interface{})
 
 	userId := getUserId(stream.Context())
-	datastreams.RegTransactionsListener(done, updates, userId, req.Id)
+	transactionsStream := d.datastreamsManager.GetTransactionsStream()
+	transactionsStream.AddListener(done, updates, userId, req.Id)
 
 	for {
 		select {

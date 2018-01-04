@@ -2,7 +2,6 @@ package models
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -102,7 +101,8 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool) error 
 
 	l.Infof("Done")
 
-	datastreams.SendMarketEvent(me.ToProto())
+	marketEventsStream := datastreamsManager.GetMarketEventsStream()
+	marketEventsStream.SendMarketEvent(me.ToProto())
 
 	return nil
 }

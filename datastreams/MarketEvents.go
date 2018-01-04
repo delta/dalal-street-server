@@ -1,84 +1,70 @@
 package datastreams
 
 import (
-	"runtime/debug"
-	"sync"
-
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
-var (
-	marketEventsListenersMutex sync.Mutex
-	marketEventsListeners      = make(map[string]listener)
-)
-
-func SendMarketEvent(meProto *models_pb.MarketEvent) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":        "SendMarketEvent",
-		"param_meProto": meProto,
-	})
-
-	defer func() {
-		if r := recover(); r != nil {
-			l.Errorf("Error! Stack trace: %s", string(debug.Stack()))
-		}
-	}()
-
-	updateProto := &datastreams_pb.MarketEventUpdate{
-		meProto,
-	}
-
-	sent := 0
-	marketEventsListenersMutex.Lock()
-	l.Debugf("Will be sending %+v to %d listeners", updateProto, len(marketEventsListeners))
-
-	for sessionId, listener := range marketEventsListeners {
-		select {
-		case <-listener.done:
-			delete(marketEventsListeners, sessionId)
-			l.Debugf("Found sid %s dead. Removed", sessionId)
-		case listener.update <- updateProto:
-			sent++
-		}
-	}
-
-	marketEventsListenersMutex.Unlock()
-
-	l.Debugf("Sent to %d listeners!. Sleeping for 15 seconds", sent)
-
+// MarketEventsStream defines the interface for interacting with the MyOrders datastream
+type MarketEventsStream interface {
+	SendMarketEvent(me *models_pb.MarketEvent)
+	AddListener(done <-chan struct{}, update chan interface{}, sessionId string)
+	RemoveListener(sessionId string)
 }
 
-func RegMarketEventsListener(done <-chan struct{}, update chan interface{}, sessionId string) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":          "RegMarketEventsListener",
+// marketEventsStream implements the MarketEventsStream interface
+type marketEventsStream struct {
+	logger          *logrus.Entry
+	broadcastStream BroadcastStream
+}
+
+// newMarketEventsStream creates a new MarketEventsStream
+func newMarketEventsStream() MarketEventsStream {
+	return &marketEventsStream{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module": "datastreams.MarketEventsStream",
+		}),
+		broadcastStream: NewBroadcastStream(),
+	}
+}
+
+// SendOrderUpdate sends an order update to a given user
+func (mes *marketEventsStream) SendMarketEvent(me *models_pb.MarketEvent) {
+	var l = mes.logger.WithFields(logrus.Fields{
+		"method":   "SendMarketEvent",
+		"param_me": me,
+	})
+
+	mes.broadcastStream.BroadcastUpdate(me)
+
+	l.Infof("Sent")
+}
+
+// AddListener adds a listener to the MyOrders stream
+func (mes *marketEventsStream) AddListener(done <-chan struct{}, update chan interface{}, sessionId string) {
+	var l = mes.logger.WithFields(logrus.Fields{
+		"method":          "AddListener",
 		"param_sessionId": sessionId,
 	})
-	l.Debugf("Got a listener.")
 
-	marketEventsListenersMutex.Lock()
-	defer marketEventsListenersMutex.Unlock()
+	mes.broadcastStream.AddListener(sessionId, &listener{
+		update: update,
+		done:   done,
+	})
 
-	if oldlistener, ok := marketEventsListeners[sessionId]; ok {
-		// remove the old listener.
-		close(oldlistener.update)
-	}
-	marketEventsListeners[sessionId] = listener{
-		update,
-		done,
-	}
-
-	go func() {
-		<-done
-		UnregMarketEventsListener(sessionId)
-		l.Debugf("Found a dead listener. Removed")
-	}()
+	l.Infof("Added")
 }
 
-func UnregMarketEventsListener(sessionId string) {
-	marketEventsListenersMutex.Lock()
-	delete(marketEventsListeners, sessionId)
-	marketEventsListenersMutex.Unlock()
+// RemoveListener removes a listener from the MyOrders stream
+func (mes *marketEventsStream) RemoveListener(sessionId string) {
+	var l = mes.logger.WithFields(logrus.Fields{
+		"method":          "AddListener",
+		"param_sessionId": sessionId,
+	})
+
+	mes.broadcastStream.RemoveListener(sessionId)
+
+	l.Infof("Removed")
 }

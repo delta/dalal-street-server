@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/actionservice"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/streamservice"
 	"github.com/thakkarparth007/dalal-street-server/matchingengine"
@@ -68,7 +69,7 @@ func Init(conf *utils.Config) {
 
 // StartServices starts the Action and Stream services
 // It passes on the Matching Engine to Action service.
-func StartServices(matchingEngine matchingengine.MatchingEngine) {
+func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams.Manager) {
 	creds, err := credentials.NewServerTLSFromFile(config.GrpcCert, config.GrpcKey)
 	if err != nil {
 		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
@@ -87,7 +88,7 @@ func StartServices(matchingEngine matchingengine.MatchingEngine) {
 	)
 
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
-	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService())
+	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService(dsm))
 
 	lis, err := net.Listen("tcp", config.GrpcAddress)
 	if err != nil {

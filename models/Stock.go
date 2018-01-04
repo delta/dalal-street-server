@@ -5,8 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
@@ -163,7 +164,8 @@ func UpdateStockPrice(stockId, price uint32) error {
 		return err
 	}
 
-	datastreams.SendStockPriceUpdate(stockId, price)
+	stockPriceStream := datastreamsManager.GetStockPricesStream()
+	stockPriceStream.SendStockPriceUpdate(stockId, price)
 
 	l.Infof("Done")
 
@@ -268,7 +270,12 @@ func AddStocksToExchange(stockId, count uint32) error {
 		return err
 	}
 
-	datastreams.SendStockExchangeUpdate(stockId, stock.CurrentPrice, stock.StocksInExchange, stock.StocksInMarket)
+	stockExchangeStream := datastreamsManager.GetStockExchangeStream()
+	stockExchangeStream.SendStockExchangeUpdate(stockId, &datastreams_pb.StockExchangeDataPoint{
+		Price:            stock.CurrentPrice,
+		StocksInExchange: stock.StocksInExchange,
+		StocksInMarket:   stock.StocksInMarket,
+	})
 
 	l.Infof("Done")
 

@@ -8,19 +8,42 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
-var (
-	dirtyStocksInExchange = make(map[uint32]*datastreams_pb.StockExchangeDataPoint) // list of stocks whose updates we haven't sent yet
-	stockExchangeMutex    sync.Mutex
+// StockExchangeStream interface defines the interface to interact with StockExchange stream
+type StockExchangeStream interface {
+	Run()
+	SendStockExchangeUpdate(stockId uint32, dp *datastreams_pb.StockExchangeDataPoint)
+	AddListener(done <-chan struct{}, updates chan interface{}, sessionId string)
+	RemoveListener(sessionId string)
+}
 
-	stockExchangeListenersMutex sync.Mutex
-	stockExchangeListeners      = make(map[string]listener)
-)
+// stockExchangeStream implements the StockExchangeInterface
+type stockExchangeStream struct {
+	logger          *logrus.Entry
+	broadcastStream BroadcastStream
 
-func InitStockExchangeStream() {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "InitStockExchangeStream",
+	stockExchangeMutex    sync.RWMutex
+	dirtyStocksInExchange map[uint32]*datastreams_pb.StockExchangeDataPoint
+}
+
+// newStockExchangeStream creates a new StockExchangeStream
+func newStockExchangeStream() StockExchangeStream {
+	return &stockExchangeStream{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module": "datastreams.StockExchangeStream",
+		}),
+		broadcastStream:       NewBroadcastStream(),
+		dirtyStocksInExchange: make(map[uint32]*datastreams_pb.StockExchangeDataPoint),
+	}
+}
+
+// Run runs the StockExchangeStream. Call in a go func. Repeatedly broadcasts stockexchange
+// data every 15s, if there's any update
+func (ses *stockExchangeStream) Run() {
+	var l = ses.logger.WithFields(logrus.Fields{
+		"method": "Run",
 	})
 
 	defer func() {
@@ -30,93 +53,68 @@ func InitStockExchangeStream() {
 	}()
 
 	for {
-		stockExchangeMutex.Lock()
+		ses.stockExchangeMutex.Lock()
 
-		stockExchangeListenersMutex.Lock()
-		l.Debugf("%d listeners as of now", len(stockExchangeListeners))
-		stockExchangeListenersMutex.Unlock()
-
-		if len(dirtyStocksInExchange) == 0 {
-			stockExchangeMutex.Unlock()
+		if len(ses.dirtyStocksInExchange) == 0 {
+			ses.stockExchangeMutex.Unlock()
 			l.Debugf("Nothing dirty yet. Sleeping for 15 seconds")
 			time.Sleep(time.Minute / 4)
 			continue
 		}
+
 		l.Debugf("Found dirtyStocks")
 		updateProto := &datastreams_pb.StockExchangeUpdate{
-			StocksInExchange: dirtyStocksInExchange,
+			StocksInExchange: ses.dirtyStocksInExchange,
 		}
-		dirtyStocksInExchange = make(map[uint32]*datastreams_pb.StockExchangeDataPoint)
-		stockExchangeMutex.Unlock()
+		ses.dirtyStocksInExchange = make(map[uint32]*datastreams_pb.StockExchangeDataPoint)
+		ses.stockExchangeMutex.Unlock()
 
-		sent := 0
-		stockExchangeListenersMutex.Lock()
-		l.Debugf("Will be sending %+v to %d listeners", updateProto, len(stockExchangeListeners))
-
-		for sessionId, listener := range stockExchangeListeners {
-			select {
-			case <-listener.done:
-				delete(stockExchangeListeners, sessionId)
-				l.Debugf("Found dead listener. Removed")
-			case listener.update <- updateProto:
-				sent++
-			}
-		}
-
-		stockExchangeListenersMutex.Unlock()
-
-		l.Debugf("Sent to %d listeners!. Sleeping for 15 seconds", sent)
+		ses.broadcastStream.BroadcastUpdate(updateProto)
+		l.Debugf("Sent to %d listeners!. Sleeping for 15 seconds", ses.broadcastStream.GetListenersCount())
 
 		time.Sleep(time.Minute / 4)
 	}
 }
 
-func SendStockExchangeUpdate(stockId, price, stocksInExchange, stocksInMarket uint32) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":                 "SendStockExchangeUpdate",
-		"param_stockId":          stockId,
-		"param_stocksInExchange": stocksInExchange,
-		"param_stocksInMarket":   stocksInMarket,
+// SendStockExchangeUpdate records the update internally. It doesn't immediately send it.
+// That's done by Run()
+func (ses *stockExchangeStream) SendStockExchangeUpdate(stockId uint32, dp *datastreams_pb.StockExchangeDataPoint) {
+	var l = ses.logger.WithFields(logrus.Fields{
+		"method":        "SendStockExchangeUpdate",
+		"param_stockId": stockId,
+		"param_dp":      dp,
 	})
 
-	l.Debugf("Adding to the next stock exchange update")
+	ses.stockExchangeMutex.Lock()
+	ses.dirtyStocksInExchange[stockId] = dp
+	ses.stockExchangeMutex.Unlock()
 
-	stockExchangeMutex.Lock()
-	defer stockExchangeMutex.Unlock()
-	dirtyStocksInExchange[stockId] = &datastreams_pb.StockExchangeDataPoint{
-		Price:            price,
-		StocksInExchange: stocksInExchange,
-		StocksInMarket:   stocksInMarket,
-	}
+	l.Infof("Recorded update")
 }
 
-func RegStockExchangeListener(done <-chan struct{}, update chan interface{}, sessionId string) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "RegStockExchangeListener",
+// AddListener adds a listener to the StockExchangeStream
+func (ses *stockExchangeStream) AddListener(done <-chan struct{}, update chan interface{}, sessionId string) {
+	var l = ses.logger.WithFields(logrus.Fields{
+		"method":          "AddListener",
+		"param_sessionId": sessionId,
 	})
-	l.Debugf("Got a listener")
 
-	stockExchangeListenersMutex.Lock()
-	defer stockExchangeListenersMutex.Unlock()
+	ses.broadcastStream.AddListener(sessionId, &listener{
+		update: update,
+		done:   done,
+	})
 
-	if oldlistener, ok := stockExchangeListeners[sessionId]; ok {
-		// remove the old listener.
-		close(oldlistener.update)
-	}
-	stockExchangeListeners[sessionId] = listener{
-		update,
-		done,
-	}
-
-	go func() {
-		<-done
-		UnregStockExchangeListener(sessionId)
-		l.Debugf("Found dead listener. Removed")
-	}()
+	l.Infof("Added")
 }
 
-func UnregStockExchangeListener(sessionId string) {
-	stockExchangeListenersMutex.Lock()
-	delete(stockExchangeListeners, sessionId)
-	stockExchangeListenersMutex.Unlock()
+// RemoveListener removes a listener from the StockExchangeStream
+func (ses *stockExchangeStream) RemoveListener(sessionId string) {
+	var l = ses.logger.WithFields(logrus.Fields{
+		"method":          "RemoveListener",
+		"param_sessionId": sessionId,
+	})
+
+	ses.broadcastStream.RemoveListener(sessionId)
+
+	l.Infof("Removed")
 }

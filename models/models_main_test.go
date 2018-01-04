@@ -15,6 +15,7 @@ func TestMain(m *testing.M) {
 
 	// TODO: remove this and insert MarketEvent data stream as a dependency to actual code, then insert stub while using it
 	datastreams.Init(conf)
+	datastreamsManager = datastreams.GetManager()
 
 	// Initialize the models package, but don't call the Init method. It does extra things we don't
 	// want to happen.

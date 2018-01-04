@@ -3,6 +3,7 @@ package grpcapi
 import (
 	"testing"
 
+	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/models"
 	"github.com/thakkarparth007/dalal-street-server/session"
 
@@ -27,9 +28,9 @@ func init() {
 
 	utils.Init(config)
 	session.Init(config)
-	models.Init(config)
+	models.Init(config, datastreams.GetManager())
 	Init(config)
-	StartServices(nil)
+	StartServices(nil, nil)
 }
 
 func getConnection(t *testing.T) *grpc.ClientConn {

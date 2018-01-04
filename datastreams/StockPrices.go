@@ -7,19 +7,42 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
-var (
-	stockPricesMutex sync.Mutex
-	dirtyStocks      = make(map[uint32]uint32) // list of stocks whose updates we haven't sent yet
+// StockPricesStream interface defines the interface to interact with StockPrices stream
+type StockPricesStream interface {
+	Run()
+	SendStockPriceUpdate(stockId uint32, price uint32)
+	AddListener(done <-chan struct{}, updates chan interface{}, sessionId string)
+	RemoveListener(sessionId string)
+}
 
-	stockPricesListenersMutex sync.Mutex
-	stockPricesListeners      = make(map[string]listener)
-)
+// stockPricesStream implements StockPricesStream interface
+type stockPricesStream struct {
+	logger          *logrus.Entry
+	broadcastStream BroadcastStream
 
-func InitStockPricesStream() {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "InitStockPricesStream",
+	stockPricesMutex sync.RWMutex
+	dirtyStocks      map[uint32]uint32 // list of stocks whose updates we haven't sent yet
+}
+
+// newStockPricesStream creates a new StockPricesStream
+func newStockPricesStream() StockPricesStream {
+	return &stockPricesStream{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module": "datastreams.StockPricesStream",
+		}),
+		broadcastStream: NewBroadcastStream(),
+		dirtyStocks:     make(map[uint32]uint32),
+	}
+}
+
+// Run runs the StockPricesStream. Call in a gofunc. Repeatedly broadcasts stock prices
+// every 15 seconds, if there's any update
+func (sps *stockPricesStream) Run() {
+	var l = sps.logger.WithFields(logrus.Fields{
+		"method": "Run",
 	})
 
 	defer func() {
@@ -29,84 +52,67 @@ func InitStockPricesStream() {
 	}()
 
 	for {
-		stockPricesMutex.Lock()
+		sps.stockPricesMutex.Lock()
 
-		stockPricesListenersMutex.Lock()
-		l.Debugf("%d listeners as of now", len(stockPricesListeners))
-		stockPricesListenersMutex.Unlock()
-
-		if len(dirtyStocks) == 0 {
-			stockPricesMutex.Unlock()
+		if len(sps.dirtyStocks) == 0 {
+			sps.stockPricesMutex.Unlock()
 			l.Debugf("Nothing dirty yet. Sleeping for 15 seconds")
 			time.Sleep(time.Minute / 4)
 			continue
 		}
+
 		l.Debugf("Found dirty stock prices")
 		updateProto := &datastreams_pb.StockPricesUpdate{
-			Prices: dirtyStocks,
+			Prices: sps.dirtyStocks,
 		}
-		dirtyStocks = make(map[uint32]uint32)
-		stockPricesMutex.Unlock()
+		sps.dirtyStocks = make(map[uint32]uint32)
+		sps.stockPricesMutex.Unlock()
 
-		sent := 0
-		stockPricesListenersMutex.Lock()
-		l.Debugf("Will be sending %+v to %d listeners", updateProto, len(stockPricesListeners))
-		for sessionId, listener := range stockPricesListeners {
-			select {
-			case <-listener.done:
-				delete(stockPricesListeners, sessionId)
-				l.Debugf("Found dead listener. Removed")
-			case listener.update <- updateProto:
-				sent++
-			}
-		}
-		stockPricesListenersMutex.Unlock()
+		sps.broadcastStream.BroadcastUpdate(updateProto)
 
-		l.Debugf("Sent to %d listeners! Sleeping for 15 seconds", sent)
+		l.Debugf("Sent to %d listeners! Sleeping for 15 seconds", sps.broadcastStream.GetListenersCount())
 
 		time.Sleep(time.Minute / 4)
 	}
 }
 
-func SendStockPriceUpdate(stockId, price uint32) {
-	var l = logger.WithFields(logrus.Fields{
+// SendStockPriceUpdate updates price of a given stock. It doesn't send it immediately. That's done by Run.
+func (sps *stockPricesStream) SendStockPriceUpdate(stockId, price uint32) {
+	var l = sps.logger.WithFields(logrus.Fields{
 		"method":        "SendStockPriceUpdate",
 		"param_stockId": stockId,
 		"param_price":   price,
 	})
+
 	l.Debugf("Adding to the next stock prices update")
-	stockPricesMutex.Lock()
-	defer stockPricesMutex.Unlock()
-	dirtyStocks[stockId] = price
+	sps.stockPricesMutex.Lock()
+	sps.dirtyStocks[stockId] = price
+	sps.stockPricesMutex.Unlock()
 }
 
-func RegStockPricesListener(done <-chan struct{}, update chan interface{}, sessionId string) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "RegStockPricesListener",
+// AddListener adds a listener to the StockPricesStream
+func (sps *stockPricesStream) AddListener(done <-chan struct{}, update chan interface{}, sessionId string) {
+	var l = sps.logger.WithFields(logrus.Fields{
+		"method":          "AddListener",
+		"param_sessionId": sessionId,
 	})
 
-	l.Debugf("Got a listener")
+	sps.broadcastStream.AddListener(sessionId, &listener{
+		update: update,
+		done:   done,
+	})
 
-	stockPricesListenersMutex.Lock()
-	defer stockPricesListenersMutex.Unlock()
-
-	if oldlistener, ok := stockPricesListeners[sessionId]; ok {
-		// remove the old listener.
-		close(oldlistener.update)
-	}
-	stockPricesListeners[sessionId] = listener{
-		update,
-		done,
-	}
-	go func() {
-		<-done
-		UnregStockPricesListener(sessionId)
-		l.Debugf("Found dead listener. Removed")
-	}()
+	l.Infof("Added")
 }
 
-func UnregStockPricesListener(sessionId string) {
-	stockPricesListenersMutex.Lock()
-	delete(stockPricesListeners, sessionId)
-	stockPricesListenersMutex.Unlock()
+// RemoveListener removes a listener from the StockPricesStream
+func (sps *stockPricesStream) RemoveListener(sessionId string) {
+	var l = sps.logger.WithFields(logrus.Fields{
+		"method":          "RemoveListener",
+		"param_sessionId": sessionId,
+	})
+
+	sps.RemoveListener(sessionId)
+
+	l.Infof("Removed")
 }
