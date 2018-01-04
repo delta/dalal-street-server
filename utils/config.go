@@ -57,6 +57,8 @@ type Config struct {
 	GrpcKey string
 	//CacheSize is the size of the LRU Cache for sessions(As of Now)
 	CacheSize int
+	//BotSecret is a string used for validation of bots
+	BotSecret string
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
@@ -95,6 +97,7 @@ var config = &Config{
 	GrpcCert:    "./tls_keys/test/server.crt",
 	GrpcKey:     "./tls_keys/test/server.key",
 	CacheSize:   1000,
+	BotSecret:   "hellobots",
 }
 
 var configFileName *string

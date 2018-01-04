@@ -19,7 +19,8 @@
       "grpcAddress": ":8000",
       "grpcCert": "./tls_keys/dev/server.crt",
       "grpcKey": "./tls_keys/dev/server.key",
-      "CacheSize": 1000
+      "CacheSize": 1000,
+      "BotSecret":"hellobots"
    },
 
    "Docker": {
@@ -42,7 +43,8 @@
       "grpcAddress": ":8000",
       "grpcCert": "./tls_keys/docker/server.crt",
       "grpcKey": "./tls_keys/docker/server.key",
-      "CacheSize": 1000
+      "CacheSize": 1000,
+      "BotSecret":"hellobots"
    },
 
    "Prod": {
@@ -65,8 +67,9 @@
       "grpcAddress": ":8000",
       "grpcCert": "./tls_keys/prod/server.crt",
       "grpcKey": "./tls_keys/prod/server.key",
-      "CacheSize": 1000
-  },
+      "CacheSize": 1000,
+      "BotSecret":"hellobots"
+ },
 
    "Test": {
       "Stage": "test",
@@ -88,6 +91,7 @@
       "grpcAddress": ":8000",
       "grpcCert": "./tls_keys/test/server.crt",
       "grpcKey": "./tls_keys/test/server.key",
-      "CacheSize": 1000 
-   }
+      "CacheSize": 1000, 
+      "BotSecret":"hellobots"
+ }
 }
