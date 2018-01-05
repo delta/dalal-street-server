@@ -2,7 +2,7 @@ package grpcapi
 
 import (
 	"log"
-	"net"
+	"net/http"
 
 	"github.com/Sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -15,6 +15,9 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
+
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
+	
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/actionservice"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/streamservice"
@@ -121,13 +124,24 @@ func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService(dsm))
 
-	lis, err := net.Listen("tcp", config.GrpcAddress)
-	if err != nil {
-		log.Fatalf("Failed while listening on port 8000. Error: %+v", err)
+	wrappedServer := grpcweb.WrapServer(grpcServer)
+
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		if wrappedServer.IsGrpcWebRequest(req) {
+			log.Printf("Got grpc web request")
+			wrappedServer.ServeHTTP(resp, req)
+		} else {
+			grpcServer.ServeHTTP(resp, req)
+		}
+	}
+
+	httpServer := http.Server{
+		Addr:    config.GrpcAddress,
+		Handler: http.HandlerFunc(handler),
 	}
 
 	go func() {
-		err = grpcServer.Serve(lis)
+		err = httpServer.ListenAndServeTLS(config.GrpcCert, config.GrpcKey)
 		if err != nil {
 			log.Fatalf("Failed while starting server. Error: %+v", err)
 		}
