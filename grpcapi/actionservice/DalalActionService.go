@@ -124,6 +124,75 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 
 	return resp, nil
 }
+func (d *dalalActionService) CreateBot(ctx context.Context, req *actions_pb.CreateBotRequest) (*actions_pb.CreateBotResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "Login",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	resp := &actions_pb.CreateBotResponse{}
+	makeError := func(st actions_pb.CreateBotResponse_StatusCode, msg string) (*actions_pb.CreateBotResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	l.Infof("BotLogin requested")
+	user, err := models.CreateBot(req.GetBotUserId())
+	if err != nil {
+		return makeError(actions_pb.CreateBotResponse_InvalidCredentialsError, "")
+	}
+	resp = &actions_pb.CreateBotResponse{
+		User: user.ToProto(),
+	}
+	return resp, err
+}
+
+func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.GetPortfolioRequest) (*actions_pb.GetPortfolioResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "Login",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("BotLogin requested")
+	resp := &actions_pb.GetPortfolioResponse{}
+	makeError := func(st actions_pb.GetPortfolioResponse_StatusCode, msg string) (*actions_pb.GetPortfolioResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	var (
+		user models.User
+		err  error
+	)
+
+	sess := ctx.Value("session").(session.Session)
+	userId, ok := sess.Get("userId")
+	if !ok {
+		l.Errorf("unable to get User Id from session")
+		return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "")
+	}
+	userIdInt, err := strconv.ParseUint(userId, 10, 32)
+	if err == nil {
+		user, err = models.GetUserCopy(uint32(userIdInt))
+		if err != nil {
+			l.Errorf("User for Id does not exist")
+			return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "")
+		}
+	}
+	stocksOwned, err := models.GetStocksOwned(user.Id)
+	if err != nil {
+		l.Errorf("Unable to get Stocks for User Id")
+		return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "")
+	}
+	resp = &actions_pb.GetPortfolioResponse{
+		SessionId:   sess.GetId(),
+		User:        user.ToProto(),
+		StocksOwned: stocksOwned,
+	}
+	return resp, nil
+}
 
 func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginRequest) (*actions_pb.LoginResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
