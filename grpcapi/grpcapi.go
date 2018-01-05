@@ -127,6 +127,15 @@ func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams
 	wrappedServer := grpcweb.WrapServer(grpcServer)
 
 	handler := func(resp http.ResponseWriter, req *http.Request) {
+		if req.Method == http.MethodOptions {
+			// reply with a CORS header
+			// FIXME: remove this from prod code!
+			resp.Header().Add("Access-Control-Allow-Origin", "*")
+			resp.Header().Add("Access-Control-Allow-Methods", "*")
+			resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web")
+			resp.Write([]byte("OK"))
+			return
+		}
 		if wrappedServer.IsGrpcWebRequest(req) {
 			log.Printf("Got grpc web request")
 			wrappedServer.ServeHTTP(resp, req)
@@ -142,6 +151,7 @@ func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams
 
 	go func() {
 		err = httpServer.ListenAndServeTLS(config.GrpcCert, config.GrpcKey)
+		//err = httpServer.ListenAndServe()
 		if err != nil {
 			log.Fatalf("Failed while starting server. Error: %+v", err)
 		}
