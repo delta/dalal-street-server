@@ -70,6 +70,8 @@ func newMarketDepthStream(stockId uint32) MarketDepthStream {
 		askDepthDiff: make(map[uint32]int32),
 		bidDepth:     make(map[uint32]uint32),
 		bidDepthDiff: make(map[uint32]int32),
+
+		broadcastStream: NewBroadcastStream(),
 	}
 
 	go mds.run()
