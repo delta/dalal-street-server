@@ -148,6 +148,44 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 	return u, nil
 }
 
+//CreateBot() creates a bot from the botName
+func CreateBot(botName string) (*User, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":   "createUser",
+		"bot_name": botName,
+	})
+
+	l.Infof("Creating user")
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer db.Close()
+
+	u := &User{
+		Email:     "willthismatter@gmail.com",
+		Name:      botName,
+		Cash:      STARTING_CASH,
+		Total:     STARTING_CASH,
+		CreatedAt: time.Now().String(),
+	}
+
+	err = db.Save(u).Error
+
+	if err != nil {
+		l.Errorf("Failed: %+v", err)
+		return nil, err
+	}
+
+	//update total user count
+	atomic.AddUint32(&TotalUserCount, 1)
+
+	l.Infof("Created Bot")
+	return u, nil
+}
+
 // postLoginToPragyan() is used to make a post request to pragyan and return
 // a pragyanUser struct.
 func postLoginToPragyan(email, password string) (pragyanUser, error) {
