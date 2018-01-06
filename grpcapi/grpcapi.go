@@ -108,15 +108,6 @@ func Init(conf *utils.Config) {
 // Handler func to handle incoming grpc requests
 // Checks the request type and calls the appropriate handler
 func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
-	if req.Method == http.MethodOptions && config.Stage != "Prod" {
-		// reply with a CORS header
-		// FIXME: remove this from prod code!
-		resp.Header().Add("Access-Control-Allow-Origin", "*")
-		resp.Header().Add("Access-Control-Allow-Methods", "*")
-		resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web")
-		resp.Write([]byte("OK"))
-		return
-	}
 	if wrappedServer.IsGrpcWebRequest(req) {
 		log.Printf("Got grpc web request")
 		wrappedServer.ServeHTTP(resp, req)
@@ -128,7 +119,7 @@ func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
 // StartServices starts the Action and Stream services
 // It passes on the Matching Engine to Action service.
 func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams.Manager) {
-	creds, err := credentials.NewServerTLSFromFile(config.GrpcCert, config.GrpcKey)
+	creds, err := credentials.NewServerTLSFromFile(config.TLSCert, config.TLSKey)
 	if err != nil {
 		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
 	}

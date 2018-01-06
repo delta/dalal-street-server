@@ -1,6 +1,10 @@
 package utils
 
-import "math/rand"
+import (
+	"math/rand"
+	"net/http"
+	"strings"
+)
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const (
@@ -33,4 +37,8 @@ func MinInt(a, b uint32) uint32 {
 		return a
 	}
 	return b
+}
+
+func IsGrpcRequest(req *http.Request) bool {
+	return strings.Contains(req.Header.Get("Content-Type"), "application/grpc")
 }

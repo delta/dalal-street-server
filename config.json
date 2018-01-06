@@ -2,8 +2,8 @@
    "Dev": {
       "Stage": "dev",
 
-      "EventId": "22",
-      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+      "EventId": "1",
+      "EventSecret": "dalalstreet~b5[D(Xdcjka",
 
       "LogFileName": "stdout",
       "LogMaxSize": 50,
@@ -14,11 +14,10 @@
       "DbHost": "",
       "DbName": "dalalstreet_dev",
 
-      "httpPort": 3000,
+      "ServerPort": ":8000",
 
-      "grpcAddress": ":8000",
-      "grpcCert": "./tls_keys/dev/server.crt",
-      "grpcKey": "./tls_keys/dev/server.key",
+      "TLSCert": "./tls_keys/dev/server.crt",
+      "TLSKey": "./tls_keys/dev/server.key",
       "CacheSize": 1000,
       "BotSecret":"hellobots"
    },
@@ -26,8 +25,8 @@
    "Docker": {
       "Stage": "docker",
 
-      "EventId": "22",
-      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+      "EventId": "1",
+      "EventSecret": "dalalstreet~b5[D(Xdcjka",
 
       "LogFileName": "./dalalstreet_docker.log",
       "LogMaxSize": 50,
@@ -38,11 +37,10 @@
       "DbHost": "tcp(db:3306)",
       "DbName": "dalalstreet_docker",
 
-      "httpPort": 3000,
+      "ServerPort": ":8000",
 
-      "grpcAddress": ":8000",
-      "grpcCert": "./tls_keys/docker/server.crt",
-      "grpcKey": "./tls_keys/docker/server.key",
+      "TLSCert": "./tls_keys/docker/server.crt",
+      "TLSKey": "./tls_keys/docker/server.key",
       "CacheSize": 1000,
       "BotSecret":"hellobots"
    },
@@ -50,8 +48,8 @@
    "Prod": {
       "Stage": "prod",
 
-      "EventId": "22",
-      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+      "EventId": "1",
+      "EventSecret": "dalalstreet~b5[D(Xdcjka",
 
       "LogFileName": "./dalalstreet.log",
       "LogMaxSize": 50,
@@ -62,11 +60,10 @@
       "DbHost": "",
       "DbName": "dalalstreet",
 
-      "httpPort": 3000,
+      "ServerPort": ":8000",
 
-      "grpcAddress": ":8000",
-      "grpcCert": "./tls_keys/prod/server.crt",
-      "grpcKey": "./tls_keys/prod/server.key",
+      "TLSCert": "./tls_keys/prod/server.crt",
+      "TLSKey": "./tls_keys/prod/server.key",
       "CacheSize": 1000,
       "BotSecret":"hellobots"
  },
@@ -74,8 +71,8 @@
    "Test": {
       "Stage": "test",
 
-      "EventId": "22",
-      "EventSecret": "21ed246e8da1e8535bc29e1bd8e7e3c4",
+      "EventId": "1",
+      "EventSecret": "dalalstreet~b5[D(Xdcjka",
 
       "LogFileName": "stdout",
       "LogMaxSize": 50,
@@ -86,11 +83,10 @@
       "DbHost": "",
       "DbName": "dalalstreet_test",
 
-      "httpPort": 3000,
+      "ServerPort": ":8000",
 
-      "grpcAddress": ":8000",
-      "grpcCert": "./tls_keys/test/server.crt",
-      "grpcKey": "./tls_keys/test/server.key",
+      "TLSCert": "./tls_keys/test/server.crt",
+      "TLSKey": "./tls_keys/test/server.key",
       "CacheSize": 1000, 
       "BotSecret":"hellobots"
  }
