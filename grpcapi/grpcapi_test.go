@@ -1,7 +1,9 @@
 package grpcapi
 
 import (
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/models"
@@ -29,8 +31,17 @@ func init() {
 	utils.Init(config)
 	session.Init(config)
 	models.Init(config, datastreams.GetManager())
-	Init(config)
-	StartServices(nil, nil)
+	Init(config, nil, nil)
+
+	httpServer := http.Server{
+		Addr:    ":8000",
+		Handler: http.HandlerFunc(GrpcHandlerFunc),
+	}
+	go func() {
+		err := httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey)
+		logger.Errorf("ERROR WHILE STARTING HTTP SERVER %+v", err)
+	}()
+	time.Sleep(time.Second)
 }
 
 func getConnection(t *testing.T) *grpc.ClientConn {

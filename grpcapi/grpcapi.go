@@ -17,7 +17,6 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/actionservice"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/streamservice"
@@ -28,13 +27,13 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
-var config *utils.Config
+var (
+	config *utils.Config
+	logger *logrus.Entry
 
-var logger *logrus.Entry
-
-var grpcServer *grpc.Server
-
-var wrappedServer *grpcweb.WrappedGrpcServer
+	grpcServer    *grpc.Server
+	wrappedServer *grpcweb.WrappedGrpcServer
+)
 
 func authFunc(ctx context.Context) (context.Context, error) {
 	var l = logger.WithFields(logrus.Fields{
@@ -97,28 +96,13 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 	return handler(newCtx, req)
 }
 
-// Init configures the grpcapi package
-func Init(conf *utils.Config) {
+// Init configures and initalizes the grpcapi package
+func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm datastreams.Manager) {
 	config = conf
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "grpcapi",
 	})
-}
 
-// Handler func to handle incoming grpc requests
-// Checks the request type and calls the appropriate handler
-func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
-	if wrappedServer.IsGrpcWebRequest(req) {
-		log.Printf("Got grpc web request")
-		wrappedServer.ServeHTTP(resp, req)
-	} else {
-		grpcServer.ServeHTTP(resp, req)
-	}
-}
-
-// StartServices starts the Action and Stream services
-// It passes on the Matching Engine to Action service.
-func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams.Manager) {
 	creds, err := credentials.NewServerTLSFromFile(config.TLSCert, config.TLSKey)
 	if err != nil {
 		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
@@ -140,4 +124,15 @@ func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService(dsm))
 
 	wrappedServer = grpcweb.WrapServer(grpcServer)
+}
+
+// Handler func to handle incoming grpc requests
+// Checks the request type and calls the appropriate handler
+func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
+	if wrappedServer.IsGrpcWebRequest(req) {
+		log.Printf("Got grpc web request")
+		wrappedServer.ServeHTTP(resp, req)
+	} else {
+		grpcServer.ServeHTTP(resp, req)
+	}
 }
