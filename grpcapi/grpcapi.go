@@ -32,6 +32,10 @@ var config *utils.Config
 
 var logger *logrus.Entry
 
+var grpcServer *grpc.Server
+
+var wrappedServer *grpcweb.WrappedGrpcServer
+
 func authFunc(ctx context.Context) (context.Context, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "authFunc",
@@ -101,6 +105,26 @@ func Init(conf *utils.Config) {
 	})
 }
 
+// Handler func to handle incoming grpc requests
+// Checks the request type and calls the appropriate handler
+func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodOptions && config.Stage != "Prod" {
+		// reply with a CORS header
+		// FIXME: remove this from prod code!
+		resp.Header().Add("Access-Control-Allow-Origin", "*")
+		resp.Header().Add("Access-Control-Allow-Methods", "*")
+		resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web")
+		resp.Write([]byte("OK"))
+		return
+	}
+	if wrappedServer.IsGrpcWebRequest(req) {
+		log.Printf("Got grpc web request")
+		wrappedServer.ServeHTTP(resp, req)
+	} else {
+		grpcServer.ServeHTTP(resp, req)
+	}
+}
+
 // StartServices starts the Action and Stream services
 // It passes on the Matching Engine to Action service.
 func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams.Manager) {
@@ -109,7 +133,7 @@ func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams
 		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
 	}
 
-	grpcServer := grpc.NewServer(
+	grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			grpc_auth.StreamServerInterceptor(authFunc), // all routes require authentication
@@ -124,36 +148,5 @@ func StartServices(matchingEngine matchingengine.MatchingEngine, dsm datastreams
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService(dsm))
 
-	wrappedServer := grpcweb.WrapServer(grpcServer)
-
-	handler := func(resp http.ResponseWriter, req *http.Request) {
-		if req.Method == http.MethodOptions {
-			// reply with a CORS header
-			// FIXME: remove this from prod code!
-			resp.Header().Add("Access-Control-Allow-Origin", "*")
-			resp.Header().Add("Access-Control-Allow-Methods", "*")
-			resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web")
-			resp.Write([]byte("OK"))
-			return
-		}
-		if wrappedServer.IsGrpcWebRequest(req) {
-			log.Printf("Got grpc web request")
-			wrappedServer.ServeHTTP(resp, req)
-		} else {
-			grpcServer.ServeHTTP(resp, req)
-		}
-	}
-
-	httpServer := http.Server{
-		Addr:    config.GrpcAddress,
-		Handler: http.HandlerFunc(handler),
-	}
-
-	go func() {
-		err = httpServer.ListenAndServeTLS(config.GrpcCert, config.GrpcKey)
-		//err = httpServer.ListenAndServe()
-		if err != nil {
-			log.Fatalf("Failed while starting server. Error: %+v", err)
-		}
-	}()
+	wrappedServer = grpcweb.WrapServer(grpcServer)
 }

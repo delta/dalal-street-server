@@ -42,6 +42,18 @@ func RealMain() {
 
 	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
 	grpcapi.StartServices(matchingEngine, datastreamsManager)
+
+	httpServer := http.Server{
+		Addr: config.GrpcAddress,
+		Handler: http.HandlerFunc(grpcapi.GrpcHandlerFunc),
+	}
+
+	go func() {
+		err := httpServer.ListenAndServeTLS(config.GrpcCert, config.GrpcKey)
+		if err != nil {
+			utils.Logger.Fatalf("Failed while starting server. Error: %+v", err)
+		}
+	}()
 	//models.InitModels()
 	//session.InitSession()
 	//socketapi.InitSocketApi()
