@@ -37,6 +37,7 @@ func RealMain() {
 	datastreamsManager := datastreams.GetManager()
 	go datastreamsManager.GetStockExchangeStream().Run()
 	go datastreamsManager.GetStockPricesStream().Run()
+	go models.UpdateLeaderboardTicker()
 
 	models.Init(config, datastreamsManager)
 
@@ -44,27 +45,36 @@ func RealMain() {
 	grpcapi.StartServices(matchingEngine, datastreamsManager)
 
 	httpServer := http.Server{
-		Addr: config.GrpcAddress,
-		Handler: http.HandlerFunc(grpcapi.GrpcHandlerFunc),
+		Addr: config.ServerPort,
+		Handler: http.HandlerFunc(
+			func (resp http.ResponseWriter, req *http.Request) {
+				if req.Method == http.MethodOptions && config.Stage != "Prod" {
+					resp.Header().Add("Access-Control-Allow-Origin", "*")
+					resp.Header().Add("Access-Control-Allow-Methods", "*")
+					resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web")
+					resp.Write([]byte("OK"))
+					return
+				}
+				if utils.IsGrpcRequest(req) {
+					grpcapi.GrpcHandlerFunc(resp, req)
+				} else {
+					socketapi.Handle(resp, req)
+				}
+			},
+		),
 	}
 
-	go func() {
-		err := httpServer.ListenAndServeTLS(config.GrpcCert, config.GrpcKey)
-		if err != nil {
-			utils.Logger.Fatalf("Failed while starting server. Error: %+v", err)
-		}
-	}()
+	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
+	
 	//models.InitModels()
 	//session.InitSession()
 	//socketapi.InitSocketApi()
 
-	go models.UpdateLeaderboardTicker()
 
-	http.Handle("/", http.FileServer(http.Dir("./public")))
-	http.HandleFunc("/ws", socketapi.Handle)
+	// http.Handle("/", http.FileServer(http.Dir("./public")))
+	// http.HandleFunc("/ws", socketapi.Handle)
 
-	port := fmt.Sprintf(":%d", config.HttpPort)
-	utils.Logger.Fatal(http.ListenAndServe(port, nil))
+	// utils.Logger.Fatal(http.ListenAndServe(config.ServerPort, nil))
 
 	for {
 

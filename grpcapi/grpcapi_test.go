@@ -23,8 +23,8 @@ import (
 
 func init() {
 	config := utils.GetConfiguration()
-	config.GrpcCert = "../tls_keys/test/server.crt"
-	config.GrpcKey = "../tls_keys/test/server.key"
+	config.TLSCert = "../tls_keys/test/server.crt"
+	config.TLSKey = "../tls_keys/test/server.key"
 
 	utils.Init(config)
 	session.Init(config)

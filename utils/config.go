@@ -42,19 +42,14 @@ type Config struct {
 	// DbName is the name of the database
 	DbName string
 
-	// HTTP Server related options
-
-	// HttpPort is the port on which the http server will run
-	HttpPort int
-
 	// GRPC Server related options
 
-	// GrpcAddress is the address to which the gRPC server will bind
-	GrpcAddress string
-	// GrpcCert is the location of the TLS certificate to be used by the server
-	GrpcCert string
-	// GrpcKey is the location of the TLS private key to be used by the server
-	GrpcKey string
+	// ServerPort is the address to which the gRPC server will bind
+	ServerPort string
+	// TLSCert is the location of the TLS certificate to be used by the server
+	TLSCert string
+	// TLSKey is the location of the TLS private key to be used by the server
+	TLSKey string
 	//CacheSize is the size of the LRU Cache for sessions(As of Now)
 	CacheSize int
 	//BotSecret is a string used for validation of bots
@@ -92,10 +87,9 @@ var config = &Config{
 	DbPassword:  "",
 	DbHost:      "",
 	DbName:      "dalalstreet_test",
-	HttpPort:    3000,
-	GrpcAddress: ":8000",
-	GrpcCert:    "./tls_keys/test/server.crt",
-	GrpcKey:     "./tls_keys/test/server.key",
+	ServerPort: ":8000",
+	TLSCert:    "./tls_keys/test/server.crt",
+	TLSKey:     "./tls_keys/test/server.key",
 	CacheSize:   1000,
 	BotSecret:   "hellobots",
 }
