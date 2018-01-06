@@ -4,16 +4,10 @@ import (
 	"log"
 	"net"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
-
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/actionservice"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi/streamservice"
@@ -22,21 +16,34 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
 	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/utils"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var config *utils.Config
 
+var logger *logrus.Entry
+
 func authFunc(ctx context.Context) (context.Context, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "authFunc",
+	})
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Missing context metadata")
 	}
 	if len(md["bot_secret"]) == 1 {
-		if md["bot_secret"][0] == config.BotSecret && len(md["bot_userid"]) == 1 {
+		if md["bot_secret"][0] == config.BotSecret && len(md["bot_user_id"]) == 1 {
 			sess, err := session.Fake()
 			if err != nil {
+				l.Errorf("Unable to create session for bot")
 				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 			}
+			err = sess.Set("UserId", md["bot_user_id"][0])
 			ctx = context.WithValue(ctx, "session", sess)
 			return ctx, nil
 		} else {

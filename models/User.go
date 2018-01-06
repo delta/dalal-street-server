@@ -165,7 +165,7 @@ func CreateBot(botName string) (*User, error) {
 	defer db.Close()
 
 	u := &User{
-		Email:     "willthismatter@gmail.com",
+		Email:     botName + "@bot",
 		Name:      botName,
 		Cash:      STARTING_CASH,
 		Total:     STARTING_CASH,
