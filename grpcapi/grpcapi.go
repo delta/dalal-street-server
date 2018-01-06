@@ -5,6 +5,13 @@ import (
 	"net"
 
 	"github.com/Sirupsen/logrus"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
@@ -16,12 +23,6 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
 	"github.com/thakkarparth007/dalal-street-server/session"
 	"github.com/thakkarparth007/dalal-street-server/utils"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
 
 var config *utils.Config
@@ -32,10 +33,12 @@ func authFunc(ctx context.Context) (context.Context, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "authFunc",
 	})
+
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Missing context metadata")
 	}
+	// handle bot related request specially
 	if len(md["bot_secret"]) == 1 {
 		if md["bot_secret"][0] == config.BotSecret && len(md["bot_user_id"]) == 1 {
 			sess, err := session.Fake()
@@ -43,20 +46,26 @@ func authFunc(ctx context.Context) (context.Context, error) {
 				l.Errorf("Unable to create session for bot")
 				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 			}
-			err = sess.Set("UserId", md["bot_user_id"][0])
+
+			sess.Set("UserId", md["bot_user_id"][0])
 			ctx = context.WithValue(ctx, "session", sess)
 			return ctx, nil
-		} else {
-			return nil, grpc.Errorf(codes.Unauthenticated, "bot Secret not set")
 		}
+
+		l.Warnf("Invalid bot request. Got %+v", md)
+		return nil, grpc.Errorf(codes.Unauthenticated, "bot secret not set")
 	}
+
+	// regular requests
 	if len(md["sessionid"]) != 1 {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
+
 	sess, err := session.Load(md["sessionid"][0])
 	if err != nil {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
+
 	ctx = context.WithValue(ctx, "session", sess)
 	return ctx, nil
 }
@@ -84,6 +93,9 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 // Init configures the grpcapi package
 func Init(conf *utils.Config) {
 	config = conf
+	logger = utils.Logger.WithFields(logrus.Fields{
+		"module": "grpcapi",
+	})
 }
 
 // StartServices starts the Action and Stream services

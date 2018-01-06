@@ -26,7 +26,7 @@ import (
 // }
 
 type MortgageQueryData struct {
-	StockId uint32
+	StockId      uint32
 	StocksInBank int32
 }
 
