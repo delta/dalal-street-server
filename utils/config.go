@@ -78,8 +78,8 @@ var allConfigurations = struct {
 // that gets painful when running individual tests
 var config = &Config{
 	Stage:       "test",
-	EventId:     "22",
-	EventSecret: "21ed246e8da1e8535bc29e1bd8e7e3c4",
+	EventId:     "1",
+	EventSecret: "dalalstreet~b5[D(Xdcjka",
 	LogFileName: "stdout",
 	LogMaxSize:  50,
 	LogLevel:    "debug",
@@ -87,9 +87,9 @@ var config = &Config{
 	DbPassword:  "",
 	DbHost:      "",
 	DbName:      "dalalstreet_test",
-	ServerPort: ":8000",
-	TLSCert:    "./tls_keys/test/server.crt",
-	TLSKey:     "./tls_keys/test/server.key",
+	ServerPort:  ":8000",
+	TLSCert:     "./tls_keys/test/server.crt",
+	TLSKey:      "./tls_keys/test/server.key",
 	CacheSize:   1000,
 	BotSecret:   "hellobots",
 }

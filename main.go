@@ -28,7 +28,6 @@ func RealMain() {
 
 	utils.Init(config)
 	datastreams.Init(config)
-	grpcapi.Init(config)
 	matchingengine.Init(config)
 	session.Init(config)
 	socketapi.Init(config)
@@ -42,12 +41,12 @@ func RealMain() {
 	models.Init(config, datastreamsManager)
 
 	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
-	grpcapi.StartServices(matchingEngine, datastreamsManager)
+	grpcapi.Init(config, matchingEngine, datastreamsManager)
 
 	httpServer := http.Server{
 		Addr: config.ServerPort,
 		Handler: http.HandlerFunc(
-			func (resp http.ResponseWriter, req *http.Request) {
+			func(resp http.ResponseWriter, req *http.Request) {
 				if req.Method == http.MethodOptions && config.Stage != "Prod" {
 					resp.Header().Add("Access-Control-Allow-Origin", "*")
 					resp.Header().Add("Access-Control-Allow-Methods", "*")
@@ -65,11 +64,10 @@ func RealMain() {
 	}
 
 	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
-	
+
 	//models.InitModels()
 	//session.InitSession()
 	//socketapi.InitSocketApi()
-
 
 	// http.Handle("/", http.FileServer(http.Dir("./public")))
 	// http.HandleFunc("/ws", socketapi.Handle)
