@@ -126,10 +126,11 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 }
 func (d *dalalActionService) CreateBot(ctx context.Context, req *actions_pb.CreateBotRequest) (*actions_pb.CreateBotResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":        "Login",
+		"method":        "CreateBot",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+	l.Infof("Creating Bot")
 	resp := &actions_pb.CreateBotResponse{}
 	makeError := func(st actions_pb.CreateBotResponse_StatusCode, msg string) (*actions_pb.CreateBotResponse, error) {
 		resp.StatusCode = st
@@ -137,15 +138,13 @@ func (d *dalalActionService) CreateBot(ctx context.Context, req *actions_pb.Crea
 		return resp, nil
 	}
 
-	l.Infof("BotLogin requested")
 	user, err := models.CreateBot(req.GetBotUserId())
 	if err != nil {
-		return makeError(actions_pb.CreateBotResponse_InvalidCredentialsError, "")
+		l.Errorf("Unable to Create bot models.CreateBot threw an error")
+		return makeError(actions_pb.CreateBotResponse_InternalServerError, "")
 	}
-	resp = &actions_pb.CreateBotResponse{
-		User: user.ToProto(),
-	}
-	return resp, err
+	resp.User = user.ToProto()
+	return resp, nil
 }
 
 func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.GetPortfolioRequest) (*actions_pb.GetPortfolioResponse, error) {
@@ -154,7 +153,7 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
-	l.Infof("BotLogin requested")
+	l.Infof("Getting Portfolio")
 	resp := &actions_pb.GetPortfolioResponse{}
 	makeError := func(st actions_pb.GetPortfolioResponse_StatusCode, msg string) (*actions_pb.GetPortfolioResponse, error) {
 		resp.StatusCode = st
@@ -168,29 +167,21 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 	)
 
 	sess := ctx.Value("session").(session.Session)
-	userId, ok := sess.Get("userId")
-	if !ok {
-		l.Errorf("unable to get User Id from session")
+
+	userId := getUserId(ctx)
+	user, err = models.GetUserCopy(userId)
+	if err != nil {
+		l.Errorf("User for Id does not exist")
 		return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "")
-	}
-	userIdInt, err := strconv.ParseUint(userId, 10, 32)
-	if err == nil {
-		user, err = models.GetUserCopy(uint32(userIdInt))
-		if err != nil {
-			l.Errorf("User for Id does not exist")
-			return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "")
-		}
 	}
 	stocksOwned, err := models.GetStocksOwned(user.Id)
 	if err != nil {
 		l.Errorf("Unable to get Stocks for User Id")
-		return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "")
+		return makeError(actions_pb.GetPortfolioResponse_InternalServerError, "")
 	}
-	resp = &actions_pb.GetPortfolioResponse{
-		SessionId:   sess.GetId(),
-		User:        user.ToProto(),
-		StocksOwned: stocksOwned,
-	}
+	resp.SessionId = sess.GetId()
+	resp.User = user.ToProto()
+	resp.StocksOwned = stocksOwned
 	return resp, nil
 }
 
