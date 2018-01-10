@@ -79,7 +79,7 @@ var allConfigurations = struct {
 var config = &Config{
 	Stage:       "test",
 	EventId:     "1",
-	EventSecret: "dalalstreet~b5[D(Xdcjka",
+	EventSecret: "be3653b77836f84ab0c1ba3f18abf36e878c5e84",
 	LogFileName: "stdout",
 	LogMaxSize:  50,
 	LogLevel:    "debug",
