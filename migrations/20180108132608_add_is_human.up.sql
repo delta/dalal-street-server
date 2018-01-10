@@ -1,0 +1,1 @@
+ALTER TABLE Users ADD isHuman BOOL;

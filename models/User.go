@@ -34,6 +34,7 @@ type User struct {
 	Cash      uint32 `gorm:"not null" json:"cash"`
 	Total     int32  `gorm:"not null" json:"total"`
 	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
+	IsHuman   bool   `gorm:"column:isHuman;not null" json:"is_human"`
 }
 
 func (u *User) ToProto() *models_pb.User {
@@ -44,6 +45,7 @@ func (u *User) ToProto() *models_pb.User {
 		Cash:      u.Cash,
 		Total:     u.Total,
 		CreatedAt: u.CreatedAt,
+		IsHuman:   u.IsHuman,
 	}
 }
 
@@ -132,6 +134,7 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 		Cash:      STARTING_CASH,
 		Total:     STARTING_CASH,
 		CreatedAt: time.Now().String(),
+		IsHuman:   true,
 	}
 
 	err = db.Save(u).Error
@@ -1287,7 +1290,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 /*
 func PerformDividendTransaction(stockId, dividendPercent uint32) (err error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":    "PerformDividendTransaction",
+		"method": "PerformDividendTransaction"
 		"param_stockId": stockId,
 		"param_dividendPercent": dividendPercent,
 	})

@@ -38,6 +38,7 @@ func Test_Login(t *testing.T) {
 		Cash:      STARTING_CASH,
 		Total:     STARTING_CASH,
 		CreatedAt: u.CreatedAt,
+		IsHuman:   true,
 	}
 	if reflect.DeepEqual(u, exU) != true {
 		t.Fatalf("Expected Login to return %+v, instead, got %+v", exU, u)
@@ -59,12 +60,13 @@ func TestUserToProto(t *testing.T) {
 		Cash:      10000,
 		Total:     -200,
 		CreatedAt: "2017-06-08T00:00:00",
+		IsHuman:   true,
 	}
 
 	o_proto := o.ToProto()
 
 	if !testutils.AssertEqual(t, o, o_proto) {
-		t.Fatal("Converted values not equal!")
+		t.Fatal("Converted values not equal!+%v,+%v", o, o_proto)
 	}
 
 }
