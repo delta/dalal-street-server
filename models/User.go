@@ -1290,7 +1290,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 /*
 func PerformDividendTransaction(stockId, dividendPercent uint32) (err error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "PerformDividendTransaction"
+		"method": "PerformDividendTransaction",
 		"param_stockId": stockId,
 		"param_dividendPercent": dividendPercent,
 	})

@@ -11,6 +11,8 @@ import (
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
+const TIMES_RESOLUTION = 60
+
 type Stock struct {
 	Id               uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	ShortName        string `gorm:"column:shortName;not null" json:"short_name"`
@@ -204,8 +206,37 @@ func LoadStocks() error {
 
 	return nil
 }
+func GetStockHistory(stockId uint32, interval Resolution) ([]*StockHistory, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":   "GetStockHistory",
+		"stockId":  stockId,
+		"interval": interval,
+	})
 
-func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
+	l.Infof("Attempting to get stock History for stockId : %v", stockId)
+
+	db, err := DbOpen()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer db.Close()
+
+	allStocks.m[stockId].RLock()
+	defer allStocks.m[stockId].RUnlock()
+
+	var histories []*StockHistory
+
+	if interval != 0 {
+		if err := db.Where("interval =", interval).Order("id desc").Limit(TIMES_RESOLUTION).Find(histories).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	return histories, nil
+}
+
+func GetCompanyDetails(stockId uint32) (*Stock, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "GetCompanyDetails",
 		"stockId": stockId,
@@ -216,7 +247,7 @@ func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
 	db, err := DbOpen()
 	if err != nil {
 		l.Error(err)
-		return nil, nil, err
+		return nil, err
 	}
 	defer db.Close()
 
@@ -225,15 +256,8 @@ func GetCompanyDetails(stockId uint32) (*Stock, []*StockHistory, error) {
 
 	stock := *allStocks.m[stockId].stock
 
-	//FETCHING ENTIRE STOCK HISTORY!! MUST BE CHANGED LATER
-	var stockHistory []*StockHistory
-	if err := db.Where("stockId = ?", stockId).Find(&stockHistory).Error; err != nil {
-		l.Errorf("Errored : %+v", err)
-		return nil, nil, err
-	}
-
 	l.Infof("Successfully fetched company profile for stock id : %v", stockId)
-	return &stock, stockHistory, nil
+	return &stock /*, stockHistory*/, nil
 }
 
 func AddStocksToExchange(stockId, count uint32) error {

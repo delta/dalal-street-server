@@ -2,7 +2,6 @@ package models
 
 import (
 	"testing"
-	"time"
 
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
@@ -77,6 +76,9 @@ func Test_UpdateStockPrice(t *testing.T) {
 		t.Fatalf("Expected %v but got %v", stock1, retrievedStock)
 	}
 }
+func Test_GetStockHistory(t *testing.T) {
+
+}
 func Test_GetCompanyDetails(t *testing.T) {
 	var stock = &Stock{Id: 1, CurrentPrice: 1000}
 	db, err := DbOpen()
@@ -90,22 +92,22 @@ func Test_GetCompanyDetails(t *testing.T) {
 		db.Delete(stock)
 	}()
 	LoadStocks()
-	go startStockHistoryRecorder(time.Millisecond * 1000)
-	testutils.Sleep(2500)
-	_, retrievedStockList, _ := GetCompanyDetails(1)
-	var stkHistoryPoint = &StockHistory{
-		StockId:    1,
-		StockPrice: 1000,
-		CreatedAt:  retrievedStockList[0].CreatedAt,
+	//go startStockHistoryRecorder(time.Millisecond * 1000)
+	//testutils.Sleep(2500)
+	retrievedStock, _ := GetCompanyDetails(1)
+	//var stkHistoryPoint = &StockHistory{
+	//	StockId:    1,
+	//	StockPrice: 1000,
+	//	CreatedAt:  retrievedStockList[0].CreatedAt,
+	//}
+	//stopStockHistoryRecorder()
+	if !testutils.AssertEqual(t, retrievedStock, stock) {
+		t.Fatalf("Expected %v but got %v", retrievedStock, stock)
 	}
-	stopStockHistoryRecorder()
-	if !testutils.AssertEqual(t, stkHistoryPoint, retrievedStockList[0]) {
-		t.Fatalf("Expected %v but got %v", stkHistoryPoint, retrievedStockList[0])
-	}
-	stkHistoryPoint.CreatedAt = retrievedStockList[1].CreatedAt
+	/*stkHistoryPoint.CreatedAt = retrievedStockList[1].CreatedAt
 	if !testutils.AssertEqual(t, stkHistoryPoint, retrievedStockList[1]) {
 		t.Fatalf("Expected %v but got %v", stkHistoryPoint, retrievedStockList[1])
-	}
+	}*/
 }
 func Test_AddStocksToExchange(t *testing.T) {
 	var stock = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 234}
