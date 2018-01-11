@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/grpcapi"
@@ -47,6 +48,15 @@ func RealMain() {
 		Addr: config.ServerPort,
 		Handler: http.HandlerFunc(
 			func(resp http.ResponseWriter, req *http.Request) {
+				start := time.Now()
+				defer func() {
+					diff := time.Now().Sub(start).Seconds()
+					if r := recover(); r != nil {
+						utils.Logger.Errorf("[%.3f] %s %s Error: %+v", diff, req.Method, req.URL.Path, r)
+					}
+					utils.Logger.Infof("[%.3f] %s %s", diff, req.Method, req.URL.Path)
+				}()
+
 				if req.Method == http.MethodOptions && config.Stage != "Prod" {
 					resp.Header().Add("Access-Control-Allow-Origin", "*")
 					resp.Header().Add("Access-Control-Allow-Methods", "*")
@@ -56,27 +66,17 @@ func RealMain() {
 				}
 				if utils.IsGrpcRequest(req) {
 					grpcapi.GrpcHandlerFunc(resp, req)
-				} else {
+				} else if req.URL.Path == "/ws" {
 					socketapi.Handle(resp, req)
+				} else {
+					resp.WriteHeader(http.StatusBadRequest)
+					resp.Write([]byte("Invalid URL requested"))
 				}
 			},
 		),
 	}
 
 	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
-
-	//models.InitModels()
-	//session.InitSession()
-	//socketapi.InitSocketApi()
-
-	// http.Handle("/", http.FileServer(http.Dir("./public")))
-	// http.HandleFunc("/ws", socketapi.Handle)
-
-	// utils.Logger.Fatal(http.ListenAndServe(config.ServerPort, nil))
-
-	for {
-
-	}
 }
 
 func main() {
