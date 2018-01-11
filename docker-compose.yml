@@ -18,9 +18,9 @@ services:
             context: ./Dockerfiles
             dockerfile: Dockerfile-server
         volumes: 
-            - $GOPATH:/go
+            - /root/go:/go
         ports:
-            - "9020:3000"
+            - "443:8000"
         depends_on:
             - db
         env_file:
