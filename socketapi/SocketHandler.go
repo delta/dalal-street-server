@@ -22,7 +22,7 @@ func Init(config *utils.Config) {
 
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return config.Stage == "test" || config.Stage == "dev"
+			return config.Stage == "test" || config.Stage == "dev" || config.Stage == "docker"
 		},
 	}
 	//actions.InitActions()
