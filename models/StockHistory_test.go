@@ -11,6 +11,10 @@ func TestStockHistoryToProto(t *testing.T) {
 		StockId:    3,
 		StockPrice: 23,
 		CreatedAt:  "2017-02-09T00:00:00",
+		Interval:   3,
+		Open:       500,
+		High:       1000,
+		Low:        100,
 	}
 
 	o_proto := o.ToProto()

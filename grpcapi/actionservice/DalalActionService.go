@@ -472,22 +472,45 @@ func (d *dalalActionService) GetCompanyProfile(ctx context.Context, req *actions
 
 	resp := &actions_pb.GetCompanyProfileResponse{}
 
-	stockDetails, stockHistory, err := models.GetCompanyDetails(req.StockId)
+	stockDetails, err := models.GetCompanyDetails(req.StockId)
 	if err != nil {
 		resp.StatusCode = actions_pb.GetCompanyProfileResponse_InternalServerError
 		return resp, nil
 	}
 
-	//Convert to proto
+	resp.StockDetails = stockDetails.ToProto()
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}
+
+func (d *dalalActionService) GetStockHistory(ctx context.Context, req *actions_pb.GetStockHistoryRequest) (*actions_pb.GetStockHistoryResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetStockHistory",
+		"param_session": fmt.Sprintf("%v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%v", req),
+	})
+	l.Infof("Getting StockHistory")
+
+	resp := &actions_pb.GetStockHistoryResponse{}
+
+	stockHistory, err := models.GetStockHistory(req.StockId, models.ResolutionFromProto(req.GetResolution())) // Check if this works
+
+	if err != nil {
+		resp.StatusCode = actions_pb.GetStockHistoryResponse_InternalServerError
+		return resp, nil
+	}
+
 	stockHistoryMap := make(map[string]*models_pb.StockHistory)
+
 	for _, stockData := range stockHistory {
 		stockHistoryMap[stockData.CreatedAt] = stockData.ToProto()
 	}
 
-	resp.StockDetails = stockDetails.ToProto()
 	resp.StockHistoryMap = stockHistoryMap
 
-	l.Infof("Request completed successfully")
+	l.Infof("StockHistory Returned")
 
 	return resp, nil
 }
