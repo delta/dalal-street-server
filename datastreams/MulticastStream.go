@@ -13,6 +13,7 @@ type MulticastStream interface {
 	AddListener(groupId uint32, sessionId string, lis *listener)
 	RemoveListener(groupId uint32, sessionId string)
 	BroadcastUpdateToGroup(groupId uint32, update interface{})
+	MakeGlobalBroadcast(update interface{})
 }
 
 // groupsMap combines a RWMutex with a map of MulticastStreams
@@ -39,7 +40,7 @@ func NewMulticastStream() MulticastStream {
 	}
 }
 
-// AddListener adds a listener to a stream
+// AddListener adds a listener to a group in a stream. Creates group if required
 func (ms *multicastStream) AddListener(groupId uint32, sessionId string, lis *listener) {
 	l := ms.logger.WithFields(logrus.Fields{
 		"method":          "AddListener",
@@ -64,7 +65,7 @@ func (ms *multicastStream) AddListener(groupId uint32, sessionId string, lis *li
 	l.Debugf("Added listener to map")
 }
 
-// RemoveListener removes a listener from a stream
+// RemoveListener removes a listener from a group of a stream. Removes group if empty.
 func (ms *multicastStream) RemoveListener(groupId uint32, sessionId string) {
 	l := ms.logger.WithFields(logrus.Fields{
 		"method":          "RemoveListener",
@@ -95,7 +96,7 @@ func (ms *multicastStream) RemoveListener(groupId uint32, sessionId string) {
 	}
 }
 
-// BroadcastUpdate broadcasts a given update to all listeners in the stream
+// BroadcastUpdateToGroup broadcasts a given update to all listeners in the stream belonging to the given group
 func (ms *multicastStream) BroadcastUpdateToGroup(groupId uint32, update interface{}) {
 	l := ms.logger.WithFields(logrus.Fields{
 		"method":        "BroadcastUpdateToGroup",
@@ -124,4 +125,20 @@ func (ms *multicastStream) BroadcastUpdateToGroup(groupId uint32, update interfa
 		ms.groups.Unlock()
 		l.Debugf("Removed group")
 	}
+}
+
+// MakeGlobalBroadcast broadcasts a given update to *all* listeners in the stream
+func (ms *multicastStream) MakeGlobalBroadcast(update interface{}) {
+	l := ms.logger.WithFields(logrus.Fields{
+		"method": "MakeGlobalBroadcast",
+	})
+
+	// TODO: Remove group if no one's alive in it
+	l.Debugf("Locking groups map")
+	ms.groups.RLock()
+	for _, group := range ms.groups.m {
+		group.BroadcastUpdate(update)
+	}
+	ms.groups.RUnlock()
+	l.Debugf("Unlocked groups map")
 }
