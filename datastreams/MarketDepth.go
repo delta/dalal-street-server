@@ -176,6 +176,10 @@ func (mds *marketDepthStream) AddListener(done <-chan struct{}, update chan inte
 			l.Debugf("Client exited before sending")
 		case update <- mdUpdate:
 			l.Debugf("Sent")
+			mds.broadcastStream.AddListener(sessionId, &listener{
+				update: update,
+				done:   done,
+			})
 		}
 	}()
 
