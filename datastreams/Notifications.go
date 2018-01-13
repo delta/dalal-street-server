@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -39,7 +40,10 @@ func (ns *notificationsStream) SendNotification(n *models_pb.Notification) {
 		"param_n": fmt.Sprintf("%+v", n),
 	})
 
-	ns.multicastStream.BroadcastUpdateToGroup(n.GetUserId(), n)
+	notifUpdate := &datastreams_pb.NotificationUpdate{
+		Notification: n,
+	}
+	ns.multicastStream.BroadcastUpdateToGroup(n.GetUserId(), notifUpdate)
 	l.Infof("Sent notification to %d", n.GetUserId())
 }
 
