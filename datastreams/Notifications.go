@@ -43,7 +43,13 @@ func (ns *notificationsStream) SendNotification(n *models_pb.Notification) {
 	notifUpdate := &datastreams_pb.NotificationUpdate{
 		Notification: n,
 	}
-	ns.multicastStream.BroadcastUpdateToGroup(n.GetUserId(), notifUpdate)
+	// it's a broadcast. Send to everyone
+	if n.GetUserId() == 0 {
+		ns.multicastStream.MakeGlobalBroadcast(notifUpdate)
+	} else {
+		ns.multicastStream.BroadcastUpdateToGroup(n.GetUserId(), notifUpdate)
+	}
+
 	l.Infof("Sent notification to %d", n.GetUserId())
 }
 
