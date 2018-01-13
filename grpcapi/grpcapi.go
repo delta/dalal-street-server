@@ -44,7 +44,9 @@ func authFunc(ctx context.Context) (context.Context, error) {
 	if !ok {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Missing context metadata")
 	}
-	// handle bot related request specially
+	// handle bot related request specially - create a fake session, since we don't
+	// want bot requests to pollute the sessions database. The bots will make stateless
+	// requests
 	if len(md["bot_secret"]) == 1 {
 		if md["bot_secret"][0] == config.BotSecret && len(md["bot_user_id"]) == 1 {
 			sess, err := session.Fake()
@@ -53,7 +55,7 @@ func authFunc(ctx context.Context) (context.Context, error) {
 				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 			}
 
-			sess.Set("UserId", md["bot_user_id"][0])
+			sess.Set("userId", md["bot_user_id"][0])
 			ctx = context.WithValue(ctx, "session", sess)
 			return ctx, nil
 		}
@@ -80,6 +82,13 @@ func authFunc(ctx context.Context) (context.Context, error) {
 func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	switch req.(type) {
 	case *actions_pb.LoginRequest:
+		// if it is a bots request, don't create a new session, even for login requests
+		// bots requests always have a fake session. authFunc handles that.
+		md, ok := metadata.FromIncomingContext(ctx)
+		if ok && len(md["bot_secret"]) > 0 {
+			break
+		}
+
 		newSess, err := session.New()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Internal error occurred")
