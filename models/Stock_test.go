@@ -77,7 +77,21 @@ func Test_UpdateStockPrice(t *testing.T) {
 	}
 }
 func Test_GetStockHistory(t *testing.T) {
-
+	/*var stock = &Stock{Id: 1, CurrentPrice: 1000}
+	db, err := DbOpen()
+	if err != nil {
+		t.Fatalf("Opening data base for inserting stocks failed %v", err)
+	}
+	defer db.Close()
+	db.Save(stock)
+	defer func() {
+		db.Exec("DELETE FROM StockHistory")
+		db.Delete(stock)
+	}()
+	LoadStocks()
+	go startStockHistoryRecorder(time.Second * 1000)
+	testutils.Sleep(5000 * 60)
+	stopStockHistoryRecorder()*/
 }
 func Test_GetCompanyDetails(t *testing.T) {
 	var stock = &Stock{Id: 1, CurrentPrice: 1000}

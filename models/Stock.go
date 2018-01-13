@@ -3,7 +3,6 @@ package models
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 
@@ -30,6 +29,11 @@ type Stock struct {
 	AvgLastPrice     uint32 `gorm:"column:avgLastPrice;not null" json:"avg_last_price"`
 	CreatedAt        string `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt        string `gorm:"column:updatedAt;not null" json:"updated_at"`
+
+	// HACK: Getting last minute's hl from transactions used by stock history
+	open uint32 // Used to store Open for the last minute
+	high uint32 // Used to store High for the last minute
+	low  uint32 // Used to store Low for the last minute
 }
 
 func (Stock) TableName() string {
@@ -137,6 +141,12 @@ func UpdateStockPrice(stockId, price uint32) error {
 		stock.DayLow = price
 	}
 
+	if price > stock.high {
+		stock.high = price
+	} else if price < stock.low {
+		stock.low = price
+	}
+
 	if price > stock.AllTimeHigh {
 		stock.AllTimeHigh = price
 	} else if price < stock.AllTimeLow {
@@ -206,6 +216,7 @@ func LoadStocks() error {
 
 	return nil
 }
+
 func GetStockHistory(stockId uint32, interval Resolution) ([]*StockHistory, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":   "GetStockHistory",
@@ -228,7 +239,7 @@ func GetStockHistory(stockId uint32, interval Resolution) ([]*StockHistory, erro
 	var histories []*StockHistory
 
 	if interval != 0 {
-		if err := db.Where("interval =", interval).Order("id desc").Limit(TIMES_RESOLUTION).Find(histories).Error; err != nil {
+		if err := db.Where("interval_record =", interval).Order("id desc").Limit(TIMES_RESOLUTION).Find(histories).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -257,7 +268,7 @@ func GetCompanyDetails(stockId uint32) (*Stock, error) {
 	stock := *allStocks.m[stockId].stock
 
 	l.Infof("Successfully fetched company profile for stock id : %v", stockId)
-	return &stock /*, stockHistory*/, nil
+	return &stock, nil
 }
 
 func AddStocksToExchange(stockId, count uint32) error {
@@ -304,68 +315,4 @@ func AddStocksToExchange(stockId, count uint32) error {
 	l.Infof("Done")
 
 	return nil
-}
-
-var stopStockHistoryRecorderChan chan struct{}
-
-func stopStockHistoryRecorder() {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "stopStockHistoryRecorder",
-	})
-
-	l.Info("Stopping")
-
-	close(stopStockHistoryRecorderChan)
-
-	l.Info("Stopped")
-}
-
-func startStockHistoryRecorder(interval time.Duration) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "startStockHistoryRecorder",
-	})
-
-	l.Info("Starting")
-
-	tickerChan := time.NewTicker(interval).C
-	stopStockHistoryRecorderChan = make(chan struct{})
-
-loop:
-	for {
-		select {
-		case <-stopStockHistoryRecorderChan:
-			break loop
-		case <-tickerChan:
-			db, err := DbOpen()
-			if err != nil {
-				l.Error(err)
-				return
-			}
-			defer db.Close()
-
-			var prices = make(map[uint32]uint32)
-			allStocks.RLock()
-			for stockId := range allStocks.m {
-				allStocks.m[stockId].RLock()
-				prices[stockId] = allStocks.m[stockId].stock.CurrentPrice
-				allStocks.m[stockId].RUnlock()
-			}
-			allStocks.RUnlock()
-
-			currentTime := time.Now().UTC().Format(time.RFC3339)
-			for stkId, price := range prices {
-				stkHistoryPoint := &StockHistory{
-					StockId:    stkId,
-					StockPrice: price,
-					CreatedAt:  currentTime,
-				}
-				err := db.Save(stkHistoryPoint).Error
-				if err != nil {
-					l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
-				}
-			}
-
-			l.Info("Recorded history")
-		}
-	}
 }
