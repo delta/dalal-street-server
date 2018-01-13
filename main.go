@@ -60,7 +60,7 @@ func RealMain() {
 				if req.Method == http.MethodOptions && config.Stage != "Prod" {
 					resp.Header().Add("Access-Control-Allow-Origin", "*")
 					resp.Header().Add("Access-Control-Allow-Methods", "*")
-					resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web")
+					resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web,sessionid")
 					resp.Write([]byte("OK"))
 					return
 				}
