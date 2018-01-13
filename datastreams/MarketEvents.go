@@ -60,7 +60,7 @@ func (mes *marketEventsStream) AddListener(done <-chan struct{}, update chan int
 // RemoveListener removes a listener from the MyOrders stream
 func (mes *marketEventsStream) RemoveListener(sessionId string) {
 	var l = mes.logger.WithFields(logrus.Fields{
-		"method":          "AddListener",
+		"method":          "RemoveListener",
 		"param_sessionId": sessionId,
 	})
 
