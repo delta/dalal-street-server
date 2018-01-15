@@ -14,7 +14,7 @@ type StockHistory struct {
 	StockId    uint32 `gorm:"column:stockId;not null" json:"stock_id"`
 	StockPrice uint32 `gorm:"column:stockPrice;not null" json:"stock_price"`
 	CreatedAt  string `gorm:"column:createdAt;not null" json:"created_at"`
-	Interval   uint32 `gorm:"column:interval_record;not null" json:"interval"`
+	Interval   uint32 `gorm:"column:intervalRecord;not null" json:"interval"`
 	Open       uint32 `gorm:"column:open;not null" json:"open"`
 	High       uint32 `gorm:"high:close;not null" json:"high"`
 	Low        uint32 `gorm:"low:close;not null" json:"low"`
@@ -144,39 +144,46 @@ func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHi
 	})
 	modifiedRange := recordingTime.Add(time.Duration(N) * -time.Minute).UTC().Format(time.RFC3339)
 	var limitedRange int = len(retrievedHistories) - 1
-	for i := 0; i < len(retrievedHistories); i++ {
+	for i := len(retrievedHistories) - 1; i >= 0; i-- {
 		if retrievedHistories[i].CreatedAt > modifiedRange {
 			limitedRange = i
-			break
+			i = -1
 		}
 	}
 	ohlcRecord := &ohlc{
-		retrievedHistories[limitedRange].StockPrice,
-		retrievedHistories[limitedRange].StockPrice,
-		retrievedHistories[limitedRange].StockPrice,
+		retrievedHistories[limitedRange].Open,
+		retrievedHistories[limitedRange].Open,
+		retrievedHistories[limitedRange].Open,
 		retrievedHistories[0].StockPrice,
 	}
-	for i := limitedRange; i >= 0; i-- {
+	if retrievedHistories[limitedRange].Open < retrievedHistories[limitedRange].StockPrice {
+		ohlcRecord.high = retrievedHistories[limitedRange].StockPrice
+		ohlcRecord.low = retrievedHistories[limitedRange].Open
+	} else {
+		ohlcRecord.high = retrievedHistories[limitedRange].Open
+		ohlcRecord.low = retrievedHistories[limitedRange].StockPrice
+	}
+	for i := 0; i < limitedRange; i++ {
 		if ohlcRecord.high < retrievedHistories[i].StockPrice {
 			ohlcRecord.high = retrievedHistories[i].StockPrice
 		}
-		if ohlcRecord.low < retrievedHistories[i].StockPrice {
+		if ohlcRecord.low > retrievedHistories[i].StockPrice {
 			ohlcRecord.low = retrievedHistories[i].StockPrice
 		}
 	}
 	stkHistoryPoint := &StockHistory{
 		StockId:    stockId,
 		StockPrice: ohlcRecord.close,
-		Interval:   1,
+		Interval:   N,
 		CreatedAt:  recordingTime.UTC().Format(time.RFC3339), // TODO: Change to IST,
 		Open:       ohlcRecord.open,
 		High:       ohlcRecord.high,
 		Low:        ohlcRecord.low,
 	}
-	err := db.Save(stkHistoryPoint).Error
-	if err != nil {
-		l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
-		return err
+	err := db.Save(stkHistoryPoint)
+	if err.Error != nil {
+		l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err.Error)
+		return err.Error
 	}
 	return nil
 }
@@ -187,32 +194,32 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 	// 2. do the recording
 
 	// 1.a Find the max time range for which we need to retrieve the records
-	maxTimeRange := recordingTime     // max time range for which stock history records need to be retrieved
+	minReqdTime := recordingTime      // Minimum Time after which records need to be retrieved
 	currMin := recordingTime.Minute() // FIXME: In case of possible errors store Minute at start and keep incrementing it
 	if currMin%60 == 0 {
 		//Go through last 60 1 Minute recordings
-		maxTimeRange = maxTimeRange.Add(-60 * time.Minute)
+		minReqdTime = minReqdTime.Add(-60 * time.Minute)
 	} else if currMin%30 == 0 {
 		//Go through last 30 1 Minute recordings
-		maxTimeRange = maxTimeRange.Add(-30 * time.Minute)
+		minReqdTime = minReqdTime.Add(-30 * time.Minute)
 	} else if currMin%10 == 0 {
 		//Go through last 10 1 Minute recordings
-		maxTimeRange = maxTimeRange.Add(-10 * time.Minute)
+		minReqdTime = minReqdTime.Add(-10 * time.Minute)
 	} else if currMin%5 == 0 {
 		//Go through last 5 1 Minute recordings
-		maxTimeRange = maxTimeRange.Add(-5 * time.Minute)
+		minReqdTime = minReqdTime.Add(-5 * time.Minute)
 	} else {
 		return nil // no need to proceed furter
 	}
-	maxTimeRangeStr := maxTimeRange.UTC().Format(time.RFC3339)
+	maxTimeRangeStr := minReqdTime.UTC().Format(time.RFC3339)
 
 	// 2. now do the recording
 	allStocks.RLock()
 	for stockId := range allStocks.m {
 		var retrievedHistories []StockHistory
 
-		db = db.Where("interval_record = ? AND stock_id = ? AND created_at >= ?", 1, stockId, maxTimeRangeStr)
-		db.Order("id desc").Limit(60).Find(&retrievedHistories)
+		db = db.Where("intervalRecord = ? AND stockId = ? AND createdAt >= ?", 1, stockId, maxTimeRangeStr)
+		db.Order("createdAt desc").Limit(60).Find(&retrievedHistories)
 
 		if currMin%5 == 0 {
 			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 5, recordingTime); err != nil {
