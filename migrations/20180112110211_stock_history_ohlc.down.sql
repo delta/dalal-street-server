@@ -1,3 +1,3 @@
 ALTER TABLE StockHistory 
-	DROP interval_record,DROP high,DROP low,DROP open;
+	DROP intervalRecord,DROP high,DROP low,DROP open;
 

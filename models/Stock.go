@@ -207,6 +207,9 @@ func LoadStocks() error {
 	avgLastPrice.Lock()
 	for _, stock := range stocks {
 		allStocks.m[stock.Id] = &stockAndLock{stock: stock}
+		allStocks.m[stock.Id].stock.open = allStocks.m[stock.Id].stock.CurrentPrice
+		allStocks.m[stock.Id].stock.high = allStocks.m[stock.Id].stock.CurrentPrice
+		allStocks.m[stock.Id].stock.low = allStocks.m[stock.Id].stock.CurrentPrice
 		avgLastPrice.m[stock.Id] = stock.CurrentPrice
 	}
 	avgLastPrice.Unlock()
@@ -239,7 +242,7 @@ func GetStockHistory(stockId uint32, interval Resolution) ([]*StockHistory, erro
 	var histories []*StockHistory
 
 	if interval != 0 {
-		if err := db.Where("interval_record =", interval).Order("id desc").Limit(TIMES_RESOLUTION).Find(histories).Error; err != nil {
+		if err := db.Where("intervalRecord =", interval).Order("createdAt desc").Limit(TIMES_RESOLUTION).Find(histories).Error; err != nil {
 			return nil, err
 		}
 	}
