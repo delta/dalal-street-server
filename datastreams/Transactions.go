@@ -3,6 +3,7 @@ package datastreams
 import (
 	"github.com/Sirupsen/logrus"
 
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -38,7 +39,10 @@ func (os *transactionsStream) SendTransaction(t *models_pb.Transaction) {
 		"param_t":      t,
 	})
 
-	os.multicastStream.BroadcastUpdateToGroup(t.UserId, t)
+	tUpdate := &datastreams_pb.TransactionUpdate{
+		Transaction: t,
+	}
+	os.multicastStream.BroadcastUpdateToGroup(t.UserId, tUpdate)
 
 	l.Infof("Sent")
 }

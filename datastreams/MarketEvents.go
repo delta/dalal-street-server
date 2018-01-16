@@ -3,6 +3,7 @@ package datastreams
 import (
 	"github.com/Sirupsen/logrus"
 
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -37,7 +38,10 @@ func (mes *marketEventsStream) SendMarketEvent(me *models_pb.MarketEvent) {
 		"param_me": me,
 	})
 
-	mes.broadcastStream.BroadcastUpdate(me)
+	meUpdate := &datastreams_pb.MarketEventUpdate{
+		MarketEvent: me,
+	}
+	mes.broadcastStream.BroadcastUpdate(meUpdate)
 
 	l.Infof("Sent")
 }
