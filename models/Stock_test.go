@@ -69,30 +69,14 @@ func Test_UpdateStockPrice(t *testing.T) {
 		AllTimeHigh:      2000,
 		AllTimeLow:       1000,
 		UpOrDown:         true,
-		AvgLastPrice:     850,
+		AvgLastPrice:     1050,
 		PreviousDayClose: 1000,
 	}
 	if !testutils.AssertEqual(t, stock1, retrievedStock) {
 		t.Fatalf("Expected %v but got %v", stock1, retrievedStock)
 	}
 }
-func Test_GetStockHistory(t *testing.T) {
-	/*var stock = &Stock{Id: 1, CurrentPrice: 1000}
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Opening data base for inserting stocks failed %v", err)
-	}
-	defer db.Close()
-	db.Save(stock)
-	defer func() {
-		db.Exec("DELETE FROM StockHistory")
-		db.Delete(stock)
-	}()
-	LoadStocks()
-	go startStockHistoryRecorder(time.Second * 1000)
-	testutils.Sleep(5000 * 60)
-	stopStockHistoryRecorder()*/
-}
+
 func Test_GetCompanyDetails(t *testing.T) {
 	var stock = &Stock{Id: 1, CurrentPrice: 1000}
 	db, err := DbOpen()

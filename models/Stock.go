@@ -116,7 +116,7 @@ func GetAllStocks() map[uint32]*Stock {
 
 func UpdateStockPrice(stockId, price uint32) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "loadStocks",
+		"method": "UpdateStockPrice",
 	})
 
 	l.Infof("Attempting")
@@ -160,7 +160,9 @@ func UpdateStockPrice(stockId, price uint32) error {
 	}
 
 	avgLastPrice.Lock()
-	avgLastPrice.m[stock.Id] = avgLastPrice.m[stock.Id] - uint32((avgLastPrice.m[stock.Id]+stock.CurrentPrice)/20)
+	avgLastPrice.m[stock.Id] -= uint32((avgLastPrice.m[stock.Id] / 20))
+	avgLastPrice.m[stock.Id] += uint32((stock.CurrentPrice) / 20)
+	l.Infof("Average Price +%v", avgLastPrice.m[stock.Id])
 	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
 	avgLastPrice.Unlock()
 
@@ -205,49 +207,24 @@ func LoadStocks() error {
 
 	allStocks.Lock()
 	avgLastPrice.Lock()
+	allStocks.m = make(map[uint32]*stockAndLock)
+	avgLastPrice.m = make(map[uint32]uint32)
+
 	for _, stock := range stocks {
 		allStocks.m[stock.Id] = &stockAndLock{stock: stock}
+		// this is inaccurate but no one would care so much. so it's okay.
 		allStocks.m[stock.Id].stock.open = allStocks.m[stock.Id].stock.CurrentPrice
 		allStocks.m[stock.Id].stock.high = allStocks.m[stock.Id].stock.CurrentPrice
 		allStocks.m[stock.Id].stock.low = allStocks.m[stock.Id].stock.CurrentPrice
 		avgLastPrice.m[stock.Id] = stock.CurrentPrice
 	}
+
 	avgLastPrice.Unlock()
 	allStocks.Unlock()
 
 	l.Infof("Loaded %+v", allStocks)
 
 	return nil
-}
-
-func GetStockHistory(stockId uint32, interval Resolution) ([]*StockHistory, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":   "GetStockHistory",
-		"stockId":  stockId,
-		"interval": interval,
-	})
-
-	l.Infof("Attempting to get stock History for stockId : %v", stockId)
-
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
-
-	allStocks.m[stockId].RLock()
-	defer allStocks.m[stockId].RUnlock()
-
-	var histories []*StockHistory
-
-	if interval != 0 {
-		if err := db.Where("intervalRecord =", interval).Order("createdAt desc").Limit(TIMES_RESOLUTION).Find(histories).Error; err != nil {
-			return nil, err
-		}
-	}
-
-	return histories, nil
 }
 
 func GetCompanyDetails(stockId uint32) (*Stock, error) {
