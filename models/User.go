@@ -574,7 +574,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	l.Infof("Attempting")
 
 	// Place cap on order price only for limit orders
-	if ask.OrderType == Limit  {	
+	if ask.OrderType == Limit {
 		l.Debugf("Acquiring lock for ask order threshold check with stock id : %v ", ask.StockId)
 
 		allStocks.m[ask.StockId].RLock()
@@ -590,8 +590,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 			l.Debugf("Threshold price check failed for ask order")
 			return 0, AskLimitExceededError{}
 		}
-	} 
-
+	}
 
 	l.Debugf("Acquiring exclusive write on user")
 
@@ -665,7 +664,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Infof("PlaceBidOrder requested")
 
 	// Place cap on order price only for limit orders
-	if bid.OrderType == Limit {	
+	if bid.OrderType == Limit {
 		l.Debugf("Acquiring lock for bid order threshold check with stock id : %v ", bid.StockId)
 
 		allStocks.m[bid.StockId].RLock()
