@@ -37,9 +37,9 @@ func RealMain() {
 	datastreamsManager := datastreams.GetManager()
 	go datastreamsManager.GetStockExchangeStream().Run()
 	go datastreamsManager.GetStockPricesStream().Run()
-	go models.UpdateLeaderboardTicker()
 
 	models.Init(config, datastreamsManager)
+	go models.UpdateLeaderboardTicker()
 
 	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
 	grpcapi.Init(config, matchingEngine, datastreamsManager)
