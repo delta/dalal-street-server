@@ -179,10 +179,10 @@ func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHi
 		High:      ohlcRecord.high,
 		Low:       ohlcRecord.low,
 	}
-	err := db.Save(stkHistoryPoint)
-	if err.Error != nil {
-		l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err.Error)
-		return err.Error
+
+	if err := db.Save(stkHistoryPoint).Error; err != nil {
+		l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
+		return err
 	}
 	return nil
 }
@@ -214,6 +214,8 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 
 	// 2. now do the recording
 	allStocks.RLock()
+	defer allStocks.RUnlock()
+
 	for stockId := range allStocks.m {
 		var retrievedHistories []StockHistory
 
@@ -241,7 +243,7 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 			}
 		}
 	}
-	allStocks.RUnlock()
+
 	return nil
 }
 
