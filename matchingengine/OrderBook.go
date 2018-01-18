@@ -185,6 +185,7 @@ func (ob *orderBook) processOrder() {
 	)
 
 	askTop, bidTop, addBackOrders := ob.getTopMatchingOrders()
+	l.Debugf("Got %+v %+v", askTop, bidTop)
 
 	for bidTop != nil && askTop != nil {
 
@@ -200,7 +201,7 @@ func (ob *orderBook) processOrder() {
 		askDone, bidDone, tr = fillOrderFn(askTop, bidTop, stockTradePrice, stockTradeQty)
 
 		if tr != nil {
-			l.Infof("Trade made between ask_id %d and bid %d", askTop.Id, bidTop.Id)
+			//l.Infof("Trade made between ask_id %d and bid %d", askTop.Id, bidTop.Id)
 			// tr is always AskTransaction. So its StockQty < 0. Make it positive.
 			ob.depth.AddTrade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 
@@ -208,7 +209,7 @@ func (ob *orderBook) processOrder() {
 			ob.depth.CloseOrder(isMarket(bidTop.OrderType), false, bidTop.Price, uint32(-tr.StockQuantity))
 
 			// Trigger stop losses here
-			ob.triggerStopLosses(tr)
+			//ob.triggerStopLosses(tr)
 		}
 
 		if askDone {
