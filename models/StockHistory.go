@@ -143,6 +143,13 @@ func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHi
 	var l = logger.WithFields(logrus.Fields{
 		"method": "recordNMinuteOHLC",
 	})
+
+	// will happen in the starting, unless initial data is loaded
+	// this will cause the server to crash if not handled
+	if len(retrievedHistories) == 0 {
+		return nil
+	}
+
 	modifiedRange := recordingTime.Add(time.Duration(N) * -time.Minute).UTC().Format(time.RFC3339)
 	//modifiedRange represents the minimum allowed time greater than which records have to be taken into account
 	var limitedRange int = len(retrievedHistories) - 1
