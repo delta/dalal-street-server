@@ -2,8 +2,8 @@ package models
 
 import (
 	"testing"
-	"time"
 
+	"github.com/thakkarparth007/dalal-street-server/utils"
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
@@ -93,8 +93,8 @@ func Test_GetCompanyDetails(t *testing.T) {
 		StocksInMarket:   140,
 		PreviousDayClose: 1300,
 		UpOrDown:         true,
-		CreatedAt:        time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt:        time.Now().UTC().Format(time.RFC3339),
+		CreatedAt:        utils.GetCurrentTimeISO8601(),
+		UpdatedAt:        utils.GetCurrentTimeISO8601(),
 	}
 
 	db, err := DbOpen()
