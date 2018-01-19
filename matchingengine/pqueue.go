@@ -2,7 +2,6 @@ package matchingengine
 
 import (
 	"sync"
-	"time"
 
 	"github.com/thakkarparth007/dalal-street-server/models"
 )
@@ -47,7 +46,7 @@ type AskPQueue struct {
 type factors struct {
 	oType    models.OrderType
 	price    uint32
-	placedAt time.Time
+	placedAt string
 	quantity uint32
 }
 
@@ -239,7 +238,7 @@ func (pq *AskPQueue) size() int {
  */
 func bidComparator(order1, order2 factors) bool {
 	if isMarket(order1.oType) && isMarket(order2.oType) {
-		return order2.placedAt.Before(order1.placedAt)
+		return order2.placedAt < order1.placedAt
 	}
 	if isMarket(order1.oType) {
 		return false
@@ -263,7 +262,7 @@ func bidComparator(order1, order2 factors) bool {
  */
 func askComparator(order1, order2 factors) bool {
 	if isMarket(order1.oType) && isMarket(order2.oType) {
-		return order2.placedAt.Before(order1.placedAt)
+		return order2.placedAt < order1.placedAt
 	}
 	if isMarket(order1.oType) {
 		return false
@@ -278,39 +277,33 @@ func askComparator(order1, order2 factors) bool {
 }
 
 func (pq *BidPQueue) less(i, j int) bool {
-	placedAt1, _ := time.Parse(time.RFC3339, pq.items[i].value.CreatedAt)
-	placedAt2, _ := time.Parse(time.RFC3339, pq.items[j].value.CreatedAt)
-
 	return pq.comparator(
 		factors{
 			oType:    pq.items[i].value.OrderType,
 			price:    pq.items[i].price,
-			placedAt: placedAt1,
+			placedAt: pq.items[i].value.CreatedAt,
 			quantity: pq.items[i].quantity,
 		},
 		factors{
 			oType:    pq.items[j].value.OrderType,
 			price:    pq.items[j].price,
-			placedAt: placedAt2,
+			placedAt: pq.items[j].value.CreatedAt,
 			quantity: pq.items[j].quantity,
 		},
 	)
 }
 func (pq *AskPQueue) less(i, j int) bool {
-	placedAt1, _ := time.Parse(time.RFC3339, pq.items[i].value.CreatedAt)
-	placedAt2, _ := time.Parse(time.RFC3339, pq.items[j].value.CreatedAt)
-
 	return pq.comparator(
 		factors{
 			oType:    pq.items[i].value.OrderType,
 			price:    pq.items[i].price,
-			placedAt: placedAt1,
+			placedAt: pq.items[i].value.CreatedAt,
 			quantity: pq.items[i].quantity,
 		},
 		factors{
 			oType:    pq.items[j].value.OrderType,
 			price:    pq.items[j].price,
-			placedAt: placedAt2,
+			placedAt: pq.items[j].value.CreatedAt,
 			quantity: pq.items[j].quantity,
 		},
 	)

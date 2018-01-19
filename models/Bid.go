@@ -181,6 +181,9 @@ func createBid(bid *Bid) error {
 	}
 	defer db.Close()
 
+	bid.CreatedAt = utils.GetCurrentTimeISO8601()
+	bid.UpdatedAt = bid.CreatedAt
+
 	if err := db.Create(bid).Error; err != nil {
 		return err
 	}
@@ -204,7 +207,9 @@ func (bid *Bid) Close() error {
 		return err
 	}
 	defer db.Close()
+	
 	bid.IsClosed = true
+	bid.UpdatedAt = utils.GetCurrentTimeISO8601()
 
 	if err := db.Save(bid).Error; err != nil {
 		l.Error(err)

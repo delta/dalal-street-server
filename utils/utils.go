@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -41,4 +42,8 @@ func MinInt(a, b uint32) uint32 {
 
 func IsGrpcRequest(req *http.Request) bool {
 	return strings.Contains(req.Header.Get("Content-Type"), "application/grpc")
+}
+
+func GetCurrentTimeISO8601() string {
+	return time.Now().Format(time.RFC3339);
 }

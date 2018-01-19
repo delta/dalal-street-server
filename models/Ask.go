@@ -232,6 +232,9 @@ func createAsk(ask *Ask) error {
 	}
 	defer db.Close()
 
+	ask.CreatedAt = utils.GetCurrentTimeISO8601()
+	ask.UpdatedAt = ask.CreatedAt
+
 	if err := db.Create(ask).Error; err != nil {
 		return err
 	}
@@ -256,6 +259,7 @@ func (ask *Ask) Close() error {
 	}
 	defer db.Close()
 	ask.IsClosed = true
+	ask.UpdatedAt = utils.GetCurrentTimeISO8601()
 
 	if err := db.Save(ask).Error; err != nil {
 		l.Error(err)

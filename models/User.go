@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 
 	"github.com/Sirupsen/logrus"
 
@@ -133,7 +133,7 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 		Name:      pu.Name,
 		Cash:      STARTING_CASH,
 		Total:     STARTING_CASH,
-		CreatedAt: time.Now().String(),
+		CreatedAt: utils.GetCurrentTimeISO8601(),
 		IsHuman:   true,
 	}
 
@@ -172,7 +172,7 @@ func CreateBot(botName string) (*User, error) {
 		Name:      botName,
 		Cash:      STARTING_CASH,
 		Total:     STARTING_CASH,
-		CreatedAt: time.Now().String(),
+		CreatedAt: utils.GetCurrentTimeISO8601(),
 	}
 
 	err = db.Save(u).Error
@@ -852,7 +852,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		StockQuantity: int32(stockQuantityRemoved),
 		Price:         price,
 		Total:         -int32(price * stockQuantityRemoved),
-		CreatedAt:     time.Now().Format(time.RFC3339),
+		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
 
 	userCash := uint32(int32(user.Cash) + transaction.Total)
@@ -1042,7 +1042,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 			StockQuantity: stockQty,
 			Price:         price,
 			Total:         total,
-			CreatedAt:     time.Now().Format(time.RFC3339),
+			CreatedAt:     utils.GetCurrentTimeISO8601(),
 		}
 	}
 
@@ -1233,7 +1233,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		StockQuantity: stockQuantity,
 		Price:         0,
 		Total:         trTotal,
-		CreatedAt:     time.Now().Format(time.RFC3339),
+		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
 
 	// A lock on user and stock has been acquired.
