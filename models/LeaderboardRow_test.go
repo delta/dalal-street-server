@@ -2,9 +2,9 @@ package models
 
 import (
 	"testing"
-	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 	"github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
@@ -50,7 +50,7 @@ func Test_UpdateLeaderboard(t *testing.T) {
 			Name:      name,
 			Cash:      cash,
 			Total:     total,
-			CreatedAt: time.Now().Format(time.RFC3339),
+			CreatedAt: utils.GetCurrentTimeISO8601(),
 		}
 	}
 
@@ -67,8 +67,8 @@ func Test_UpdateLeaderboard(t *testing.T) {
 			AllTimeLow:       allLow,
 			StocksInExchange: stocks,
 			UpOrDown:         upOrDown,
-			CreatedAt:        time.Now().Format(time.RFC3339),
-			UpdatedAt:        time.Now().Format(time.RFC3339),
+			CreatedAt:        utils.GetCurrentTimeISO8601(),
+			UpdatedAt:        utils.GetCurrentTimeISO8601(),
 		}
 	}
 
