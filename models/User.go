@@ -648,12 +648,13 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 
 		myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
-			Id:         ask.Id,
-			IsAsk:      true,
-			IsNewOrder: true,
-			StockId:    ask.StockId,
-			OrderPrice: ask.Price,
-			OrderType:  ask.ToProto().OrderType,
+			Id:            ask.Id,
+			IsAsk:         true,
+			IsNewOrder:    true,
+			StockId:       ask.StockId,
+			OrderPrice:    ask.Price,
+			OrderType:     ask.ToProto().OrderType,
+			StockQuantity: ask.StockQuantity,
 		})
 
 		l.Infof("Sent through the datastreams")
@@ -745,12 +746,13 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 
 		myOrdersStream.SendOrder(bid.UserId, &datastreams_pb.MyOrderUpdate{
-			Id:         bid.Id,
-			IsAsk:      false,
-			IsNewOrder: true,
-			StockId:    bid.StockId,
-			OrderPrice: bid.Price,
-			OrderType:  bid.ToProto().OrderType,
+			Id:            bid.Id,
+			IsAsk:         false,
+			IsNewOrder:    true,
+			StockId:       bid.StockId,
+			OrderPrice:    bid.Price,
+			OrderType:     bid.ToProto().OrderType,
+			StockQuantity: bid.StockQuantity,
 		})
 
 		l.Infof("Sent through the datastreams")
