@@ -78,7 +78,9 @@ func GetManager() Manager {
 // GetMarketDepthStream returns a singleton instance MarketDepthStream for a given stockId
 func (dsm *dataStreamsManager) GetMarketDepthStream(stockId uint32) MarketDepthStream {
 	dsm.marketDepthsLock.Lock()
-	dsm.marketDepthsMap[stockId] = newMarketDepthStream(stockId)
+	if dsm.marketDepthsMap[stockId] == nil {
+		dsm.marketDepthsMap[stockId] = newMarketDepthStream(stockId)
+	}
 	dsm.marketDepthsLock.Unlock()
 
 	go dsm.marketDepthsMap[stockId].run()
