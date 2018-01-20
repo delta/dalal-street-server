@@ -12,7 +12,6 @@ import (
 
 // MarketDepthStream defines the interface for accessing a single stock's market depth
 type MarketDepthStream interface {
-	run()
 	AddListener(done <-chan struct{}, updates chan interface{}, sessionId string)
 	RemoveListener(sessionId string)
 

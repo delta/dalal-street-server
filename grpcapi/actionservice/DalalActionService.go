@@ -382,7 +382,7 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 			StockQuantity: req.StockQuantity,
 		}
 		orderId, err = models.PlaceAskOrder(userId, ask)
-		if err != nil {
+		if err == nil {
 			go d.matchingEngine.AddAskOrder(ask)
 		}
 	} else {
@@ -394,7 +394,7 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 			StockQuantity: req.StockQuantity,
 		}
 		orderId, err = models.PlaceBidOrder(userId, bid)
-		if err != nil {
+		if err == nil {
 			go d.matchingEngine.AddBidOrder(bid)
 		}
 	}
