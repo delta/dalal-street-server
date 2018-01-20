@@ -105,11 +105,11 @@ func (m *matchingEngine) loadOldOrders() {
 
 	//Load open ask orders into priority queue
 	for _, openAskOrder := range openAskOrders {
-		m.orderBooks[openAskOrder.StockId].AddAskOrder(openAskOrder)
+		m.orderBooks[openAskOrder.StockId].LoadOldAsk(openAskOrder)
 	}
 
 	//Load open bid orders into priority queue
 	for _, openBidOrder := range openBidOrders {
-		m.orderBooks[openBidOrder.StockId].AddBidOrder(openBidOrder)
+		m.orderBooks[openBidOrder.StockId].LoadOldBid(openBidOrder)
 	}
 }

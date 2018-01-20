@@ -17,6 +17,8 @@ var fillOrderFn FillOrder = models.PerformOrderFillTransaction
 
 // OrderBook stores the order book for a given stock
 type OrderBook interface {
+	LoadOldAsk(*models.Ask)
+	LoadOldBid(*models.Bid)
 	AddAskOrder(*models.Ask)
 	AddBidOrder(*models.Bid)
 	StartStockMatching()
@@ -51,6 +53,48 @@ func NewOrderBook(stockId uint32, mds datastreams.MarketDepthStream) OrderBook {
 		bidStoploss: NewBidPQueue(MINPQ), // They sell when price goes below a certain trigger price.
 		depth:       mds,
 	}
+}
+
+func (ob *orderBook) addAskToQueue(ask *models.Ask) {
+	l := ob.logger.WithFields(logrus.Fields{
+		"method": "addAskToQueue",
+	})
+
+	if ask.OrderType == models.StopLoss {
+		l.Debugf("Adding stopLoss with ask_id %d to the queue", ask.Id)
+		ob.askStoploss.Push(ask, ask.Price, ask.StockQuantity)
+		return
+	}
+
+	// If control reaches here, it's not a StopLoss order
+	askUnfulfilledQuantity := ask.StockQuantity - ask.StockQuantityFulfilled
+	ob.asks.Push(ask, ask.Price, askUnfulfilledQuantity)
+	ob.depth.AddOrder(isMarket(ask.OrderType), true, ask.Price, ask.StockQuantity)
+}
+
+func (ob *orderBook) addBidToQueue(bid *models.Bid) {
+	l := ob.logger.WithFields(logrus.Fields{
+		"method": "addBidToQueue",
+	})
+
+	if bid.OrderType == models.StopLoss {
+		l.Debugf("Adding stopLoss with bid_id %d to the queue", bid.Id)
+		ob.bidStoploss.Push(bid, bid.Price, bid.StockQuantity)
+		return
+	}
+
+	// If control reaches here, it's not a StopLoss order
+	bidUnfulfilledQuantity := bid.StockQuantity - bid.StockQuantityFulfilled
+	ob.bids.Push(bid, bid.Price, bidUnfulfilledQuantity)
+	ob.depth.AddOrder(isMarket(bid.OrderType), false, bid.Price, bid.StockQuantity)
+}
+
+func (ob *orderBook) LoadOldAsk(ask *models.Ask) {
+	ob.addAskToQueue(ask)
+}
+
+func (ob *orderBook) LoadOldBid(bid *models.Bid) {
+	ob.addBidToQueue(bid)
 }
 
 // AddAskOrder adds an ask order to the book. It will take care of adding stopLoss, or partially filled orders automatically
@@ -253,28 +297,10 @@ func (ob *orderBook) waitForOrder() {
 	select {
 	case askOrder := <-ob.askChan:
 		l.Debugf("Got ask %+v. Processing", askOrder)
-		if askOrder.OrderType == models.StopLoss {
-			l.Debugf("Adding stopLoss with ask_id %d to the list", askOrder.Id)
-			ob.askStoploss.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
-			break
-		}
-
-		// If control reaches here, it's not a StopLoss order
-		askUnfulfilledQuantity := askOrder.StockQuantity - askOrder.StockQuantityFulfilled
-		ob.asks.Push(askOrder, askOrder.Price, askUnfulfilledQuantity)
-		ob.depth.AddOrder(isMarket(askOrder.OrderType), true, askOrder.Price, askOrder.StockQuantity)
+		ob.addAskToQueue(askOrder)
 
 	case bidOrder := <-ob.bidChan:
 		l.Debugf("Got bid %+v. Processing", bidOrder)
-		if bidOrder.OrderType == models.StopLoss {
-			l.Debugf("Adding stopLoss with bid_id %d to the list", bidOrder.Id)
-			ob.bidStoploss.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
-			break
-		}
-
-		// If control reaches here, it's not a StopLoss order
-		bidUnfulfilledQuantity := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
-		ob.bids.Push(bidOrder, bidOrder.Price, bidUnfulfilledQuantity)
-		ob.depth.AddOrder(isMarket(bidOrder.OrderType), true, bidOrder.Price, bidOrder.StockQuantity)
+		ob.addBidToQueue(bidOrder)
 	}
 }

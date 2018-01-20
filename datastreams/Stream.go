@@ -80,7 +80,6 @@ func (dsm *dataStreamsManager) GetMarketDepthStream(stockId uint32) MarketDepthS
 	dsm.marketDepthsLock.Lock()
 	if dsm.marketDepthsMap[stockId] == nil {
 		dsm.marketDepthsMap[stockId] = newMarketDepthStream(stockId)
-		go dsm.marketDepthsMap[stockId].run()
 	}
 	stream := dsm.marketDepthsMap[stockId]
 	dsm.marketDepthsLock.Unlock()
