@@ -60,6 +60,7 @@ func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer 
 		datastreams_pb.DataStreamType_STOCK_EXCHANGE,
 		datastreams_pb.DataStreamType_STOCK_PRICES,
 		datastreams_pb.DataStreamType_TRANSACTIONS,
+		datastreams_pb.DataStreamType_STOCK_HISTORY,
 	}
 
 	for _, t := range types {
@@ -149,6 +150,46 @@ func (d *dalalStreamService) getSubscription(req *datastreams_pb.SubscriptionId,
 	}
 
 	return subscription, nil
+}
+
+func (d *dalalStreamService) GetStockHistoryUpdates(req *datastreams_pb.SubscriptionId, stream pb.DalalStreamService_GetStockHistoryUpdatesServer) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetStockHistoryUpdates",
+		"param_session": fmt.Sprintf("%+v", stream.Context().Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("GetStockHistoryUpdates requested")
+
+	subscription, err := d.getSubscription(req, datastreams_pb.DataStreamType_MARKET_DEPTH)
+	if err != nil {
+		return err
+	}
+
+	subscribeReq := subscription.subscribeReq
+	done := subscription.doneChan
+	updates := make(chan interface{})
+
+	stockId, _ := strconv.ParseUint(subscribeReq.DataStreamId, 10, 32)
+
+	depthStream := d.datastreamsManager.GetStockHistoryStream(uint32(stockId))
+	depthStream.AddListener(done, updates, req.Id)
+
+loop:
+	for {
+		select {
+		case <-done:
+			break loop
+		case update := <-updates:
+			err := stream.Send(update.(*datastreams_pb.StockHistoryUpdate))
+			if err != nil {
+				// log the error
+				break
+			}
+		}
+	}
+	l.Infof("Request completed successfully")
+
+	return nil
 }
 
 func (d *dalalStreamService) GetMarketDepthUpdates(req *datastreams_pb.SubscriptionId, stream pb.DalalStreamService_GetMarketDepthUpdatesServer) error {
