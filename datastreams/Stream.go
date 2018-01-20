@@ -31,6 +31,7 @@ type Manager interface {
 	GetStockExchangeStream() StockExchangeStream
 	GetStockPricesStream() StockPricesStream
 	GetTransactionsStream() TransactionsStream
+	GetStockHistoryStream(stockId uint32) StockHistoryStream
 }
 
 // dataStreamsManager implements the Manager interface
@@ -40,6 +41,10 @@ type dataStreamsManager struct {
 	// market depth streams
 	marketDepthsLock sync.RWMutex
 	marketDepthsMap  map[uint32]MarketDepthStream
+
+	// stock history streams
+	stockHistoryLock      sync.RWMutex
+	stockHistoryStreamMap map[uint32]StockHistoryStream
 
 	// market events stream
 	marketEventsStreamInstance MarketEventsStream
@@ -66,6 +71,7 @@ func GetManager() Manager {
 		}),
 
 		marketDepthsMap:             make(map[uint32]MarketDepthStream),
+		stockHistoryStreamMap:       make(map[uint32]StockHistoryStream),
 		marketEventsStreamInstance:  newMarketEventsStream(),
 		myOrdersStreamInstance:      newMyOrdersStream(),
 		notificationsStreamInstance: newNotificationsStream(),
@@ -78,18 +84,30 @@ func GetManager() Manager {
 // GetMarketDepthStream returns a singleton instance MarketDepthStream for a given stockId
 func (dsm *dataStreamsManager) GetMarketDepthStream(stockId uint32) MarketDepthStream {
 	dsm.marketDepthsLock.Lock()
-	if dsm.marketDepthsMap[stockId] == nil {
+	defer dsm.marketDepthsLock.Unlock()
+
+	_, ok := dsm.marketDepthsMap[stockId]
+	if !ok {
 		dsm.marketDepthsMap[stockId] = newMarketDepthStream(stockId)
 	}
-	stream := dsm.marketDepthsMap[stockId]
-	dsm.marketDepthsLock.Unlock()
-
-	return stream
+	return dsm.marketDepthsMap[stockId]
 }
 
 // GetMarketEventsStream returns a singleton instance of MarketEvents stream
 func (dsm *dataStreamsManager) GetMarketEventsStream() MarketEventsStream {
 	return dsm.marketEventsStreamInstance
+}
+
+// GetStockHistoryStream returns a singleton instance StockHistoryStream for a given stockId
+func (dsm *dataStreamsManager) GetStockHistoryStream(stockId uint32) StockHistoryStream {
+	dsm.stockHistoryLock.Lock()
+	defer dsm.stockHistoryLock.Unlock()
+
+	_, ok := dsm.stockHistoryStreamMap[stockId]
+	if !ok {
+		dsm.stockHistoryStreamMap[stockId] = newStockHistoryStream(stockId)
+	}
+	return dsm.stockHistoryStreamMap[stockId]
 }
 
 // GetMyOrdersStream returns a singleton instance of MyOrders stream

@@ -89,6 +89,12 @@ func stopStockHistoryRecorder() {
 	l.Info("Stopped")
 }
 
+func stockHistoryStreamUpdate(stockId uint32, stockHistory *StockHistory) {
+	stockStream := datastreamsManager.GetStockHistoryStream(stockId)
+	pbStockHistory := stockHistory.ToProto()
+	stockStream.SendStockHistoryUpdate(stockId, pbStockHistory)
+}
+
 // recordOneMinuteOHLC records one minute ohlc for each stock
 func recordOneMinuteOHLC(db *gorm.DB, recordingTime time.Time) error {
 	var l = logger.WithFields(logrus.Fields{
@@ -132,6 +138,7 @@ func recordOneMinuteOHLC(db *gorm.DB, recordingTime time.Time) error {
 			l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
 			return err
 		}
+		stockHistoryStreamUpdate(stockId, stkHistoryPoint)
 	}
 
 	l.Debugf("Recorded")
@@ -191,6 +198,8 @@ func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHi
 		l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
 		return err
 	}
+	stockHistoryStreamUpdate(stockId, stkHistoryPoint)
+
 	return nil
 }
 
