@@ -16,8 +16,9 @@ type StockHistory struct {
 	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
 	Interval  uint32 `gorm:"column:intervalRecord;not null" json:"interval"`
 	Open      uint32 `gorm:"column:open;not null" json:"open"`
-	High      uint32 `gorm:"high:close;not null" json:"high"`
-	Low       uint32 `gorm:"low:close;not null" json:"low"`
+	High      uint32 `gorm:"column:high;not null" json:"high"`
+	Low       uint32 `gorm:"column:low;not null" json:"low"`
+	Volume    uint32 `gorm:"column:volume;not null" json:"volume"`
 }
 
 func (StockHistory) TableName() string {
@@ -33,6 +34,7 @@ func (gStockHistory *StockHistory) ToProto() *models_pb.StockHistory {
 		Open:      gStockHistory.Open,
 		High:      gStockHistory.High,
 		Low:       gStockHistory.Low,
+		Volume:    gStockHistory.Volume,
 	}
 }
 
@@ -68,11 +70,12 @@ func ResolutionFromProto(s actions_pb.StockHistoryResolution) Resolution {
 }
 
 // ohlc represents ohlc for a given stock
-type ohlc struct {
-	open  uint32
-	high  uint32
-	low   uint32
-	close uint32
+type ohlcv struct {
+	open   uint32
+	high   uint32
+	low    uint32
+	close  uint32
+	volume uint32
 }
 
 var stopStockHistoryRecorderChan chan struct{}
@@ -110,28 +113,31 @@ func recordOneMinuteOHLC(db *gorm.DB, recordingTime time.Time) error {
 	for stockId := range allStocks.m {
 		allStocks.m[stockId].Lock()
 
-		currentMinuteOHLC := &ohlc{
+		currentMinuteOHLCV := &ohlcv{
 			allStocks.m[stockId].stock.open,
 			allStocks.m[stockId].stock.high,
 			allStocks.m[stockId].stock.low,
 			allStocks.m[stockId].stock.CurrentPrice,
+			allStocks.m[stockId].stock.volume,
 		}
 
 		// Reset Open to previous Close
 		// Set High,Low to Closing Price
-		allStocks.m[stockId].stock.open = currentMinuteOHLC.close
-		allStocks.m[stockId].stock.high = currentMinuteOHLC.close
-		allStocks.m[stockId].stock.low = currentMinuteOHLC.close
+		allStocks.m[stockId].stock.open = currentMinuteOHLCV.close
+		allStocks.m[stockId].stock.high = currentMinuteOHLCV.close
+		allStocks.m[stockId].stock.low = currentMinuteOHLCV.close
+		allStocks.m[stockId].stock.volume = 0
 		allStocks.m[stockId].Unlock()
 
 		stkHistoryPoint := &StockHistory{
 			StockId:   stockId,
-			Close:     currentMinuteOHLC.close,
+			Close:     currentMinuteOHLCV.close,
 			Interval:  1,
 			CreatedAt: recordingTime.UTC().Format(time.RFC3339), // TODO: Change to IST,
-			Open:      currentMinuteOHLC.open,
-			High:      currentMinuteOHLC.high,
-			Low:       currentMinuteOHLC.low,
+			Open:      currentMinuteOHLCV.open,
+			High:      currentMinuteOHLCV.high,
+			Low:       currentMinuteOHLCV.low,
+			Volume:    currentMinuteOHLCV.volume,
 		}
 		err := db.Save(stkHistoryPoint).Error
 		if err != nil {
@@ -168,30 +174,33 @@ func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHi
 		}
 	}
 	//Initialize open to open of chronologically first open within range and close to close of the chronologically last history
-	ohlcRecord := &ohlc{
+	ohlcvRecord := &ohlcv{
 		retrievedHistories[limitedRange].Open,
 		retrievedHistories[limitedRange].Open,
 		retrievedHistories[limitedRange].Open,
 		retrievedHistories[0].Close,
+		0,
 	}
 	// Iterate and find max of all max and min of all min
 	for i := 0; i <= limitedRange; i++ {
-		if ohlcRecord.high < retrievedHistories[i].High {
-			ohlcRecord.high = retrievedHistories[i].High
+		if ohlcvRecord.high < retrievedHistories[i].High {
+			ohlcvRecord.high = retrievedHistories[i].High
 		}
-		if ohlcRecord.low > retrievedHistories[i].Low {
-			ohlcRecord.low = retrievedHistories[i].Low
+		if ohlcvRecord.low > retrievedHistories[i].Low {
+			ohlcvRecord.low = retrievedHistories[i].Low
 		}
+		ohlcvRecord.volume += retrievedHistories[i].Volume
 	}
 	// Save it
 	stkHistoryPoint := &StockHistory{
 		StockId:   stockId,
-		Close:     ohlcRecord.close,
+		Close:     ohlcvRecord.close,
 		Interval:  N,
 		CreatedAt: recordingTime.UTC().Format(time.RFC3339), // TODO: Change to IST,
-		Open:      ohlcRecord.open,
-		High:      ohlcRecord.high,
-		Low:       ohlcRecord.low,
+		Open:      ohlcvRecord.open,
+		High:      ohlcvRecord.high,
+		Low:       ohlcvRecord.low,
+		Volume:    ohlcvRecord.volume,
 	}
 
 	if err := db.Save(stkHistoryPoint).Error; err != nil {

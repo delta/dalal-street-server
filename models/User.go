@@ -1168,6 +1168,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 
 	go updateDataStreams(askTransaction, bidTransaction)
 
+	UpdateStockVolume(ask.StockId, stockTradeQty)
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
 	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
