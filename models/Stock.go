@@ -31,9 +31,10 @@ type Stock struct {
 	UpdatedAt        string `gorm:"column:updatedAt;not null" json:"updated_at"`
 
 	// HACK: Getting last minute's hl from transactions used by stock history
-	open uint32 // Used to store Open for the last minute
-	high uint32 // Used to store High for the last minute
-	low  uint32 // Used to store Low for the last minute
+	open   uint32 // Used to store Open for the last minute
+	high   uint32 // Used to store High for the last minute
+	low    uint32 // Used to store Low for the last minute
+	volume uint32 //Used to store trade volume for the last minute
 }
 
 func (Stock) TableName() string {
@@ -184,6 +185,11 @@ func UpdateStockPrice(stockId, price uint32) error {
 	l.Infof("Done")
 
 	return nil
+}
+func UpdateStockVolume(stockId uint32, volume uint32) {
+	allStocks.Lock()
+	allStocks.m[stockId].stock.volume += volume
+	allStocks.Unlock()
 }
 
 func LoadStocks() error {
