@@ -160,7 +160,7 @@ func (d *dalalStreamService) GetStockHistoryUpdates(req *datastreams_pb.Subscrip
 	})
 	l.Infof("GetStockHistoryUpdates requested")
 
-	subscription, err := d.getSubscription(req, datastreams_pb.DataStreamType_MARKET_DEPTH)
+	subscription, err := d.getSubscription(req, datastreams_pb.DataStreamType_STOCK_HISTORY)
 	if err != nil {
 		return err
 	}
