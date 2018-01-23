@@ -2,6 +2,7 @@ package datastreams
 
 import (
 	"github.com/Sirupsen/logrus"
+	datastreams_pb "github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	models_pb "github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -15,9 +16,9 @@ type StockHistoryStream interface {
 
 // stockHistoryStream implements the StockHistory interface
 type stockHistoryStream struct {
-	logger            *logrus.Entry
-	broadcastStream   BroadcastStream
-	stockId           uint32
+	logger          *logrus.Entry
+	broadcastStream BroadcastStream
+	stockId         uint32
 }
 
 // newStockHistoryStream returns a new instance of StockHistoryStream
@@ -67,6 +68,9 @@ func (shs *stockHistoryStream) SendStockHistoryUpdate(stockId uint32, history *m
 	})
 
 	l.Infof("Sending History Broadcast")
+	update := &datastreams_pb.StockHistoryUpdate{
+		StockHistory: history,
+	}
 
-	shs.broadcastStream.BroadcastUpdate(history)
+	shs.broadcastStream.BroadcastUpdate(update)
 }
