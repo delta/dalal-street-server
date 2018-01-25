@@ -42,13 +42,13 @@ func (gStockHistory *StockHistory) ToProto() *models_pb.StockHistory {
 type Resolution uint32
 
 const (
-	OneMinute     Resolution = 1   // Range will be 60*Resolution
-	FiveMinutes   Resolution = 5   // Range will be 60*Resolution
-	TenMinutes    Resolution = 10  // Range will be 60*Resolution
-	ThirtyMinutes Resolution = 30  // Range will be 60*Resolution
-	SixtyMinutes  Resolution = 60  // Range will be 60*Resolution
-	OneDay        Resolution = 0   // Range will be 60*Resolution
-	Other         Resolution = 123 //For individual transaction entries if reqd
+	OneMinute      Resolution = 1   // Range will be 60*Resolution
+	FiveMinutes    Resolution = 5   // Range will be 60*Resolution
+	FifteenMinutes Resolution = 15  // Range will be 60*Resolution
+	ThirtyMinutes  Resolution = 30  // Range will be 60*Resolution
+	SixtyMinutes   Resolution = 60  // Range will be 60*Resolution
+	OneDay         Resolution = 0   // Range will be 60*Resolution
+	Other          Resolution = 123 //For individual transaction entries if reqd
 )
 
 // ResolutionFromProto converts proto StockHistoryResolution to a model's Resolution value
@@ -57,8 +57,8 @@ func ResolutionFromProto(s actions_pb.StockHistoryResolution) Resolution {
 		return OneMinute
 	} else if s == actions_pb.StockHistoryResolution_FiveMinutes {
 		return FiveMinutes
-	} else if s == actions_pb.StockHistoryResolution_TenMinutes {
-		return TenMinutes
+	} else if s == actions_pb.StockHistoryResolution_FifteenMinutes {
+		return FifteenMinutes
 	} else if s == actions_pb.StockHistoryResolution_ThirtyMinutes {
 		return ThirtyMinutes
 	} else if s == actions_pb.StockHistoryResolution_SixtyMinutes {
@@ -152,7 +152,7 @@ func recordOneMinuteOHLC(db *gorm.DB, recordingTime time.Time) error {
 	return nil
 }
 
-func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHistory, N uint32, recordingTime time.Time) error {
+func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHistory, N Resolution, recordingTime time.Time) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "recordNMinuteOHLC",
 	})
@@ -195,7 +195,7 @@ func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHi
 	stkHistoryPoint := &StockHistory{
 		StockId:   stockId,
 		Close:     ohlcvRecord.close,
-		Interval:  N,
+		Interval:  uint32(N),
 		CreatedAt: recordingTime.UTC().Format(time.RFC3339), // TODO: Change to IST,
 		Open:      ohlcvRecord.open,
 		High:      ohlcvRecord.high,
@@ -226,9 +226,9 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 	} else if currMin%30 == 0 {
 		//Go through last 30 1 Minute recordings
 		minReqdTime = minReqdTime.Add(-30 * time.Minute)
-	} else if currMin%10 == 0 {
-		//Go through last 10 1 Minute recordings
-		minReqdTime = minReqdTime.Add(-10 * time.Minute)
+	} else if currMin%15 == 0 {
+		//Go through last 15 1 Minute recordings
+		minReqdTime = minReqdTime.Add(-15 * time.Minute)
 	} else if currMin%5 == 0 {
 		//Go through last 5 1 Minute recordings
 		minReqdTime = minReqdTime.Add(-5 * time.Minute)
@@ -253,7 +253,7 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 			}
 		}
 		if currMin%10 == 0 {
-			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 10, recordingTime); err != nil {
+			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 15, recordingTime); err != nil {
 				return err
 			}
 		}
