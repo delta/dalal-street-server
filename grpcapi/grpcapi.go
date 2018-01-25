@@ -3,6 +3,7 @@ package grpcapi
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -13,7 +14,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -105,6 +105,24 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 	return handler(newCtx, req)
 }
 
+func streamAuthInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+	// no login for StockPrices
+	if strings.Contains(info.FullMethod, "StockPrices") {
+		return handler(srv, stream)
+	} else if strings.Contains(info.FullMethod, "MarketEvents") {
+		return handler(srv, stream)
+	}
+
+	newCtx, err := authFunc(stream.Context())
+	if err != nil {
+		return err
+	}
+
+	wrapped := grpc_middleware.WrapServerStream(stream)
+	wrapped.WrappedContext = newCtx
+	return handler(srv, wrapped)
+}
+
 // Init configures and initalizes the grpcapi package
 func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm datastreams.Manager) {
 	config = conf
@@ -120,7 +138,7 @@ func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm 
 	grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
-			grpc_auth.StreamServerInterceptor(authFunc), // all routes require authentication
+			streamAuthInterceptor, // all streams expect StockPrices, MarketEvents require authentication
 			grpc_recovery.StreamServerInterceptor(),
 		)),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
