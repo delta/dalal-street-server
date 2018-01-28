@@ -88,12 +88,20 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		if ok && len(md["bot_secret"]) > 0 {
 			break
 		}
-
-		newSess, err := session.New()
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Internal error occurred")
+		if len(md["sessionid"]) == 0 {
+			newSess, err := session.New()
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "Internal error occurred")
+			}
+			ctx = context.WithValue(ctx, "session", newSess)
+		} else {
+			//This block handles the case where a user is already logged in and holds a non-expired session
+			oldSess, err := session.Load(md["sessionid"][0])
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "Internal error occurred")
+			}
+			ctx = context.WithValue(ctx, "session", oldSess)
 		}
-		ctx = context.WithValue(ctx, "session", newSess)
 		return handler(ctx, req)
 	}
 
