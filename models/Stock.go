@@ -167,12 +167,7 @@ func UpdateStockPrice(stockId, price uint32) error {
 	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
 	avgLastPrice.Unlock()
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	if err := db.Save(stock).Error; err != nil {
 		*stock = oldStockCopy
@@ -199,12 +194,7 @@ func LoadStocks() error {
 
 	l.Infof("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var stocks []*Stock
 	if err := db.Find(&stocks).Error; err != nil {
@@ -241,13 +231,6 @@ func GetCompanyDetails(stockId uint32) (*Stock, error) {
 
 	l.Infof("Attempting to get company profile for stockId : %v", stockId)
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
-
 	allStocks.m[stockId].RLock()
 	defer allStocks.m[stockId].RUnlock()
 
@@ -279,12 +262,7 @@ func AddStocksToExchange(stockId, count uint32) error {
 
 	stock.StocksInExchange += count
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	if err := db.Save(stock).Error; err != nil {
 		stock.StocksInExchange -= count

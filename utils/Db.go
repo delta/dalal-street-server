@@ -8,20 +8,32 @@ import (
 )
 
 var dbConfig *Config
+var db *gorm.DB
 
-// DbOpen returns a database connection object by opening one based
+// GetDB returns a database connection object by opening one based
 // on the configuration
-func DbOpen() (*gorm.DB, error) {
+func GetDB() *gorm.DB {
+	return db
+}
+
+func CloseDB() error {
+	return db.Close()
+}
+
+func initDbHelper(config *Config) {
+	fmt.Printf("initDbHelper called!")
+	dbConfig = config
+
 	user := dbConfig.DbUser
 	pwd := dbConfig.DbPassword
 	host := dbConfig.DbHost
 	dbname := dbConfig.DbName
 
 	connstr := fmt.Sprintf("%s:%s@%s/%s?charset=utf8&parseTime=true", user, pwd, host, dbname)
-	return gorm.Open("mysql", connstr)
-}
 
-func initDbHelper(config *Config) {
-	fmt.Printf("initDbHelper called!")
-	dbConfig = config
+	var err error
+	db, err = gorm.Open("mysql", connstr)
+	if err != nil {
+		panic(fmt.Errorf("Error opening DB. Got error: %+v", err))
+	}
 }

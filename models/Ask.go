@@ -134,15 +134,11 @@ func getAsk(id uint32) (*Ask, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading ask from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
 
 	asksMap.m[id] = &Ask{}
 	ask = asksMap.m[id]
+
+	db := getDB()
 	db.First(ask, id)
 
 	if ask == nil {
@@ -187,12 +183,7 @@ func getAskCopy(id uint32) (chan struct{}, *Ask, error) {
 
 	/* Otherwise load from database * /
 	l.Debugf("Loading ask from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	askLocks.Lock()
 	db.First(a.ask, id)
@@ -225,16 +216,10 @@ func createAsk(ask *Ask) error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
-
 	ask.CreatedAt = utils.GetCurrentTimeISO8601()
 	ask.UpdatedAt = ask.CreatedAt
 
+	db := getDB()
 	if err := db.Create(ask).Error; err != nil {
 		return err
 	}
@@ -252,15 +237,10 @@ func (ask *Ask) Close() error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
 	ask.IsClosed = true
 	ask.UpdatedAt = utils.GetCurrentTimeISO8601()
 
+	db := getDB()
 	if err := db.Save(ask).Error; err != nil {
 		l.Error(err)
 		return err
@@ -277,11 +257,7 @@ func GetMyOpenAsks(userId uint32) ([]*Ask, error) {
 
 	l.Infof("Attempting to get open ask orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myOpenAsks []*Ask
 
@@ -303,11 +279,7 @@ func GetMyClosedAsks(userId, lastId, count uint32) (bool, []*Ask, error) {
 
 	l.Infof("Attempting to get closed ask orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myClosedAsks []*Ask
 

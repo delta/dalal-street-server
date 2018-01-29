@@ -82,12 +82,7 @@ func Login(email, password string) (User, error) {
 
 	l.Debugf("Trying to get user from database. UserId: %d, Name: %s", pu.Id, pu.Name)
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return User{}, InternalError
-	}
-	defer db.Close()
+	db := getDB()
 
 	u := &User{}
 	if result := db.First(u, pu.Id); result.Error != nil {
@@ -120,12 +115,7 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 
 	l.Infof("Creating user")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	u := &User{
 		Id:        pu.Id,
@@ -137,7 +127,7 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 		IsHuman:   true,
 	}
 
-	err = db.Save(u).Error
+	err := db.Save(u).Error
 
 	if err != nil {
 		l.Errorf("Failed: %+v", err)
@@ -160,12 +150,7 @@ func CreateBot(botName string) (*User, error) {
 
 	l.Infof("Creating user")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	u := &User{
 		Email:     botName + "@bot",
@@ -175,7 +160,7 @@ func CreateBot(botName string) (*User, error) {
 		CreatedAt: utils.GetCurrentTimeISO8601(),
 	}
 
-	err = db.Save(u).Error
+	err := db.Save(u).Error
 
 	if err != nil {
 		l.Errorf("Failed: %+v", err)
@@ -281,12 +266,7 @@ func getSingleStockCount(u *User, stockId uint32) (int32, error) {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return 0, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var stockCount = struct{ Sc int32 }{0}
 	sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=?"
@@ -406,14 +386,7 @@ func getUserExclusively(id uint32) (chan struct{}, *User, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading user from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		userLocks.Unlock()
-		l.Debugf("Unlocked userLocks map")
-		return nil, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	userLocks.m[id] = u
 	db = db.First(u.user, id)
@@ -524,14 +497,7 @@ func GetUserCopy(id uint32) (User, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading user from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		userLocks.Unlock()
-		l.Debugf("Unlocked userLocks map")
-		return User{}, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	userLocks.m[id] = u
 	db = db.First(u.user, id)
@@ -894,12 +860,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	stock.StocksInMarket += stockQuantityRemoved
 
 	/* Committing to database */
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	tx := db.Begin()
 
@@ -1102,12 +1063,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	bidIsClosed := (bid.StockQuantity == bidStockQuantityFulfilled)
 
 	//Committing to database
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return false, false, nil
-	}
-	defer db.Close()
+	db := getDB()
 
 	//Begin transaction
 	tx := db.Begin()
@@ -1213,12 +1169,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		rate = MORTGAGE_RETRIEVE_RATE
 		l.Debugf("stockQuantity positive. Retrieving stocks from mortgage @ %d%%", rate)
 
-		db, err := DbOpen()
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-		defer db.Close()
+		db := getDB()
 
 		stockCount := struct{ Sc int32 }{0}
 		sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=? and Type=?"
@@ -1277,12 +1228,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	userCash := uint32(int32(user.Cash) + trTotal)
 
 	/* Committing to database */
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	tx := db.Begin()
 
@@ -1368,12 +1314,7 @@ func PerformDividendTransaction(stockId, dividendPercent uint32) (err error) {
 	user.Cash = uint32(int32(user.Cash) + transaction.Total)
 
 	/* Committing to database * /
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err, 0, 0
-	}
-	defer db.Close()
+	db := getDB()
 
 	tx := db.Begin()
 
@@ -1430,12 +1371,7 @@ func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 		l.Debugf("Released lock on user")
 	}()
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, InternalError
-	}
-	defer db.Close()
+	db := getDB()
 
 	sql := "Select stockId, sum(stockQuantity) as stockQuantity from Transactions where userId=? group by stockId"
 	rows, err := db.Raw(sql, userId).Rows()

@@ -57,10 +57,7 @@ func Test_GetMyOpenAsks(t *testing.T) {
 		makeAsk(3, 2, true),
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 
 	defer func() {
 		for _, ask := range asks {
@@ -70,7 +67,6 @@ func Test_GetMyOpenAsks(t *testing.T) {
 			db.Delete(stock)
 		}
 		db.Delete(user)
-		db.Close()
 	}()
 
 	if err := db.Create(user).Error; err != nil {
@@ -137,10 +133,7 @@ func Test_GetMyClosedAsks(t *testing.T) {
 		makeAsk(3, 2, true),
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 
 	defer func() {
 		for _, ask := range asks {
@@ -150,7 +143,6 @@ func Test_GetMyClosedAsks(t *testing.T) {
 			db.Delete(stock)
 		}
 		db.Delete(user)
-		db.Close()
 	}()
 
 	if err := db.Create(user).Error; err != nil {

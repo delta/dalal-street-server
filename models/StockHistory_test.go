@@ -33,11 +33,7 @@ func Test_RecordNMinuteOHLCs(t *testing.T) {
 	//Manipulate faked time such that it starts at the minute after a %5
 	fakeTime = fakeTime.Add((-time.Duration(fakeTime.Minute()%5) + 1) * time.Minute)
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Error:Opening Database for inserting Stocks,Record failed +%v", err)
-	}
-	defer db.Close()
+	db := getDB()
 
 	stock := &Stock{
 		Id:           1,
@@ -78,10 +74,6 @@ func Test_RecordNMinuteOHLCs(t *testing.T) {
 		}
 	}
 
-	if err != nil {
-		t.Fatalf("Recording one minute interval failed with the error +%v", err)
-	}
-
 	//Get recordings with interval 5 of stockId 1
 	var retrievedHistory []*StockHistory
 	db.Where("stockId = 1 AND intervalRecord = ?", 5).Find(&retrievedHistory)
@@ -118,11 +110,7 @@ func Test_VolumeRecording(t *testing.T) {
 			Total:         total,
 		}
 	}
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Error:Opening Database for inserting Stocks,Record failed +%v", err)
-	}
-	defer db.Close()
+	db := getDB()
 
 	stock := &Stock{
 		Id:           1,
@@ -178,11 +166,7 @@ func Test_RecordOneMinuteOHLC(t *testing.T) {
 	t.Logf("Testing record one minute ohlc")
 
 	fakeTime := time.Now()
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Error:Opening Database for inserting Stocks,Record failed +%v", err)
-	}
-	defer db.Close()
+	db := getDB()
 	defer db.Exec("DELETE FROM Stocks")
 	defer db.Exec("DELETE FROM StockHistory")
 	defer db.Exec("DELETE FROM Users")
@@ -207,7 +191,7 @@ func Test_RecordOneMinuteOHLC(t *testing.T) {
 	UpdateStockPrice(1, 900)
 	UpdateStockVolume(1, 30)
 	UpdateStockVolume(1, 20)
-	err = recordOneMinuteOHLC(db, fakeTime)
+	err := recordOneMinuteOHLC(db, fakeTime)
 
 	fakeTime1 := fakeTime.Add(time.Minute)
 	UpdateStockPrice(1, 300)
@@ -248,11 +232,7 @@ func Test_GetStockHistory(t *testing.T) {
 	t.Logf("Testing getstockhistory")
 	var stock = &Stock{Id: 1, CurrentPrice: 2000}
 	now := time.Now()
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Opening data base for inserting stocks failed %v", err)
-	}
-	defer db.Close()
+	db := getDB()
 	db.Save(stock)
 	defer func() {
 		db.Exec("DELETE FROM StockHistory")

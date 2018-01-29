@@ -21,6 +21,7 @@ func RealMain() {
 		if r := recover(); r != nil {
 			fmt.Printf("Error: '%+v'\n", r)
 		}
+		utils.CloseDB()
 	}()
 
 	if config.Stage != "prod" {
