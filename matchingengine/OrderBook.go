@@ -135,12 +135,7 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		"method": "triggerStopLosses",
 	})
 
-	db, err := utils.DbOpen()
-	if err != nil {
-		l.Errorf("Error while opening DB to trigger stoplosses. Not triggering them.")
-		return
-	}
-	defer db.Close()
+	db := utils.GetDB()
 
 	l.Debugf("Triggering ask stoplosses")
 	topAskStoploss := ob.askStoploss.Head()

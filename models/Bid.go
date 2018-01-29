@@ -83,12 +83,7 @@ func getBid(id uint32) (*Bid, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading bid from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	bidsMap.m[id] = &Bid{}
 	bid := bidsMap.m[id]
@@ -136,12 +131,7 @@ func getBidCopy(id uint32) (chan struct{}, *Bid, error) {
 
 	/* Otherwise load from database * /
 	l.Debugf("Loading bid from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	bidLocks.Lock()
 	db.First(a.bid, id)
@@ -174,12 +164,7 @@ func createBid(bid *Bid) error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	bid.CreatedAt = utils.GetCurrentTimeISO8601()
 	bid.UpdatedAt = bid.CreatedAt
@@ -201,13 +186,8 @@ func (bid *Bid) Close() error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
-	
+	db := getDB()
+
 	bid.IsClosed = true
 	bid.UpdatedAt = utils.GetCurrentTimeISO8601()
 
@@ -227,11 +207,7 @@ func GetMyOpenBids(userId uint32) ([]*Bid, error) {
 
 	l.Infof("Attempting to get open bid orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myOpenBids []*Bid
 
@@ -253,11 +229,7 @@ func GetMyClosedBids(userId, lastId, count uint32) (bool, []*Bid, error) {
 
 	l.Infof("Attempting to get closed bid orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myClosedBids []*Bid
 

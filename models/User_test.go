@@ -22,11 +22,7 @@ func Test_Login(t *testing.T) {
 	}
 
 	defer func() {
-		db, err := DbOpen()
-		if err != nil {
-			t.Fatal("Failed opening DB for cleaning up test user")
-		}
-		defer db.Close()
+		db := getDB()
 
 		db.Delete(u)
 	}()
@@ -114,10 +110,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		{makeAsk(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			db.Delete(tr)
@@ -128,7 +121,6 @@ func Test_PlaceAskOrder(t *testing.T) {
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
-		db.Close()
 
 		delete(userLocks.m, 2)
 	}()
@@ -227,10 +219,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 		{makeBid(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			db.Delete(tr)
@@ -241,7 +230,6 @@ func Test_PlaceBidOrder(t *testing.T) {
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
-		db.Close()
 
 		delete(userLocks.m, 2)
 	}()
@@ -347,10 +335,7 @@ func Test_CancelOrder(t *testing.T) {
 		{2, 260, false, false},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, a := range asks {
 			db.Delete(a)
@@ -361,7 +346,6 @@ func Test_CancelOrder(t *testing.T) {
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
-		db.Close()
 
 		delete(userLocks.m, 2)
 	}()
@@ -457,10 +441,7 @@ func Test_GetStocksOwned(t *testing.T) {
 		{userId: 4, expected: map[uint32]int32{2: -10, 3: 10}},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			if err := db.Delete(tr).Error; err != nil {
@@ -479,8 +460,6 @@ func Test_GetStocksOwned(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {
@@ -583,10 +562,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 	transactions.m[3] = &lockedTrList{}
 	transactions.m[4] = &lockedTrList{}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, ltrlist := range transactions.m {
 			for _, tr := range ltrlist.trlist {
@@ -607,8 +583,6 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {
@@ -767,10 +741,7 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 		{4, 1, 5, 5 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 0, true},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			if err := db.Delete(tr).Error; err != nil {
@@ -789,8 +760,6 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {
@@ -906,10 +875,7 @@ func Test_PerformMortgageDepositTransaction(t *testing.T) {
 		{4, 1, -5, 5 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 0, true},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			if err := db.Delete(tr).Error; err != nil {
@@ -928,8 +894,6 @@ func Test_PerformMortgageDepositTransaction(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {

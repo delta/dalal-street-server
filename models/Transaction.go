@@ -97,11 +97,7 @@ func GetTransactions(userId, lastId, count uint32) (bool, []*Transaction, error)
 
 	l.Infof("Attempting to get transactions")
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var transactions []*Transaction
 

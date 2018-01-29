@@ -88,10 +88,7 @@ func Test_GetMortgageDetails(t *testing.T) {
 		makeTrans(2, 2, MortgageTransaction, 30, 300, -9000),
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 
 	defer func() {
 		for _, tr := range transactions {
@@ -103,7 +100,6 @@ func Test_GetMortgageDetails(t *testing.T) {
 		for _, user := range users {
 			db.Delete(user)
 		}
-		db.Close()
 	}()
 
 	for _, user := range users {
@@ -125,6 +121,10 @@ func Test_GetMortgageDetails(t *testing.T) {
 	}
 
 	mortgageDetailsTestResponse, err := GetMortgageDetails(2)
+
+	if err != nil {
+		t.Fatalf("GetMortgageDetails failed with error: %+v", err)
+	}
 
 	l.Infof("Response : %+v", mortgageDetailsTestResponse)
 }

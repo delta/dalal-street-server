@@ -55,11 +55,7 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 		count = utils.MinInt(count, LEADERBOARD_COUNT)
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		return nil, nil, TotalUserCount, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Model(&User{}).Count(&TotalUserCount)
 
@@ -100,12 +96,7 @@ func UpdateLeaderboard() {
 	var results []leaderboardQueryData
 	var leaderboardEntries []*LeaderboardRow
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Errorf("Error opening database. %+v", err)
-		return
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Raw("SELECT U.id as user_id, U.name as user_name, U.cash as cash, ifNull(SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)),0) AS stock_worth, ifnull((U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))),U.cash) AS total from Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id GROUP BY U.id ORDER BY Total DESC;").Scan(&results)
 

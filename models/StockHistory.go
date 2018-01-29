@@ -281,12 +281,7 @@ func GetStockHistory(stockId uint32, interval Resolution) ([]*StockHistory, erro
 
 	l.Infof("Attempting to get stock History for stockId : %v", stockId)
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	allStocks.m[stockId].RLock()
 	defer allStocks.m[stockId].RUnlock()
@@ -326,12 +321,7 @@ loop:
 			// since multiple history records might be inserted, grabbing it here to keep times consistent
 			currentTime := time.Now()
 
-			db, err := DbOpen()
-			if err != nil {
-				l.Error(err)
-				return
-			}
-			defer db.Close()
+			db := getDB()
 
 			// TODO: handle errors better
 			// record the current minute's interval

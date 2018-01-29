@@ -1,19 +1,11 @@
 package models
 
-import (
-	"fmt"
-)
-
 var isMarketOpen = false
 
 func OpenMarket() {
 	isMarketOpen = true
 
-	db, err := DbOpen()
-	if err != nil {
-		return
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Exec("Update Config set isMarketOpen = true")
 
@@ -27,11 +19,7 @@ func OpenMarket() {
 func CloseMarket() {
 	isMarketOpen = false
 
-	db, err := DbOpen()
-	if err != nil {
-		return
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Exec("Update Config set isMarketOpen = false")
 
@@ -45,20 +33,4 @@ func CloseMarket() {
 
 func IsMarketOpen() bool {
 	return isMarketOpen
-}
-
-func lookupIsMarketOpenFromDb() {
-	db, err := DbOpen()
-	if err != nil {
-		return
-	}
-	defer db.Close()
-
-	resp := struct {
-		Open bool
-	}{}
-
-	db.Raw("Select isMarketOpen as open from Config").Scan(&resp)
-	fmt.Printf("resp %+v", resp)
-	isMarketOpen = resp.Open
 }

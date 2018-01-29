@@ -70,12 +70,7 @@ func (m *matchingEngine) loadOldOrders() {
 		"method": "loadOldOrders",
 	})
 
-	db, err := models.DbOpen()
-	if err != nil {
-		l.Errorf("Errored : %+v", err)
-		panic("Error opening database for matching engine")
-	}
-	defer db.Close()
+	db := utils.GetDB()
 
 	var (
 		openAskOrders []*models.Ask
@@ -112,4 +107,6 @@ func (m *matchingEngine) loadOldOrders() {
 	for _, openBidOrder := range openBidOrders {
 		m.orderBooks[openBidOrder.StockId].LoadOldBid(openBidOrder)
 	}
+
+	l.Info("Loaded!")
 }

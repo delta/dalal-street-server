@@ -42,11 +42,7 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 
 	l.Infof("Attempting to get market events")
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var marketEvents []*MarketEvent
 
@@ -81,11 +77,7 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool) error 
 
 	l.Infof("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	me := &MarketEvent{
 		StockId:  stockId,

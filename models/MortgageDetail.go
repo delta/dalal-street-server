@@ -38,11 +38,7 @@ func GetMortgageDetails(userId uint32) ([]MortgageQueryData, error) {
 
 	l.Infof("Attempting to get mortgageDetails for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var mortgageDetails []MortgageQueryData
 

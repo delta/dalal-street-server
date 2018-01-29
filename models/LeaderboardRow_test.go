@@ -98,13 +98,9 @@ func Test_UpdateLeaderboard(t *testing.T) {
 	var results []leaderboardQueryData
 	var leaderboardEntries []*LeaderboardRow
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 
 	defer func() {
-
 		db.Exec("TRUNCATE TABLE Leaderboard")
 		for _, tr := range transactions {
 			db.Delete(tr)
@@ -115,7 +111,6 @@ func Test_UpdateLeaderboard(t *testing.T) {
 		for _, user := range users {
 			db.Delete(user)
 		}
-		db.Close()
 	}()
 
 	for _, user := range users {
