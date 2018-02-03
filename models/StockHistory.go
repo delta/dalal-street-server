@@ -243,16 +243,16 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 
 	for stockId := range allStocks.m {
 		var retrievedHistories []StockHistory
-
-		db = db.Where("intervalRecord = ? AND stockId = ? AND createdAt >= ?", 1, stockId, maxTimeRangeStr)
-		db.Order("createdAt desc").Limit(TIMES_RESOLUTION).Find(&retrievedHistories)
+		// Need to do this because db = db. chains the wheres
+		dbCurrStock := db.Where("intervalRecord = ? AND stockId = ? AND createdAt >= ?", 1, stockId, maxTimeRangeStr)
+		dbCurrStock.Order("createdAt desc").Limit(TIMES_RESOLUTION).Find(&retrievedHistories)
 
 		if currMin%5 == 0 {
 			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 5, recordingTime); err != nil {
 				return err
 			}
 		}
-		if currMin%10 == 0 {
+		if currMin%15 == 0 {
 			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 15, recordingTime); err != nil {
 				return err
 			}

@@ -171,8 +171,8 @@ func (d *dalalStreamService) GetStockHistoryUpdates(req *datastreams_pb.Subscrip
 
 	stockId, _ := strconv.ParseUint(subscribeReq.DataStreamId, 10, 32)
 
-	depthStream := d.datastreamsManager.GetStockHistoryStream(uint32(stockId))
-	depthStream.AddListener(done, updates, req.Id)
+	historyStream := d.datastreamsManager.GetStockHistoryStream(uint32(stockId))
+	historyStream.AddListener(done, updates, req.Id)
 
 loop:
 	for {
