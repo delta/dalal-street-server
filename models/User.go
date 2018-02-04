@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	UnauthorizedError  = errors.New("Invalid credentials")
-	NotRegisteredError = errors.New("Not registered on main site")
-	InternalError      = errors.New("Internal server error")
+	UnauthorizedError      = errors.New("Invalid credentials")
+	NotRegisteredError     = errors.New("Not registered")
+	InternalError          = errors.New("Internal server error")
+	AlreadyRegisteredError = errors.New("Already registered")
 )
 
 var TotalUserCount uint32
@@ -51,8 +52,9 @@ func (u *User) ToProto() *models_pb.User {
 
 // pragyanUser is the structure returned by Pragyan API
 type pragyanUser struct {
-	Id   uint32 `json:"user_id"`
-	Name string `json:"user_fullname"`
+	Id       uint32 `json:"user_id"`
+	Name     string `json:"user_fullname"`
+	UserName string `json:"user_name"`
 }
 
 // User.TableName() is for letting Gorm know the correct table name.
@@ -72,45 +74,151 @@ func Login(email, password string) (User, error) {
 
 	l.Infof("Attempting to login user")
 
-	l.Debugf("Trying to call Pragyan API for logging in")
-
-	pu, err := postLoginToPragyan(email, password)
-	if err != nil {
-		l.Debugf("Pragyan API call failed")
-		return User{}, err
-	}
-
-	l.Debugf("Trying to get user from database. UserId: %d, Name: %s", pu.Id, pu.Name)
-
 	db := getDB()
 
-	u := &User{}
-	if result := db.First(u, pu.Id); result.Error != nil {
+	var registeredUser = Register{
+		Email: email,
+	}
+
+	err := db.First(&registeredUser).Error
+	l.Infof("%v", err)
+	var userId uint32 = 0
+	//error is nil this implies we have the user in our database
+	if err != nil {
+		//User was not found in our local db which implies he's logging in with pragyan for the first time
+		//So register him if pragyan returns 200
+		l.Infof("Trying to call Pragyan API for logging in")
+
+		pu, err := postLoginToPragyan(email, password)
+
+		if err == nil {
+			//Registering this pragyan user
+			u, err := createUser(pu.Name, email)
+			if err != nil {
+				return User{}, InternalError
+			} else {
+				register := &Register{
+					Email:      email,
+					IsPragyan:  true,
+					IsVerified: true,
+					Name:       pu.Name,
+					UserName:   pu.UserName,
+					UserId:     u.Id,
+				}
+
+				err := db.Save(register)
+				if err.Error != nil {
+					db.Delete(u)
+					return User{}, InternalError
+				}
+				return *u, nil
+			}
+		} else {
+			return User{}, err
+		}
+	} else {
+		//If he's not registered with pragyan match password
+		if registeredUser.IsPragyan == false {
+			if registeredUser.Password == password {
+				userId = registeredUser.UserId
+			}
+			return User{}, UnauthorizedError
+
+		} else {
+			//Registered with pragyan so hit pragyan with the username and password
+			_, err = postLoginToPragyan(email, password)
+			if err == nil {
+				//Pragyan returned 200 hence use our db's user Id to load User
+				userId = registeredUser.UserId
+				//Register him in our db
+			} else if err == UnauthorizedError {
+				//Pragyan returned unauthorized which implies wrong password but user is registered
+				return User{}, UnauthorizedError
+
+			} else if err == NotRegisteredError {
+				//Should never happen but is handled just in case
+				//User once registered with pragyan creds but has now been deleted from the pragyan db
+				db.Delete(&User{Id: registeredUser.Id})
+				db.Delete(&registeredUser)
+				return User{}, NotRegisteredError
+			}
+			return User{}, InternalError
+		}
+	}
+
+	l.Debugf("Trying to get user from database. UserId: %d", userId)
+
+	u := User{}
+	if result := db.First(&u, userId); result.Error != nil {
 		if !result.RecordNotFound() {
 			l.Errorf("Error in loading user info from database: '%s'", result.Error)
 			return User{}, InternalError
 		}
-
-		l.Infof("User (%d, %s, %s) not found in database. Registering new user", pu.Id, email, pu.Name)
-
-		u, err = createUser(pu, email)
-		if err != nil {
-			return User{}, InternalError
-		}
+		l.Infof("User (%d, %s) not found in database", userId, email)
 	}
 
-	l.Infof("Found user (%d, %s, %s). Logging him in.", u.Id, u.Email, u.Name)
+	return u, nil
+}
 
-	return *u, nil
+func RegisterUser(email, password, userName, fullName string) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":         "Login",
+		"param_email":    email,
+		"param_password": password,
+	})
+	l.Debugf("Attempting to register user")
+
+	db := getDB()
+
+	var registeredUser = Register{
+		Email: email,
+	}
+
+	err := db.First(&registeredUser).Error
+
+	if err == nil {
+		return AlreadyRegisteredError
+	}
+	l.Debugf("Trying to call Pragyan API for checking if email avalaible with Pragyan")
+	_, err = postLoginToPragyan(email, password)
+
+	if err == UnauthorizedError || err == nil {
+		l.Error("User registered with pragyan ask to login with Pragyan")
+		return AlreadyRegisteredError
+	}
+	if err == InternalError {
+		l.Error("Pragyan internal server error")
+		return InternalError
+	}
+	u, err := createUser(userName, email)
+	if err != nil {
+		l.Error(" server error in Create user while logging in Pragyan user for the first time")
+		return InternalError
+	}
+
+	register := &Register{
+		Email:      email,
+		Password:   password,
+		IsPragyan:  false,
+		IsVerified: false,
+		Name:       fullName,
+		UserName:   userName,
+		UserId:     u.Id,
+	}
+	errors := db.Save(register).Error
+	if errors != nil {
+		return InternalError
+	}
+
+	return nil
 }
 
 // createUser() creates a user given his email and name.
-func createUser(pu pragyanUser, email string) (*User, error) {
+func createUser(name string, email string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":      "createUser",
-		"param_id":    pu.Id,
 		"param_email": email,
-		"param_name":  pu.Name,
+		"param_name":  name,
 	})
 
 	l.Infof("Creating user")
@@ -118,9 +226,8 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 	db := getDB()
 
 	u := &User{
-		Id:        pu.Id,
 		Email:     email,
-		Name:      pu.Name,
+		Name:      name,
 		Cash:      STARTING_CASH,
 		Total:     STARTING_CASH,
 		CreatedAt: utils.GetCurrentTimeISO8601(),
@@ -217,6 +324,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 		user_info_map := r.Message.(map[string]interface{})
 		pu.Id = uint32(user_info_map["user_id"].(float64)) // sigh. Have to do this because Message is interface{}
 		pu.Name = user_info_map["user_fullname"].(string)
+		pu.UserName = user_info_map["user_name"].(string)
 
 		l.Debugf("Credentials verified. UserId: %d, Name: %s", pu.Id, pu.Name)
 
@@ -509,9 +617,8 @@ func GetUserCopy(id uint32) (User, error) {
 		if errDb.RecordNotFound() {
 			l.Errorf("Attempted to get non-existing user")
 			return User{}, fmt.Errorf("User with Id %d does not exist", id)
-		} else {
-			return User{}, errDb.Error
 		}
+		return User{}, errDb.Error
 	}
 
 	l.Debugf("Loaded user from db. Locking.")

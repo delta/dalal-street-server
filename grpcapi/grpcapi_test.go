@@ -71,7 +71,7 @@ func Test_Authentication(t *testing.T) {
 	// It should fail with InvalidCredentialsError
 	loginReq := &actions_pb.LoginRequest{
 		Email:    "test@test.com",
-		Password: "test",
+		Password: "pleasedontletthisbethepassword",
 	}
 	loginRes, err := actionClient.Login(context.Background(), loginReq)
 	statusCode, _ = status.FromError(err)
