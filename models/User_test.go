@@ -13,7 +13,7 @@ import (
 func Test_Login(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
-
+	//Tests case for first time pragyan login
 	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
 
 	u, err := Login("test@testmail.com", "password")
@@ -23,12 +23,12 @@ func Test_Login(t *testing.T) {
 
 	defer func() {
 		db := getDB()
-
+		db.Delete(&Register{UserId: u.Id})
 		db.Delete(u)
 	}()
 
 	exU := User{
-		Id:        2,
+		Id:        u.Id,
 		Email:     "test@testmail.com",
 		Name:      "TestName",
 		Cash:      STARTING_CASH,
@@ -39,12 +39,10 @@ func Test_Login(t *testing.T) {
 	if reflect.DeepEqual(u, exU) != true {
 		t.Fatalf("Expected Login to return %+v, instead, got %+v", exU, u)
 	}
-
 	_, err = Login("test@testmail.com", "TestName")
 	if err != nil {
 		t.Fatalf("Login failed: '%s'", err)
 	}
-
 	//allErrors, ok = migrate.DownSync(connStr, "../migrations")
 }
 

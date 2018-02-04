@@ -187,7 +187,28 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 
 	return resp, nil
 }
-
+func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.RegisterRequest) (*actions_pb.RegisterResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "Register",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("Register requested")
+	resp := &actions_pb.RegisterResponse{}
+	makeError := func(st actions_pb.RegisterResponse_StatusCode, msg string) (*actions_pb.RegisterResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetUserName(), req.GetFullName())
+	if err == models.AlreadyRegisteredError {
+		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredError, "Already registered please Login")
+	}
+	if err == models.InternalError {
+		return makeError(actions_pb.RegisterResponse_InternalServerError, "Internal Server Error")
+	}
+	return resp, nil
+}
 func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginRequest) (*actions_pb.LoginResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Login",
@@ -215,7 +236,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		password := req.GetPassword()
 
 		if email == "" || password == "" {
-			return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "")
+			return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "Invalid Credentials")
 		}
 
 		user, err = models.Login(email, password)
