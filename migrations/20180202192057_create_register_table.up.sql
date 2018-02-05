@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS Register(
+CREATE TABLE IF NOT EXISTS Registers(
 	id int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
 	userId int(11) UNSIGNED NOT NULL,
 	email varchar(70) NOT NULL,
@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS Register(
 	fullName varchar(100) NOT NULL,
 	isPragyan BOOL NOT NULL,
 	isVerified BOOL NOT NULL,
-	pass varchar(80) NOT NULL,
+	password varchar(80) NOT NULL,
 	FOREIGN KEY (userId) REFERENCES Users(id),
 	PRIMARY KEY (id)
 	) AUTO_INCREMENT = 1;

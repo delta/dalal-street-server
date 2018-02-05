@@ -43,7 +43,71 @@ func Test_Login(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Login failed: '%s'", err)
 	}
+
+	//The email should be registered with the previous login attempt
+	u, err = Login("test@testmail.com", "password")
+
+	if reflect.DeepEqual(u, exU) != true {
+		t.Fatalf("Expected Login to return %+v, instead, got %+v", exU, u)
+	}
+	_, err = Login("test@testmail.com", "TestName")
+	if err != nil {
+		t.Fatalf("Login failed: '%s'", err)
+	}
 	//allErrors, ok = migrate.DownSync(connStr, "../migrations")
+}
+
+func Test_Regsiter(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+	//Tests case for first time pragyan login
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	err := RegisterUser("test@testname.com", "password", "UserName", "FullName")
+	defer func() {
+		db := getDB()
+		db.Exec("DELETE FROM Register")
+		db.Exec("DELETE FROM Users")
+	}()
+	if err != AlreadyRegisteredError {
+		t.Fatalf("Expected %+v but got %+v", AlreadyRegisteredError, err)
+	}
+	httpmock.DeactivateAndReset()
+	httpmock.Activate()
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(401, `{"status_code":401,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	err = RegisterUser("test@testname.com", "password", "UserName", "FullName")
+
+	if err != AlreadyRegisteredError {
+		t.Fatalf("Expected %+v but got %+v", AlreadyRegisteredError, err)
+	}
+	httpmock.DeactivateAndReset()
+	httpmock.Activate()
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(400, `{"status_code":400,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	err = RegisterUser("test@testname.com", "password", "UserName", "FullName")
+	db := getDB()
+	registeredTestUser := &Register{
+		Email: "test@testname.com",
+	}
+	if err != nil {
+		t.Fatalf("Expected %+v but got %+v", nil, err)
+	}
+	err = db.Find(registeredTestUser).Error
+	expectedUser := &Register{
+		Id:         registeredTestUser.Id,
+		UserId:     registeredTestUser.UserId,
+		Email:      "test@testname.com",
+		Password:   "password",
+		UserName:   "UserName",
+		Name:       "FullName",
+		IsPragyan:  false,
+		IsVerified: false,
+	}
+	if !testutils.AssertEqual(t, expectedUser, registeredTestUser) {
+		t.Fatalf("Expected %+v but got %+v", expectedUser, registeredTestUser)
+	}
+	if err != nil {
+		t.Fatalf("Retrieving from db failed with %v", err)
+	}
+
 }
 
 func TestUserToProto(t *testing.T) {
