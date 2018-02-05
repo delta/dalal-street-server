@@ -229,7 +229,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 
 	switch {
 	case err == models.UnauthorizedError:
-		return makeError(actions_pb.LoginResponse_InternalServerError, "Incorrect username/password combination. Please use your Pragyan credentials.")
+		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "Incorrect username/password combination. Please use your Pragyan credentials.")
 	case err == models.NotRegisteredError:
 		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "You have not registered for Dalal Street on the Pragyan website")
 	case err != nil:
