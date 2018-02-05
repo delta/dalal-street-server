@@ -205,22 +205,18 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	}
 	l.Debugf("Pragyan API call response: '%s'", string(body))
 
-	type message_t struct {
-		Id   uint32 `json:"user_id"`
-		Name string `json:"user_fullname"`
-	}
 	r := struct {
-		StatusCode int       `json:"status_code"`
-		Message    message_t `json:"message"`
+		StatusCode int         `json:"status_code"`
+		Message    interface{} `json:"message"` // sometimes a pragyanUser, sometimes a string. :(
 	}{}
 	json.Unmarshal(body, &r)
 
 	switch r.StatusCode {
 	case 200:
-		pu := pragyanUser{
-			Id:   r.Message.Id,
-			Name: r.Message.Name,
-		}
+		pu := pragyanUser{}
+		user_info_map := r.Message.(map[string]interface{})
+		pu.Id = uint32(user_info_map["user_id"].(float64)) // sigh. Have to do this because Message is interface{}
+		pu.Name = user_info_map["user_fullname"].(string)
 
 		l.Debugf("Credentials verified. UserId: %d, Name: %s", pu.Id, pu.Name)
 
@@ -228,9 +224,14 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	case 401:
 		l.Debugf("Bad credentials")
 		return pragyanUser{}, UnauthorizedError
-	case 412:
+	case 412: // Not sure if this is needed. Unaware of the current API changes
 		l.Debugf("Not registered on main site")
 		return pragyanUser{}, NotRegisteredError
+	case 400:
+		if r.Message == "Account Not Registered" {
+			return pragyanUser{}, NotRegisteredError
+		}
+		fallthrough
 	default:
 		l.Errorf("Pragyan rejected API call with (%d, %s)", r.StatusCode, r.Message)
 		return pragyanUser{}, InternalError
