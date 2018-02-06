@@ -1,9 +1,11 @@
 #!/bin/bash
 
-wget -N https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip
+if [ ! -f protoc-3.2.0rc2-linux-x86_64.zip ]; then
+    wget --tries=3 https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip
 
-echo "######## Unzipping protoc compiler ##########"
-unzip protoc-3.2.0rc2-linux-x86_64.zip -d protobuf
+    echo "######## Unzipping protoc compiler ##########"
+    unzip protoc-3.2.0rc2-linux-x86_64.zip -d protobuf
+fi
 
 echo "######## Adding to path ##########"
 export PATH=$PATH:$(pwd)/protobuf/bin
