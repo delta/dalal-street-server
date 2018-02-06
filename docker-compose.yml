@@ -4,21 +4,18 @@ services:
         container_name: dalalstreet_web_1
         image: nginx:latest
         build: 
-            context: ./Dockerfiles
-            dockerfile: Dockerfile-frontend
+            context: ./frontend
         volumes: 
-            - ./conf:/etc/nginx/conf.d
+            - ./frontend/conf:/etc/nginx/conf.d
             - ./frontend:/var/www/dalalstreet
         ports:
             - "9000:80"
     
     dalalserver:
         container_name: dalalstreet_server_1
-        build:
-            context: ./Dockerfiles
-            dockerfile: Dockerfile-server
+        build: .
         volumes: 
-            - /root/go:/go
+            - $GOPATH:/go
         ports:
             - "443:8000"
         depends_on:
