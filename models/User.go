@@ -977,6 +977,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 
 	var updateDataStreams = func(askTrans, bidTrans *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+		transactionsStream := datastreamsManager.GetTransactionsStream()
 
 		if stockTradeQty != 0 || ask.IsClosed {
 			myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
@@ -994,6 +995,9 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 				IsClosed:      bid.IsClosed,
 			})
 		}
+
+		transactionsStream.SendTransaction(askTrans.ToProto())
+		transactionsStream.SendTransaction(bidTrans.ToProto())
 
 		l.Infof("Sent through the datastreams")
 	}
