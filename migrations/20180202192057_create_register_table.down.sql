@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS Registers;
+DROP TABLE IF EXISTS Registrations;
