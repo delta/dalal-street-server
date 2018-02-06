@@ -14,7 +14,7 @@ func Test_Login(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	//Tests case for first time pragyan login
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India" }}`))
 
 	u, err := Login("test@testmail.com", "password")
 	if err != nil {
@@ -23,7 +23,7 @@ func Test_Login(t *testing.T) {
 
 	defer func() {
 		db := getDB()
-		db.Delete(&Register{UserId: u.Id})
+		db.Delete(&Registration{UserId: u.Id})
 		db.Delete(u)
 	}()
 
@@ -44,7 +44,7 @@ func Test_Login(t *testing.T) {
 		t.Fatalf("Login failed: '%s'", err)
 	}
 
-	//The email should be registered with the previous login attempt
+	//The email should be Registrationed with the previous login attempt
 	u, err = Login("test@testmail.com", "password")
 
 	if reflect.DeepEqual(u, exU) != true {
@@ -61,11 +61,11 @@ func Test_Regsiter(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	//Tests case for first time pragyan login
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India"}}`))
 	err := RegisterUser("test@testname.com", "password", "UserName", "FullName")
 	defer func() {
 		db := getDB()
-		db.Exec("DELETE FROM Register")
+		db.Exec("DELETE FROM Registrations")
 		db.Exec("DELETE FROM Users")
 	}()
 	if err != AlreadyRegisteredError {
@@ -73,7 +73,7 @@ func Test_Regsiter(t *testing.T) {
 	}
 	httpmock.DeactivateAndReset()
 	httpmock.Activate()
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(401, `{"status_code":401,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(401, `{"status_code":401,"message": "Invalid Credentials"}`))
 	err = RegisterUser("test@testname.com", "password", "UserName", "FullName")
 
 	if err != AlreadyRegisteredError {
@@ -81,21 +81,24 @@ func Test_Regsiter(t *testing.T) {
 	}
 	httpmock.DeactivateAndReset()
 	httpmock.Activate()
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(400, `{"status_code":400,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(400, `{"status_code":400,"message": "Account Not Registered"}`))
 	err = RegisterUser("test@testname.com", "password", "UserName", "FullName")
 	db := getDB()
-	registeredTestUser := &Register{
+	registeredTestUser := &Registration{
 		Email: "test@testname.com",
 	}
 	if err != nil {
 		t.Fatalf("Expected %+v but got %+v", nil, err)
 	}
 	err = db.Find(registeredTestUser).Error
-	expectedUser := &Register{
+	if !CheckPasswordHash("password", registeredTestUser.Password) {
+		t.Fatalf("Incorrect password")
+	}
+	expectedUser := &Registration{
 		Id:         registeredTestUser.Id,
 		UserId:     registeredTestUser.UserId,
 		Email:      "test@testname.com",
-		Password:   "password",
+		Password:   registeredTestUser.Password,
 		UserName:   "UserName",
 		Name:       "FullName",
 		IsPragyan:  false,

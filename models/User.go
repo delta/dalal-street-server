@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -55,6 +57,7 @@ type pragyanUser struct {
 	Id       uint32 `json:"user_id"`
 	Name     string `json:"user_fullname"`
 	UserName string `json:"user_name"`
+	Country  string `json:"user_country"`
 }
 
 // User.TableName() is for letting Gorm know the correct table name.
@@ -76,7 +79,7 @@ func Login(email, password string) (User, error) {
 
 	db := getDB()
 
-	var registeredUser = Register{
+	var registeredUser = Registration{
 		Email: email,
 	}
 
@@ -97,7 +100,7 @@ func Login(email, password string) (User, error) {
 			if err != nil {
 				return User{}, InternalError
 			} else {
-				register := &Register{
+				register := &Registration{
 					Email:      email,
 					IsPragyan:  true,
 					IsVerified: true,
@@ -119,10 +122,11 @@ func Login(email, password string) (User, error) {
 	} else {
 		//If he's not registered with pragyan match password
 		if registeredUser.IsPragyan == false {
-			if registeredUser.Password == password {
+			if CheckPasswordHash(registeredUser.Password, password) {
 				userId = registeredUser.UserId
+			} else {
+				return User{}, UnauthorizedError
 			}
-			return User{}, UnauthorizedError
 
 		} else {
 			//Registered with pragyan so hit pragyan with the username and password
@@ -141,8 +145,9 @@ func Login(email, password string) (User, error) {
 				db.Delete(&User{Id: registeredUser.Id})
 				db.Delete(&registeredUser)
 				return User{}, NotRegisteredError
+			} else {
+				return User{}, InternalError
 			}
-			return User{}, InternalError
 		}
 	}
 
@@ -170,7 +175,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 
 	db := getDB()
 
-	var registeredUser = Register{
+	var registeredUser = Registration{
 		Email: email,
 	}
 
@@ -195,8 +200,8 @@ func RegisterUser(email, password, userName, fullName string) error {
 		l.Error(" server error in Create user while logging in Pragyan user for the first time")
 		return InternalError
 	}
-
-	register := &Register{
+	password, _ = HashPassword(password)
+	register := &Registration{
 		Email:      email,
 		Password:   password,
 		IsPragyan:  false,
@@ -211,6 +216,22 @@ func RegisterUser(email, password, userName, fullName string) error {
 	}
 
 	return nil
+}
+
+func HashPassword(password string) (string, error) {
+	h := sha1.New()
+	h.Write([]byte(password))
+	sha1_hash := hex.EncodeToString(h.Sum(nil))
+	return sha1_hash, nil
+	//bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	//return string(bytes), err
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	h := sha1.New()
+	h.Write([]byte(password))
+	sha1_hash := hex.EncodeToString(h.Sum(nil))
+	return hash == sha1_hash
 }
 
 // createUser() creates a user given his email and name.
@@ -248,7 +269,7 @@ func createUser(name string, email string) (*User, error) {
 	return u, nil
 }
 
-//CreateBot() creates a bot from the botName
+// CreateBot() creates a bot from the botName
 func CreateBot(botName string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":   "createUser",
@@ -325,6 +346,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 		pu.Id = uint32(user_info_map["user_id"].(float64)) // sigh. Have to do this because Message is interface{}
 		pu.Name = user_info_map["user_fullname"].(string)
 		pu.UserName = user_info_map["user_name"].(string)
+		pu.Country = user_info_map["user_country"].(string)
 
 		l.Debugf("Credentials verified. UserId: %d, Name: %s", pu.Id, pu.Name)
 
