@@ -73,6 +73,25 @@ func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer 
 	return dss
 }
 
+// will be called whenever Unsubscribe is called, or when doneChan gets closed due to network error or something
+// returns a subscription. It'll be nil in case the subscription doesn't exist. If it exists, it means
+// that was called by Unsubscribe. So it can close the doneChan. Otherwise this got called from one
+// of the GetXUpdates()...and that happened because doneChan got closed due to network issue.
+func (d *dalalStreamService) removeSubscriptionFromMap(subId *datastreams_pb.SubscriptionId) *subscription {
+	id := subId.Id
+	dataStreamType := subId.DataStreamType
+
+	d.subscriptionsMap[dataStreamType].Lock()
+	subscription, ok := d.subscriptionsMap[dataStreamType].m[id]
+	if !ok {
+		d.subscriptionsMap[dataStreamType].Unlock()
+		return nil
+	}
+	delete(d.subscriptionsMap[dataStreamType].m, id)
+	d.subscriptionsMap[dataStreamType].Unlock()
+	return subscription
+}
+
 func (d *dalalStreamService) Unsubscribe(ctx context.Context, req *datastreams_pb.UnsubscribeRequest) (*datastreams_pb.UnsubscribeResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Unsubscribe",
@@ -82,20 +101,12 @@ func (d *dalalStreamService) Unsubscribe(ctx context.Context, req *datastreams_p
 	l.Infof("Unsubscribe requested")
 
 	resp := &datastreams_pb.UnsubscribeResponse{}
-	id := req.SubscriptionId.Id
-	dataStreamType := req.SubscriptionId.DataStreamType
+	subscription := d.removeSubscriptionFromMap(req.GetSubscriptionId())
 
-	d.subscriptionsMap[dataStreamType].Lock()
-	subscription, ok := d.subscriptionsMap[dataStreamType].m[id]
-	if !ok {
-		d.subscriptionsMap[dataStreamType].Unlock()
-		return resp, nil
+	if subscription != nil {
+		// closing the done channel will automatically remove the user from the stream
+		close(subscription.doneChan)
 	}
-	delete(d.subscriptionsMap[dataStreamType].m, id)
-	d.subscriptionsMap[dataStreamType].Unlock()
-
-	// closing the done channel will automatically remove the user from the stream
-	close(subscription.doneChan)
 
 	l.Infof("Request completed successfully")
 
@@ -179,6 +190,9 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockHistoryUpdate))
 			if err != nil {
@@ -219,6 +233,9 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketDepthUpdate))
 			if err != nil {
@@ -255,6 +272,9 @@ loop:
 	for {
 		select {
 		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketEventUpdate))
@@ -294,6 +314,9 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MyOrderUpdate))
 			if err != nil {
@@ -332,6 +355,9 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.NotificationUpdate))
 			if err != nil {
@@ -368,6 +394,9 @@ loop:
 	for {
 		select {
 		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockExchangeUpdate))
@@ -407,6 +436,9 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockPricesUpdate))
 			if err != nil {
@@ -445,6 +477,9 @@ loop:
 	for {
 		select {
 		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.TransactionUpdate))
