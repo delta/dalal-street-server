@@ -354,7 +354,6 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		}
 
 		ob.asks.Push(topAskStoploss, topAskStoploss.Price, topAskStoploss.StockQuantity)
-		ob.depth.AddOrder(true, true, topAskStoploss.Price, topAskStoploss.StockQuantity)
 		topAskStoploss = ob.askStoploss.Head()
 	}
 
@@ -372,7 +371,6 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		}
 
 		ob.bids.Push(topBidStoploss, topBidStoploss.Price, topBidStoploss.StockQuantity)
-		ob.depth.AddOrder(true, false, topBidStoploss.Price, topBidStoploss.StockQuantity)
 		topBidStoploss = ob.bidStoploss.Head()
 	}
 }
@@ -395,6 +393,9 @@ func (ob *orderBook) clearExistingOrders() {
 	askTop, addBackOrders := ob.getTopMatchingAsk(bidTop)
 
 	for bidTop != nil && askTop != nil {
+		// passing false as third argument
+		// thus, treating bid as incoming order
+		// hence bid should NOT be in queue, which is why the bid has been popped
 		askDone, bidDone = ob.makeTrade(askTop, bidTop, false)
 		addBackOrders()
 
@@ -411,6 +412,11 @@ func (ob *orderBook) clearExistingOrders() {
 		if bidTop != nil {
 			askTop, addBackOrders = ob.getTopMatchingAsk(bidTop)
 		}
+	}
+
+	// if bid is not fulfilled and asks queue becomes empty
+	if bidTop != nil {
+		ob.addBidToQueue(bidTop)
 	}
 }
 
