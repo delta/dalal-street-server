@@ -192,6 +192,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockHistoryUpdate))
@@ -235,6 +236,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketDepthUpdate))
@@ -275,6 +277,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketEventUpdate))
@@ -316,6 +319,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MyOrderUpdate))
@@ -357,6 +361,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.NotificationUpdate))
@@ -397,6 +402,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockExchangeUpdate))
@@ -438,6 +444,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockPricesUpdate))
@@ -480,6 +487,7 @@ loop:
 			break loop
 		case <-stream.Context().Done():
 			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.TransactionUpdate))
