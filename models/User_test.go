@@ -91,7 +91,7 @@ func Test_Regsiter(t *testing.T) {
 		t.Fatalf("Expected %+v but got %+v", nil, err)
 	}
 	err = db.Find(registeredTestUser).Error
-	if !CheckPasswordHash("password", registeredTestUser.Password) {
+	if !checkPasswordHash("password", registeredTestUser.Password) {
 		t.Fatalf("Incorrect password")
 	}
 	expectedUser := &Registration{

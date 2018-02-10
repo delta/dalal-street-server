@@ -85,86 +85,90 @@ func Login(email, password string) (User, error) {
 
 	err := db.First(&registeredUser).Error
 	l.Infof("%v", err)
-	var userId uint32 = 0
-	//error is nil this implies we have the user in our database
+
+	// User was not found in our local db
+	// Thus, he's logging in with pragyan for the first time
 	if err != nil {
-		//User was not found in our local db which implies he's logging in with pragyan for the first time
+
 		//So register him if pragyan returns 200
 		l.Infof("Trying to call Pragyan API for logging in")
 
 		pu, err := postLoginToPragyan(email, password)
 
-		if err == nil {
-			//Registering this pragyan user
-			u, err := createUser(pu.Name, email)
-			if err != nil {
-				return User{}, InternalError
-			} else {
-				register := &Registration{
-					Email:      email,
-					IsPragyan:  true,
-					IsVerified: true,
-					Name:       pu.Name,
-					UserName:   pu.UserName,
-					UserId:     u.Id,
-				}
-
-				err := db.Save(register)
-				if err.Error != nil {
-					db.Delete(u)
-					return User{}, InternalError
-				}
-				return *u, nil
-			}
-		} else {
+		if err != nil {
 			return User{}, err
 		}
-	} else {
-		//If he's not registered with pragyan match password
-		if registeredUser.IsPragyan == false {
-			if CheckPasswordHash(registeredUser.Password, password) {
-				userId = registeredUser.UserId
-			} else {
-				return User{}, UnauthorizedError
-			}
 
-		} else {
-			//Registered with pragyan so hit pragyan with the username and password
-			_, err = postLoginToPragyan(email, password)
-			if err == nil {
-				//Pragyan returned 200 hence use our db's user Id to load User
-				userId = registeredUser.UserId
-				//Register him in our db
-			} else if err == UnauthorizedError {
-				//Pragyan returned unauthorized which implies wrong password but user is registered
-				return User{}, UnauthorizedError
-
-			} else if err == NotRegisteredError {
-				//Should never happen but is handled just in case
-				//User once registered with pragyan creds but has now been deleted from the pragyan db
-				db.Delete(&User{Id: registeredUser.Id})
-				db.Delete(&registeredUser)
-				return User{}, NotRegisteredError
-			} else {
-				return User{}, InternalError
-			}
-		}
-	}
-
-	l.Debugf("Trying to get user from database. UserId: %d", userId)
-
-	u := User{}
-	if result := db.First(&u, userId); result.Error != nil {
-		if !result.RecordNotFound() {
-			l.Errorf("Error in loading user info from database: '%s'", result.Error)
+		// Pragyan returned 200
+		// Add entry to Users table
+		u, err := createUser(pu.Name, email)
+		if err != nil {
 			return User{}, InternalError
 		}
-		l.Infof("User (%d, %s) not found in database", userId, email)
+		register := &Registration{
+			Email:      email,
+			IsPragyan:  true,
+			IsVerified: true,
+			Name:       pu.Name,
+			UserName:   pu.UserName,
+			UserId:     u.Id,
+		}
+
+		// Add entry to Registrations table
+		err = db.Save(register).Error
+		if err != nil {
+			// If registration failed, remove user from Users table as well
+			db.Delete(u)
+			return User{}, InternalError
+		}
+		return *u, nil
 	}
 
-	return u, nil
+	getUserFromDB := func(userId uint32) (User, error) {
+		l.Debugf("Trying to get user from database. UserId: %d", userId)
+		u := User{}
+		if result := db.First(&u, userId); result.Error != nil {
+			if !result.RecordNotFound() {
+				l.Errorf("Error in loading user info from database: '%s'", result.Error)
+				return User{}, InternalError
+			}
+			l.Infof("User (%d, %s) not found in database", userId, email)
+		}
+		return u, nil
+	}
+
+	// Found in our local database
+	// If he's not registered with Pragyan, match password
+	if registeredUser.IsPragyan == false {
+		if checkPasswordHash(registeredUser.Password, password) {
+			return getUserFromDB(registeredUser.UserId)
+		}
+		return User{}, UnauthorizedError
+	}
+	//Registered with pragyan so hit pragyan with the username and password
+	_, err = postLoginToPragyan(email, password)
+
+	if err != nil {
+		switch err {
+		case UnauthorizedError:
+			// Pragyan returned unauthorized
+			// Thus, wrong password but user is registered
+			return User{}, UnauthorizedError
+		case NotRegisteredError:
+			// Should never happen but is handled just in case
+			// User once registered with pragyan creds but has now been deleted from the pragyan db
+			db.Delete(&User{Id: registeredUser.Id})
+			db.Delete(&registeredUser)
+			return User{}, NotRegisteredError
+		default:
+			return User{}, InternalError
+		}
+	}
+	// Pragyan returned 200 hence use our db's user Id to load User
+	return getUserFromDB(registeredUser.UserId)
 }
 
+// RegisterUser is called when a user tries to sign up in our site
 func RegisterUser(email, password, userName, fullName string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "Login",
@@ -200,7 +204,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 		l.Error(" server error in Create user while logging in Pragyan user for the first time")
 		return InternalError
 	}
-	password, _ = HashPassword(password)
+	password, _ = hashPassword(password)
 	register := &Registration{
 		Email:      email,
 		Password:   password,
@@ -218,20 +222,18 @@ func RegisterUser(email, password, userName, fullName string) error {
 	return nil
 }
 
-func HashPassword(password string) (string, error) {
+func hashPassword(password string) (string, error) {
 	h := sha1.New()
 	h.Write([]byte(password))
-	sha1_hash := hex.EncodeToString(h.Sum(nil))
-	return sha1_hash, nil
-	//bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	//return string(bytes), err
+	sha1Hash := hex.EncodeToString(h.Sum(nil))
+	return sha1Hash, nil
 }
 
-func CheckPasswordHash(password, hash string) bool {
+func checkPasswordHash(password, hash string) bool {
 	h := sha1.New()
 	h.Write([]byte(password))
-	sha1_hash := hex.EncodeToString(h.Sum(nil))
-	return hash == sha1_hash
+	sha1Hash := hex.EncodeToString(h.Sum(nil))
+	return hash == sha1Hash
 }
 
 // createUser() creates a user given his email and name.
