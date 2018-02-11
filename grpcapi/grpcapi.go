@@ -103,8 +103,14 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 			ctx = context.WithValue(ctx, "session", oldSess)
 		}
 		return handler(ctx, req)
+	case *actions_pb.RegisterRequest:
+		newSess, err := session.New()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Internal error occurred")
+		}
+		ctx = context.WithValue(ctx, "session", newSess)
+		return handler(ctx, req)
 	}
-
 	newCtx, err := authFunc(ctx)
 	if err != nil {
 		return nil, err
