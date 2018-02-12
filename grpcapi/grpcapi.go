@@ -73,6 +73,10 @@ func authFunc(ctx context.Context) (context.Context, error) {
 	if err != nil {
 		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
+	err = sess.Touch() // ignore the error here.
+	if err != nil {
+		l.Errorf("Got error while touching the session. Suppressing. %+v", err)
+	}
 
 	ctx = context.WithValue(ctx, "session", sess)
 	return ctx, nil
@@ -80,6 +84,10 @@ func authFunc(ctx context.Context) (context.Context, error) {
 
 // allows "Login" requests to pass through unauthenticated. Others require authentication
 func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "unaryAuthInterceptor",
+	})
+
 	switch req.(type) {
 	case *actions_pb.LoginRequest:
 		// if it is a bots request, don't create a new session, even for login requests
@@ -95,6 +103,10 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 			sess, err = session.New()
 		} else {
 			sess, err = session.Load(md["sessionid"][0])
+			err2 := sess.Touch() // ignore the error here.
+			if err2 != nil {
+				l.Errorf("Got error while touching the session. Suppressing. %+v", err2)
+			}
 		}
 
 		if err != nil {

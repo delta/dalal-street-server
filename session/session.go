@@ -23,6 +23,7 @@ type Session interface {
 	GetID() string
 	Get(string) (string, bool)
 	Set(string, string) error
+	Touch() error // updates the LastAccessTime of the session
 	Delete(string) error
 	Destroy() error
 }
@@ -104,6 +105,9 @@ func New() (Session, error) {
 	sess.Id = base64.URLEncoding.EncodeToString(rb)
 	sess.m = make(map[string]string)
 
+	sess.Set("CreatedAt", utils.GetCurrentTimeISO8601())
+	sess.Set("LastAccessTime", utils.GetCurrentTimeISO8601())
+
 	l.Debugf("Created session: %+v", sess)
 	cache.Add(sess.Id, sess)
 	return sess, nil
@@ -146,6 +150,10 @@ func (sess *session) Get(str string) (string, bool) {
 	value, ok := sess.m[str] // return value if found or ok=false if not found
 	sess.mutex.RUnlock()
 	return value, ok
+}
+
+func (sess *session) Touch() error {
+	return sess.Set("LastAccessTime", utils.GetCurrentTimeISO8601())
 }
 
 // Delete deletes a particular key in a given session
