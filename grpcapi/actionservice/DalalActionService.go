@@ -188,7 +188,7 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 		return makeError(actions_pb.GetPortfolioResponse_InternalServerError, "")
 	}
 
-	resp.SessionId = sess.GetId()
+	resp.SessionId = sess.GetID()
 	resp.User = user.ToProto()
 	resp.StocksOwned = stocksOwned
 
@@ -274,7 +274,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		}
 	}
 
-	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetId())
+	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetID())
 
 	stocksOwned, err := models.GetStocksOwned(user.Id)
 	if err != nil {
@@ -307,7 +307,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 	}
 
 	resp = &actions_pb.LoginResponse{
-		SessionId:                sess.GetId(),
+		SessionId:                sess.GetID(),
 		User:                     user.ToProto(),
 		StocksOwned:              stocksOwned,
 		StockList:                stockListProto,

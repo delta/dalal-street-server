@@ -88,25 +88,31 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		if ok && len(md["bot_secret"]) > 0 {
 			break
 		}
+
+		var sess session.Session
+		var err error
 		if len(md["sessionid"]) == 0 {
-			newSess, err := session.New()
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "Internal error occurred")
-			}
-			ctx = context.WithValue(ctx, "session", newSess)
+			sess, err = session.New()
 		} else {
-			//This block handles the case where a user is already logged in and holds a non-expired session
-			oldSess, err := session.Load(md["sessionid"][0])
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "Internal error occurred")
-			}
-			ctx = context.WithValue(ctx, "session", oldSess)
+			sess, err = session.Load(md["sessionid"][0])
 		}
+
+		if err != nil {
+			if config.Stage == "Dev" || config.Stage == "Test" || config.Stage == "Docker" {
+				return nil, status.Errorf(codes.Internal, "Internal error occurred: %+v", err)
+			}
+			return nil, status.Errorf(codes.Internal, "Internal error occurred")
+		}
+		ctx = context.WithValue(ctx, "session", sess)
+
 		return handler(ctx, req)
 	case *actions_pb.RegisterRequest:
 		// Fake because a session starts only once the user logs in.
 		newSess, err := session.Fake()
 		if err != nil {
+			if config.Stage == "Dev" || config.Stage == "Test" || config.Stage == "Docker" {
+				return nil, status.Errorf(codes.Internal, "Internal error occurred: %+v", err)
+			}
 			return nil, status.Errorf(codes.Internal, "Internal error occurred")
 		}
 		ctx = context.WithValue(ctx, "session", newSess)

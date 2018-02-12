@@ -27,7 +27,7 @@ func Fake() (Session, error) {
 	return sess, nil
 }
 
-func (sess *fakeSession) GetId() string {
+func (sess *fakeSession) GetID() string {
 	return sess.Id
 }
 
