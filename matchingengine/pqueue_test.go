@@ -82,20 +82,18 @@ func TestBidPQueuePushAndPop_protects_max_order(t *testing.T) {
 	pqueue := NewBidPQueue(MAXPQ)
 
 	testcases := []struct {
-		bid      *models.Bid
-		price    uint32
-		quantity uint32
+		bid *models.Bid
 	}{
-		{makeBid(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"), 100, 5},
-		{makeBid(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z"), 800, 2},
-		{makeBid(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z"), 500, 3},
-		{makeBid(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z"), 400, 11},
-		{makeBid(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z"), 100, 10},
+		{makeBid(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z")},
+		{makeBid(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z")},
+		{makeBid(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z")},
+		{makeBid(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z")},
+		{makeBid(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z")},
 	}
 
 	// Populate the test bid priority queue with dummy elements
 	for i := 0; i < 5; i++ {
-		pqueue.Push(testcases[i].bid, testcases[i].price, testcases[i].quantity)
+		pqueue.Push(testcases[i].bid)
 	}
 
 	var expectedPrice = []uint32{500, 400, 800, 100, 100}
@@ -123,15 +121,13 @@ func TestBidPQueuePushAndPop_concurrently_protects_max_order(t *testing.T) {
 	pqueue := NewBidPQueue(MAXPQ)
 
 	testcases := []struct {
-		bid      *models.Bid
-		price    uint32
-		quantity uint32
+		bid *models.Bid
 	}{
-		{makeBid(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"), 100, 5},
-		{makeBid(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z"), 800, 2},
-		{makeBid(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z"), 500, 3},
-		{makeBid(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z"), 400, 11},
-		{makeBid(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z"), 100, 10},
+		{makeBid(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z")},
+		{makeBid(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z")},
+		{makeBid(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z")},
+		{makeBid(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z")},
+		{makeBid(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z")},
 	}
 
 	// Populate the test bid priority queue with dummy elements
@@ -141,7 +137,7 @@ func TestBidPQueuePushAndPop_concurrently_protects_max_order(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			pqueue.Push(testcases[i].bid, testcases[i].price, testcases[i].quantity)
+			pqueue.Push(testcases[i].bid)
 		}(i)
 	}
 
@@ -170,20 +166,18 @@ func TestAskPQueuePushAndPop_protects_min_order(t *testing.T) {
 	pqueue := NewAskPQueue(MINPQ)
 
 	testcases := []struct {
-		ask      *models.Ask
-		price    uint32
-		quantity uint32
+		ask *models.Ask
 	}{
-		{makeAsk(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"), 100, 5},
-		{makeAsk(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z"), 800, 2},
-		{makeAsk(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z"), 500, 3},
-		{makeAsk(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z"), 400, 11},
-		{makeAsk(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z"), 100, 10},
+		{makeAsk(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z")},
+		{makeAsk(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z")},
+		{makeAsk(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z")},
+		{makeAsk(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z")},
+		{makeAsk(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z")},
 	}
 
 	// Populate the test ask priority queue with dummy elements
 	for i := 0; i < 5; i++ {
-		pqueue.Push(testcases[i].ask, testcases[i].price, testcases[i].quantity)
+		pqueue.Push(testcases[i].ask)
 	}
 
 	var expectedPrice = []uint32{500, 400, 100, 100, 800}
@@ -212,15 +206,13 @@ func TestAskPQueuePushAndPop_concurrently_protects_min_order(t *testing.T) {
 	pqueue := NewAskPQueue(MINPQ)
 
 	testcases := []struct {
-		ask      *models.Ask
-		price    uint32
-		quantity uint32
+		ask *models.Ask
 	}{
-		{makeAsk(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"), 100, 5},
-		{makeAsk(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z"), 800, 2},
-		{makeAsk(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z"), 500, 3},
-		{makeAsk(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z"), 400, 11},
-		{makeAsk(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z"), 100, 10},
+		{makeAsk(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z")},
+		{makeAsk(2, 1, models.Limit, 2, 800, "2017-12-29T02:00:00Z")},
+		{makeAsk(2, 1, models.Market, 3, 500, "2017-12-29T03:00:00Z")},
+		{makeAsk(2, 1, models.StopLossActive, 11, 400, "2017-12-29T04:00:00Z")},
+		{makeAsk(2, 1, models.Limit, 10, 100, "2017-12-29T05:00:00Z")},
 	}
 
 	// Populate the test ask priority queue with dummy elements
@@ -230,7 +222,7 @@ func TestAskPQueuePushAndPop_concurrently_protects_min_order(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			pqueue.Push(testcases[i].ask, testcases[i].price, testcases[i].quantity)
+			pqueue.Push(testcases[i].ask)
 		}(i)
 	}
 
@@ -257,8 +249,8 @@ func TestAskPQueuePushAndPop_concurrently_protects_min_order(t *testing.T) {
 func TestBidPQueueHead_returns_max_element(t *testing.T) {
 	pqueue := NewBidPQueue(MAXPQ)
 
-	pqueue.Push(makeBid(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"), 100, 5)
-	pqueue.Push(makeBid(2, 1, models.Limit, 11, 400, "2017-12-29T02:00:00Z"), 400, 11)
+	pqueue.Push(makeBid(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"))
+	pqueue.Push(makeBid(2, 1, models.Limit, 11, 400, "2017-12-29T02:00:00Z"))
 
 	topBid := pqueue.Head()
 
@@ -273,8 +265,8 @@ func TestBidPQueueHead_returns_max_element(t *testing.T) {
 func TestAskPQueueHead_returns_min_element(t *testing.T) {
 	pqueue := NewAskPQueue(MINPQ)
 
-	pqueue.Push(makeAsk(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"), 100, 5)
-	pqueue.Push(makeAsk(2, 1, models.Limit, 11, 400, "2017-12-29T02:00:00Z"), 400, 11)
+	pqueue.Push(makeAsk(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"))
+	pqueue.Push(makeAsk(2, 1, models.Limit, 11, 400, "2017-12-29T02:00:00Z"))
 
 	topAsk := pqueue.Head()
 

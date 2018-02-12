@@ -1,6 +1,8 @@
 package matchingengine
 
 import (
+	"sync"
+
 	"github.com/Sirupsen/logrus"
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
@@ -14,6 +16,8 @@ var logger *logrus.Entry
 type MatchingEngine interface {
 	AddAskOrder(*models.Ask)
 	AddBidOrder(*models.Bid)
+	CancelAskOrder(*models.Ask)
+	CancelBidOrder(*models.Bid)
 }
 
 // matchingEngine implements the MatchingEngine interface
@@ -46,10 +50,17 @@ func NewMatchingEngine(dsm datastreams.Manager) MatchingEngine {
 
 	engine.loadOldOrders()
 
+	var wg sync.WaitGroup
+
 	for _, ob := range engine.orderBooks {
-		go ob.StartStockMatching()
+		wg.Add(1)
+		go func(ob OrderBook) {
+			ob.StartStockMatching() // this will return when it's initialized
+			wg.Done()
+		}(ob)
 	}
 
+	wg.Wait() // Don't return till the orderbooks have been initialized
 	engine.logger.Info("Started matching engine")
 	return engine
 }
@@ -64,6 +75,16 @@ func (m *matchingEngine) AddBidOrder(bidOrder *models.Bid) {
 	m.orderBooks[bidOrder.StockId].AddBidOrder(bidOrder)
 }
 
+// CancelAskOrder removes the ask order from the orderbook.
+func (m *matchingEngine) CancelAskOrder(askOrder *models.Ask) {
+	m.orderBooks[askOrder.StockId].CancelAskOrder(askOrder)
+}
+
+// CancelBidOrder removes the bid order from the orderbook.
+func (m *matchingEngine) CancelBidOrder(bidOrder *models.Bid) {
+	m.orderBooks[bidOrder.StockId].CancelBidOrder(bidOrder)
+}
+
 // loadOldOrders() loads old unfulfilled orders from database
 func (m *matchingEngine) loadOldOrders() {
 	var l = m.logger.WithFields(logrus.Fields{
@@ -75,27 +96,30 @@ func (m *matchingEngine) loadOldOrders() {
 	var (
 		openAskOrders []*models.Ask
 		openBidOrders []*models.Bid
-		stockIds      []uint32
+		stockIDs      []uint32
+		err           error
 	)
 
 	//Load stock ids from database
-	if err := db.Model(&models.Stock{}).Pluck("id", &stockIds).Error; err != nil {
+	if err = db.Model(&models.Stock{}).Pluck("id", &stockIDs).Error; err != nil {
 		panic("Failed to load stock ids in matching engine: " + err.Error())
 	}
 
 	//Load open ask orders from database
-	if err := db.Where("isClosed = ?", 0).Find(&openAskOrders).Error; err != nil {
+	openAskOrders, err = models.GetAllOpenAsks()
+	if err != nil {
 		panic("Error loading open ask orders in matching engine: " + err.Error())
 	}
 
 	//Load open bid orders from database
-	if err := db.Where("isClosed = ?", 0).Find(&openBidOrders).Error; err != nil {
+	openBidOrders, err = models.GetAllOpenBids()
+	if err != nil {
 		panic("Error loading open bid orders in matching engine: " + err.Error())
 	}
 
-	for _, stockId := range stockIds {
-		marketDepth := m.datastreamsManager.GetMarketDepthStream(stockId)
-		m.orderBooks[stockId] = NewOrderBook(stockId, marketDepth)
+	for _, stockID := range stockIDs {
+		marketDepth := m.datastreamsManager.GetMarketDepthStream(stockID)
+		m.orderBooks[stockID] = NewOrderBook(stockID, marketDepth)
 	}
 
 	//Load open ask orders into priority queue

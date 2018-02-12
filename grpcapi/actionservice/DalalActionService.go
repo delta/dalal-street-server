@@ -108,7 +108,7 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 	orderId := req.OrderId
 	isAsk := req.IsAsk
 
-	err := models.CancelOrder(userId, orderId, isAsk)
+	askOrder, bidOrder, err := models.CancelOrder(userId, orderId, isAsk)
 
 	switch err.(type) {
 	case models.InvalidAskIdError:
@@ -118,6 +118,13 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 
 	if err != nil {
 		return makeError(actions_pb.CancelOrderResponse_InternalServerError)
+	}
+
+	// remove the order from matching engine
+	if isAsk {
+		d.matchingEngine.CancelAskOrder(askOrder)
+	} else {
+		d.matchingEngine.CancelBidOrder(bidOrder)
 	}
 
 	l.Infof("Request completed successfully")

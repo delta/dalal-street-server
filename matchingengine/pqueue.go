@@ -111,8 +111,8 @@ func NewAskPQueue(pqType PQType) *AskPQueue {
 }
 
 // Push the value item into the priority queue with provided priority.
-func (pq *BidPQueue) Push(value *models.Bid, price uint32, quantity uint32) {
-	item := newBidItem(value, price, quantity)
+func (pq *BidPQueue) Push(value *models.Bid) {
+	item := newBidItem(value, value.Price, value.StockQuantity)
 
 	pq.Lock()
 	pq.items = append(pq.items, item)
@@ -121,8 +121,8 @@ func (pq *BidPQueue) Push(value *models.Bid, price uint32, quantity uint32) {
 	pq.Unlock()
 }
 
-func (pq *AskPQueue) Push(value *models.Ask, price uint32, quantity uint32) {
-	item := newAskItem(value, price, quantity)
+func (pq *AskPQueue) Push(value *models.Ask) {
+	item := newAskItem(value, value.Price, value.StockQuantity)
 
 	pq.Lock()
 	pq.items = append(pq.items, item)
