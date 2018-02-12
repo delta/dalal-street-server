@@ -104,7 +104,8 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		}
 		return handler(ctx, req)
 	case *actions_pb.RegisterRequest:
-		newSess, err := session.New()
+		// Fake because a session starts only once the user logs in.
+		newSess, err := session.Fake()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Internal error occurred")
 		}
