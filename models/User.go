@@ -83,7 +83,7 @@ func Login(email, password string) (User, error) {
 		Email: email,
 	}
 
-	err := db.First(&registeredUser).Where("email = ?", email).Error
+	err := db.Where("email = ?", email).First(&registeredUser).Error
 	l.Infof("%v", err)
 
 	// User was not found in our local db
@@ -183,7 +183,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 		Email: email,
 	}
 
-	err := db.First(&registeredUser).Where("email = ?", email).Error
+	err := db.Where("email = ?", email).First(&registeredUser).Error 
 
 	if err == nil {
 		return AlreadyRegisteredError
