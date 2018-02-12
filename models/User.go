@@ -83,7 +83,7 @@ func Login(email, password string) (User, error) {
 		Email: email,
 	}
 
-	err := db.First(&registeredUser).Error
+	err := db.First(&registeredUser).Where("email = ?", email).Error
 	l.Infof("%v", err)
 
 	// User was not found in our local db
@@ -171,7 +171,7 @@ func Login(email, password string) (User, error) {
 // RegisterUser is called when a user tries to sign up in our site
 func RegisterUser(email, password, userName, fullName string) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":         "Login",
+		"method":         "Register",
 		"param_email":    email,
 		"param_password": password,
 	})
@@ -183,7 +183,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 		Email: email,
 	}
 
-	err := db.First(&registeredUser).Error
+	err := db.First(&registeredUser).Where("email = ?", email).Error
 
 	if err == nil {
 		return AlreadyRegisteredError
