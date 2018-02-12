@@ -45,6 +45,10 @@ func (sess *fakeSession) Set(k string, v string) error {
 	return nil
 }
 
+func (sess *fakeSession) Touch() error {
+	return nil
+}
+
 func (sess *fakeSession) Delete(str string) error {
 	return nil
 }
