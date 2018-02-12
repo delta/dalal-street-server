@@ -44,7 +44,7 @@ func Test_Login(t *testing.T) {
 		t.Fatalf("Login failed: '%s'", err)
 	}
 
-	//The email should be Registrationed with the previous login attempt
+	//The email should be Registered with the previous login attempt
 	u, err = Login("test@testmail.com", "password")
 
 	if reflect.DeepEqual(u, exU) != true {

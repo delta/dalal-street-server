@@ -171,7 +171,7 @@ func Login(email, password string) (User, error) {
 // RegisterUser is called when a user tries to sign up in our site
 func RegisterUser(email, password, userName, fullName string) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":         "Login",
+		"method":         "Register",
 		"param_email":    email,
 		"param_password": password,
 	})
@@ -185,7 +185,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 
 	err := db.First(&registeredUser).Error
 
-	if err == nil {
+	if err != nil {
 		return AlreadyRegisteredError
 	}
 	l.Debugf("Trying to call Pragyan API for checking if email avalaible with Pragyan")
