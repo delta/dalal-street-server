@@ -76,7 +76,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	sess.Set("IP", r.RemoteAddr)
 
-	conn, err := upgrader.Upgrade(w, r, http.Header{"Set-Cookie": {"sid=" + sess.GetId() + "; HttpOnly"}})
+	conn, err := upgrader.Upgrade(w, r, http.Header{"Set-Cookie": {"sid=" + sess.GetID() + "; HttpOnly"}})
 
 	if err != nil {
 		l.Errorf("Could not upgrade connection: '%s'", err)

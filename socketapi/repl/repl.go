@@ -293,7 +293,7 @@ func Handle(done <-chan struct{}, userSess session.Session, cmd string) (ret str
 		}
 	}()
 
-	sid := userSess.GetId()
+	sid := userSess.GetID()
 
 	cmdSessionsMutex.Lock()
 	defer cmdSessionsMutex.Unlock()
