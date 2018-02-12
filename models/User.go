@@ -1584,7 +1584,9 @@ func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 	return stocksOwned, nil
 }
 
-// Call User.Unload() when a user logs out. This will remove him from RAM
-func (u *User) Unload() {
-
+// Logout removes the user from RAM.
+func Logout(userID uint32) {
+	userLocks.Lock()
+	delete(userLocks.m, userID)
+	userLocks.Unlock()
 }
