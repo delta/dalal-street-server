@@ -186,7 +186,10 @@ func (sess *session) Destroy() error {
 		return db.Error
 	}
 
+	sess.mutex.Lock()
 	sess.m = nil
+	sess.mutex.Unlock()
+	cache.Remove(sess.Id)
 
 	return nil
 }

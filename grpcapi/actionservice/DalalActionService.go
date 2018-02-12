@@ -331,6 +331,8 @@ func (d *dalalActionService) Logout(ctx context.Context, req *actions_pb.LogoutR
 	l.Infof("Logout requested")
 
 	sess := ctx.Value("session").(session.Session)
+	userId := getUserId(ctx)
+	models.Logout(userId)
 	sess.Destroy()
 
 	l.Infof("Request completed successfully")
