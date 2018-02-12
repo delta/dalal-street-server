@@ -201,7 +201,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 	}
 	u, err := createUser(userName, email)
 	if err != nil {
-		l.Error(" server error in Create user while logging in Pragyan user for the first time")
+		l.Error("Server error in Create user while logging in Pragyan user for the first time")
 		return InternalError
 	}
 	password, _ = hashPassword(password)
@@ -348,7 +348,12 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 		pu.Id = uint32(user_info_map["user_id"].(float64)) // sigh. Have to do this because Message is interface{}
 		pu.Name = user_info_map["user_fullname"].(string)
 		pu.UserName = user_info_map["user_name"].(string)
-		pu.Country = user_info_map["user_country"].(string)
+		switch country := user_info_map["user_country"].(type) {
+		case string:
+			pu.Country = country
+		case nil:
+			pu.Country = "India"
+		}
 
 		l.Debugf("Credentials verified. UserId: %d, Name: %s", pu.Id, pu.Name)
 
