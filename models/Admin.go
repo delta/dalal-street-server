@@ -11,12 +11,14 @@ func IsAdmin(username, password string) (bool, error) {
 
 	db := getDB()
 
-	sql := "Select * from Admins where username = ? and password = MD5(?)"
-	db = db.Exec(sql, username, password)
-	if err := db.Error; err != nil {
+	row := db.Table("Admins").Where("username = ? and password = MD5(?)", username, password).Select("username").Row()
+	tmp := ""
+	err := row.Scan(&tmp)
+	if err != nil {
 		l.Errorf("Error checking if user is admin: %+v", err)
 		return false, err
 	}
+
 	return true, nil
 }
 
