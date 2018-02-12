@@ -729,7 +729,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 }
 
-func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
+func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "CancelOrder",
 		"userId":  userId,
@@ -744,7 +744,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 	ch, _, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
-		return err
+		return nil, nil, err
 	}
 	l.Debugf("Acquired")
 	defer func() {
@@ -757,36 +757,38 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 		askOrder, err := getAsk(orderId)
 		if askOrder == nil || askOrder.UserId != userId {
 			l.Errorf("Invalid ask id provided")
-			return InvalidAskIdError{}
+			return nil, nil, InvalidAskIdError{}
 		} else if err != nil {
 			l.Errorf("Unknown error in getAsk: %+v", err)
-			return err
+			return nil, nil, err
 		}
 
 		if err := askOrder.Close(); err != nil {
 			l.Errorf("Unknown error while saving that ask is cancelled %+v", err)
-			return err
+			return nil, nil, err
 		}
+
+		l.Infof("Cancelled order")
+		return askOrder, nil, nil
 	} else {
 		l.Debugf("Acquiring lock on bid order")
 		bidOrder, err := getBid(orderId)
 		if bidOrder == nil || bidOrder.UserId != userId {
 			l.Errorf("Invalid bid id provided")
-			return InvalidBidIdError{}
+			return nil, nil, InvalidBidIdError{}
 		} else if err != nil {
 			l.Errorf("Unknown error in getBid")
-			return err
+			return nil, nil, err
 		}
 
 		if err := bidOrder.Close(); err != nil {
 			l.Errorf("Unknown error while saving that bid is cancelled %+v", err)
-			return err
+			return nil, nil, err
 		}
+
+		l.Infof("Cancelled order")
+		return nil, bidOrder, nil
 	}
-
-	l.Infof("Cancelled order")
-
-	return nil
 }
 
 func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*Transaction, error) {
@@ -931,7 +933,22 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 *		- if askDone is true, ask can be removed
 *		- if bidDone is true, bid can be removed
  */
-func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, stockTradeQty uint32) (bool, bool, *Transaction) {
+type AskOrderFillStatus uint8
+type BidOrderFillStatus uint8
+
+const (
+	AskAlreadyClosed AskOrderFillStatus = iota // Order was already cancelled before execution started!
+	AskDone                                    // Order either got fulfilled or dropped
+	AskUndone                                  // Order yet to complete
+)
+
+const (
+	BidAlreadyClosed BidOrderFillStatus = iota // Order was already cancelled before execution started!
+	BidDone                                    // Order either got fulfilled or dropped
+	BidUndone                                  // Order yet to complete
+)
+
+func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, stockTradeQty uint32) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "PerformOrderFillTransaction",
 		"askingUserId":  ask.UserId,
@@ -939,7 +956,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 		"stockId":       ask.StockId,
 	})
 
-	l.Infof("PerformOrderFillTransaction requested for stock id %v", ask.StockId)
+	l.Infof("Attempting")
 
 	/*
 		if ask.isclosed() return askDone, bidNotDone
@@ -968,12 +985,35 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 
 		return askdone,  biddone
 	*/
+
+	/*
+		Grab lock on user pair before checking for order cancellation,
+		since CancelOrder will otherwise have a race condition with this one
+	*/
+	done, askingUser, biddingUser, err := getUserPairExclusive(ask.UserId, bid.UserId)
+	if err != nil {
+		l.Errorf("Unable to acquire locks on the user pair: %+v", err)
+		return AskUndone, BidUndone, nil
+	}
+	defer close(done)
+
+	/* Check if either (or both) of the order(s) has been closed already */
+	askStatus := AskUndone
+	bidStatus := BidUndone
+
 	if ask.IsClosed {
-		return true, false, nil
+		askStatus = AskAlreadyClosed
 	}
 	if bid.IsClosed {
-		return false, true, nil
+		bidStatus = BidAlreadyClosed
 	}
+
+	if askStatus == AskAlreadyClosed || bidStatus == BidAlreadyClosed {
+		l.Infof("Done. One of the orders already closed. %+s and %+s", askStatus, bidStatus)
+		return askStatus, bidStatus, nil
+	}
+
+	/* We're here, so both orders are open now */
 
 	var updateDataStreams = func(askTrans, bidTrans *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
@@ -996,42 +1036,45 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 			})
 		}
 
-		transactionsStream.SendTransaction(askTrans.ToProto())
-		transactionsStream.SendTransaction(bidTrans.ToProto())
+		if askTrans != nil {
+			transactionsStream.SendTransaction(askTrans.ToProto())
+			transactionsStream.SendTransaction(bidTrans.ToProto())
+		}
 
 		l.Infof("Sent through the datastreams")
 	}
 
 	//Check if bidder has enough cash
-	// var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice)*stockTradeQty
+	var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice*stockTradeQty)
 
-	// if cashLeft < MINIMUM_CASH_LIMIT {
-	// 	l.Debugf("Check1: Failed. Not enough cash.")
-	// 	bid.IsClosed = true
-	// 	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
-	// 	go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
-	// 	return false, true, nil
-	// }
+	if cashLeft < MINIMUM_CASH_LIMIT {
+		l.Errorf("Check1: Failed. Not enough cash.")
+		bid.Close()
+		go updateDataStreams(nil, nil)
+		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
+		return AskUndone, BidDone, nil
+	}
 
 	//Check if askingUser has enough stocks
-	// numStocks, err := getSingleStockCount(askingUser, ask.StockId)
-	// if err != nil {
-	// 	return false, false, nil
-	// }
+	numStocks, err := getSingleStockCount(askingUser, ask.StockId)
+	if err != nil {
+		l.Errorf("Error getting stock count for askingUser: %+v", err)
+		return AskUndone, BidUndone, nil
+	}
 
-	// var numStocksLeft = numStocks - int32(stockTradeQty)
+	var numStocksLeft = numStocks - int32(stockTradeQty)
 
-	// if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
-	// 	l.Debugf("Check2: Failed. Not enough stocks.")
-	// 	currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
-	// 	if currentAllowedQty > ASK_LIMIT {
-	// 		currentAllowedQty = ASK_LIMIT
-	// 	}
-	// 	ask.IsClosed = true
-	// 	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
-	// 	go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
-	// 	return true, false, nil
-	// }
+	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
+		l.Debugf("Check2: Failed. Not enough stocks.")
+		currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
+		if currentAllowedQty > ASK_LIMIT {
+			currentAllowedQty = ASK_LIMIT
+		}
+		ask.Close()
+		go updateDataStreams(nil, nil)
+		go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
+		return AskDone, BidUndone, nil
+	}
 
 	//helper function to return a transaction object
 	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
@@ -1045,12 +1088,6 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 			CreatedAt:     utils.GetCurrentTimeISO8601(),
 		}
 	}
-
-	done, askingUser, biddingUser, err := getUserPairExclusive(ask.UserId, bid.UserId)
-	if err != nil {
-		return false, false, nil
-	}
-	defer close(done)
 
 	total := int32(stockTradePrice * stockTradeQty)
 
@@ -1073,10 +1110,10 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	//Begin transaction
 	tx := db.Begin()
 
-	var errorHelper = func(fmt string, args ...interface{}) (bool, bool, *Transaction) {
+	var errorHelper = func(fmt string, args ...interface{}) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
 		l.Errorf(fmt, args...)
 		tx.Rollback()
-		return false, false, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	//save askTransaction
@@ -1124,7 +1161,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	//Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return false, false, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	go updateDataStreams(askTransaction, bidTransaction)
@@ -1134,10 +1171,23 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 
 	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
-		return ask.IsClosed, bid.IsClosed, askTransaction
 	}
 
-	return ask.IsClosed, bid.IsClosed, askTransaction
+	/* Set the order statuses */
+
+	if ask.IsClosed {
+		askStatus = AskDone
+	} else {
+		askStatus = AskUndone
+	}
+
+	if bid.IsClosed {
+		bidStatus = BidDone
+	} else {
+		bidStatus = BidUndone
+	}
+
+	return askStatus, bidStatus, askTransaction
 }
 
 func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {

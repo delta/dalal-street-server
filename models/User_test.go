@@ -377,11 +377,21 @@ func Test_CancelOrder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := CancelOrder(tc.userId, tc.orderId, tc.isAsk)
-			if tc.pass == true && err != nil {
-				fm.Lock()
-				defer fm.Unlock()
-				t.Fatalf("Did not expect error. Got %+v", err)
+			askOrder, bidOrder, err := CancelOrder(tc.userId, tc.orderId, tc.isAsk)
+			if tc.pass == true {
+				if err != nil {
+					fm.Lock()
+					defer fm.Unlock()
+					t.Fatalf("Did not expect error. Got %+v", err)
+				} else if tc.isAsk && (askOrder == nil || bidOrder != nil) {
+					fm.Lock()
+					defer fm.Unlock()
+					t.Fatalf("For tc.isAsk, only askOrder should be not-nil")
+				} else if !tc.isAsk && (askOrder != nil || bidOrder == nil) {
+					fm.Lock()
+					defer fm.Unlock()
+					t.Fatalf("For !tc.isAsk, only bidOrder should be not-nil")
+				}
 			} else if tc.pass == false && err == nil {
 				fm.Lock()
 				defer fm.Unlock()
