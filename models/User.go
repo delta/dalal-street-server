@@ -140,7 +140,7 @@ func Login(email, password string) (User, error) {
 	// Found in our local database
 	// If he's not registered with Pragyan, match password
 	if registeredUser.IsPragyan == false {
-		if checkPasswordHash(registeredUser.Password, password) {
+		if checkPasswordHash(password, registeredUser.Password) {
 			return getUserFromDB(registeredUser.UserId)
 		}
 		return User{}, UnauthorizedError
@@ -183,7 +183,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 		Email: email,
 	}
 
-	err := db.Where("email = ?", email).First(&registeredUser).Error 
+	err := db.Where("email = ?", email).First(&registeredUser).Error
 
 	if err == nil {
 		return AlreadyRegisteredError
