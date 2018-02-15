@@ -1,0 +1,1 @@
+ALTER TABLE MarketEvents ADD COLUMN imagePath varchar(255);
