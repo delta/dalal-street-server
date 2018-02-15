@@ -101,19 +101,23 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		var err error
 		if len(md["sessionid"]) == 0 {
 			sess, err = session.New()
+			if err != nil {
+				// Need to refactor this
+				if config.Stage == "Dev" || config.Stage == "Test" || config.Stage == "Docker" {
+					return nil, status.Errorf(codes.Internal, "Internal error occurred: %+v", err)
+				}
+				return nil, status.Errorf(codes.Internal, "Internal error occurred")
+			}
 		} else {
 			sess, err = session.Load(md["sessionid"][0])
+			if err != nil {
+				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")	
+			}
+
 			err2 := sess.Touch() // ignore the error here.
 			if err2 != nil {
 				l.Errorf("Got error while touching the session. Suppressing. %+v", err2)
 			}
-		}
-
-		if err != nil {
-			if config.Stage == "Dev" || config.Stage == "Test" || config.Stage == "Docker" {
-				return nil, status.Errorf(codes.Internal, "Internal error occurred: %+v", err)
-			}
-			return nil, status.Errorf(codes.Internal, "Internal error occurred")
 		}
 		ctx = context.WithValue(ctx, "session", sess)
 
