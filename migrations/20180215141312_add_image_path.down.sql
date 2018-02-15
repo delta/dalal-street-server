@@ -1,0 +1,1 @@
+ALTER TABLE MarketEvents DROP COLUMN imagePath;
