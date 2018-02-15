@@ -1,6 +1,11 @@
 package models
 
 import (
+	"io"
+	"net/http"
+	"os"
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
@@ -13,6 +18,7 @@ type MarketEvent struct {
 	Headline     string `gorm:"column:headline;not null" json:"headline"`
 	Text         string `gorm:"column:text" json:"text"`
 	IsGlobal     bool   `gorm:"column:isGlobal" json:"is_global"`
+	ImagePath    string `gorm:"column:imagePath" json:"image_path"`
 	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
 }
 
@@ -28,6 +34,7 @@ func (gMarketEvent *MarketEvent) ToProto() *models_pb.MarketEvent {
 		Text:         gMarketEvent.Text,
 		EmotionScore: gMarketEvent.EmotionScore,
 		IsGlobal:     gMarketEvent.IsGlobal,
+		ImagePath:    gMarketEvent.ImagePath,
 		CreatedAt:    gMarketEvent.CreatedAt,
 	}
 	return pMarketEvent
@@ -66,27 +73,59 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	return moreExists, marketEvents, nil
 }
 
-func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool) error {
+func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageURL string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "AddMarketEvent",
 		"param_stockId":  stockId,
 		"param_headline": headline,
 		"param_text":     text,
 		"param_isGlobal": isGlobal,
+		"param_imageURL": imageURL,
 	})
 
 	l.Infof("Attempting")
 
+	// Try downloading image first
+	response, err := http.Get(imageURL)
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+
+	defer response.Body.Close()
+
+	const IMAGE_BASE_PATH = "./frontend/public/src/images/news/"
+	var splitURL = strings.Split(imageURL, "/")
+	var basename = splitURL[len(splitURL)-1]
+	l.Debugf("strings : %v ImageURL : %s Basename : %s", splitURL, imageURL, basename)
+	// open file for saving image
+	file, err := os.Create(IMAGE_BASE_PATH + basename)
+
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	defer file.Close()
+
+	// copy image to file
+	_, err = io.Copy(file, response.Body)
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+
 	db := getDB()
 
 	me := &MarketEvent{
-		StockId:  stockId,
-		Headline: headline,
-		Text:     text,
-		IsGlobal: isGlobal,
+		StockId:   stockId,
+		Headline:  headline,
+		Text:      text,
+		IsGlobal:  isGlobal,
+		ImagePath: basename,
+		CreatedAt: utils.GetCurrentTimeISO8601(),
 	}
 
-	if err := db.Save(me).Error; err != nil {
+	if err = db.Save(me).Error; err != nil {
 		l.Error(err)
 		return err
 	}

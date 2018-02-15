@@ -234,6 +234,7 @@ var replCmds = map[string]replCmdFn{
 		var headline string
 		var text string
 		var isGlobal bool
+		var imageURL string
 
 		aun, _ := userSess.Get("repl_Username")
 
@@ -242,6 +243,9 @@ var replCmds = map[string]replCmdFn{
 
 		s.print("Enter brief text:")
 		s.read("%q", &text)
+
+		s.print("Enter image URL:")
+		s.read("%q", &imageURL)
 
 		if stockId == 0 {
 			isGlobal = true
@@ -257,7 +261,7 @@ var replCmds = map[string]replCmdFn{
 		c := 'N'
 		s.read("%c", &c)
 		if c == 'Y' {
-			err := models.AddMarketEvent(stockId, headline, text, isGlobal)
+			err := models.AddMarketEvent(stockId, headline, text, isGlobal, imageURL)
 			if err != nil {
 				models.AdminLog(aun, fmt.Sprintf("Adding market event '%s'[%s] for %d failed due to '%+v'", headline, text, stockId, err))
 				s.error(err)
