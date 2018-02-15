@@ -91,7 +91,6 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 		l.Error(err)
 		return err
 	}
-
 	defer response.Body.Close()
 
 	var splitURL = strings.Split(imageURL, "/")
@@ -99,7 +98,7 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 	l.Debugf("strings : %v ImageURL : %s Basename : %s", splitURL, imageURL, basename)
 
 	// open file for saving image
-	file, err := os.Create(IMAGE_BASE_PATH + basename)
+	file, err := os.Create(utils.GetImageBasePath() + basename)
 
 	if err != nil {
 		l.Error(err)
