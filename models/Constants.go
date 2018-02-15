@@ -21,3 +21,5 @@ const LEADERBOARD_COUNT = 10
 
 const MARKET_IS_OPEN_HACKY_NOTIF = "Market is open"
 const MARKET_IS_CLOSED_HACKY_NOTIF = "Market is closed"
+
+const IMAGE_BASE_PATH = "./frontend/public/src/images/news/"

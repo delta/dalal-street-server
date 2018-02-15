@@ -94,10 +94,10 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 
 	defer response.Body.Close()
 
-	const IMAGE_BASE_PATH = "./frontend/public/src/images/news/"
 	var splitURL = strings.Split(imageURL, "/")
 	var basename = splitURL[len(splitURL)-1]
 	l.Debugf("strings : %v ImageURL : %s Basename : %s", splitURL, imageURL, basename)
+
 	// open file for saving image
 	file, err := os.Create(IMAGE_BASE_PATH + basename)
 
