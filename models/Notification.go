@@ -78,6 +78,7 @@ func SendNotification(userId uint32, text string, isBroadcast bool) error {
 		UserId:      userId,
 		Text:        text,
 		IsBroadcast: isBroadcast,
+		CreatedAt:   utils.GetCurrentTimeISO8601(),
 	}
 
 	if err := db.Save(n).Error; err != nil {

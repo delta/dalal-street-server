@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-
 	"github.com/Sirupsen/logrus"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 const TIMES_RESOLUTION = 60
@@ -160,6 +160,8 @@ func UpdateStockPrice(stockId, price uint32) error {
 		stock.UpOrDown = false
 	}
 
+	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
+
 	avgLastPrice.Lock()
 	avgLastPrice.m[stock.Id] -= uint32((avgLastPrice.m[stock.Id] / 20))
 	avgLastPrice.m[stock.Id] += uint32((stock.CurrentPrice) / 20)
@@ -261,6 +263,7 @@ func AddStocksToExchange(stockId, count uint32) error {
 	stock := stockNLock.stock
 
 	stock.StocksInExchange += count
+	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
 
 	db := getDB()
 

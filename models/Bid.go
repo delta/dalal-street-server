@@ -11,6 +11,7 @@ import (
 )
 
 type Bid struct {
+	sync.Mutex
 	Id                     uint32    `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId                 uint32    `gorm:"column:userId;not null" json:"user_id"`
 	StockId                uint32    `gorm:"column:stockId;not null" json:"stock_id"`
@@ -61,7 +62,10 @@ func (bid *Bid) TriggerStoploss() error {
 
 	db := getDB()
 	if bid.OrderType == StopLoss {
+		bid.Lock()
 		bid.OrderType = StopLossActive
+		bid.UpdatedAt = utils.GetCurrentTimeISO8601()
+		bid.Unlock()
 		if err := db.Save(bid).Error; err != nil {
 			l.Errorf("Error while saving data: %+v", err)
 			return err
@@ -155,8 +159,10 @@ func (bid *Bid) Close() error {
 
 	db := getDB()
 
+	bid.Lock()
 	bid.IsClosed = true
 	bid.UpdatedAt = utils.GetCurrentTimeISO8601()
+	bid.Unlock()
 
 	if err := db.Save(bid).Error; err != nil {
 		l.Error(err)

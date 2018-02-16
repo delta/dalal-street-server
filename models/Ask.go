@@ -62,6 +62,7 @@ func OrderTypeFromProto(pOt models_pb.OrderType) OrderType {
 }
 
 type Ask struct {
+	sync.Mutex
 	Id                     uint32    `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId                 uint32    `gorm:"column:userId;not null" json:"user_id"`
 	StockId                uint32    `gorm:"column:stockId;not null" json:"stock_id"`
@@ -112,7 +113,10 @@ func (ask *Ask) TriggerStoploss() error {
 
 	db := getDB()
 	if ask.OrderType == StopLoss {
+		ask.Lock()
 		ask.OrderType = StopLossActive
+		ask.UpdatedAt = utils.GetCurrentTimeISO8601()
+		ask.Unlock()
 		if err := db.Save(ask).Error; err != nil {
 			l.Errorf("Error while saving data: %+v", err)
 			return err
@@ -207,8 +211,10 @@ func (ask *Ask) Close() error {
 
 	l.Debugf("Attempting")
 
+	ask.Lock()
 	ask.IsClosed = true
 	ask.UpdatedAt = utils.GetCurrentTimeISO8601()
+	ask.Unlock()
 
 	db := getDB()
 	if err := db.Save(ask).Error; err != nil {
