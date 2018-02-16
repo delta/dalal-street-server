@@ -68,6 +68,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 		UpOrDown:         true,
 		AvgLastPrice:     1050,
 		PreviousDayClose: 1000,
+		UpdatedAt: retrievedStock.UpdatedAt,
 	}
 	if !testutils.AssertEqual(t, stock1, retrievedStock) {
 		t.Fatalf("Expected %v but got %v", stock1, retrievedStock)
@@ -128,7 +129,7 @@ func Test_AddStocksToExchange(t *testing.T) {
 
 	var retrievedStock = &Stock{Id: 1}
 	db.First(retrievedStock)
-	var stockEqual = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 244}
+	var stockEqual = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 244, UpdatedAt: retrievedStock.UpdatedAt}
 
 	if !testutils.AssertEqual(t, retrievedStock, stockEqual) {
 		t.Fatalf("Expected %v but got %v", stockEqual, retrievedStock)
