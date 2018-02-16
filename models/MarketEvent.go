@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -87,15 +88,22 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 
 	// Try downloading image first
 	response, err := http.Get(imageURL)
-	if err != nil {
-		l.Error(err)
-		return err
+	if err != nil || response.StatusCode != http.StatusOK {
+		l.Errorf("Error : %v, StatusCode : %d", err, response.StatusCode)
+		if err != nil {
+			return err
+		}
+		return errors.New("NOT OK status code")
 	}
 	defer response.Body.Close()
 
-	var splitURL = strings.Split(imageURL, "/")
-	var basename = splitURL[len(splitURL)-1]
-	l.Debugf("strings : %v ImageURL : %s Basename : %s", splitURL, imageURL, basename)
+	// Extract filename
+	var basename = imageURL[strings.LastIndex(imageURL, "/")+1:]
+	var getParamStartIndex = strings.Index(basename, "?")
+	if getParamStartIndex != -1 {
+		basename = basename[:getParamStartIndex]
+	}
+	l.Debugf("ImageURL : %s Basename : %s", imageURL, basename)
 
 	// open file for saving image
 	file, err := os.Create(utils.GetImageBasePath() + basename)
