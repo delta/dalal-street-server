@@ -283,3 +283,41 @@ func AddStocksToExchange(stockId, count uint32) error {
 
 	return nil
 }
+
+func SetPreviousDayClose() (err error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "SetPreviousDayClose",
+	})
+
+	db := getDB()
+	tx := db.Begin()
+
+	l.Info("Attempting to set previous day close")
+
+	l.Info("Locking allStocks in SetPreviousDayClose")
+	allStocks.Lock()
+	defer func() {
+		l.Info("Unlocking allStocks in SetPreviousDayClose")
+		allStocks.Unlock()
+
+		// Calling LoadStocks to prevent inconsistency
+		// between db and allStocks
+		err = LoadStocks()
+	}()
+
+	for _, stockNLock := range allStocks.m {
+		stockNLock.stock.PreviousDayClose = stockNLock.stock.CurrentPrice
+		if err = tx.Save(stockNLock.stock).Error; err != nil {
+			l.Errorf("Error occured : %v", err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		l.Errorf("Error while commiting transaction : %v", err)
+		return err
+	}
+
+	return err
+}
