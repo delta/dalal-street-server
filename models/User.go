@@ -994,46 +994,53 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
 
-	userCash := uint32(int32(user.Cash) + transaction.Total)
-	stock.StocksInExchange -= stockQuantityRemoved
-	stock.StocksInMarket += stockQuantityRemoved
+	oldCash := user.Cash
+	newCash := uint32(int32(user.Cash) + transaction.Total)
+
+	oldStocksInExchange := stock.StocksInExchange
+	oldStocksInMarket := stock.StocksInMarket
+	newStocksInExchange := stock.StocksInExchange - stockQuantityRemoved
+	newStocksInMarket := stock.StocksInMarket + stockQuantityRemoved
 
 	/* Committing to database */
 	db := getDB()
 
 	tx := db.Begin()
 
-	if err := tx.Save(transaction).Error; err != nil {
-		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
+	var errorHelper = func(format string, args ...interface{}) (*Transaction, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
+		stock.StocksInExchange = oldStocksInExchange
+		stock.StocksInMarket = oldStocksInMarket
 		tx.Rollback()
-		return nil, err
+		return nil, InternalError
+	}
+
+	if err := tx.Save(transaction).Error; err != nil {
+		return errorHelper("Error creating the transaction. Rolling back. Error: %+v", err)
 	}
 
 	l.Debugf("Added transaction to Transactions table")
 
-	if err := tx.Model(user).Update("cash", userCash).Error; err != nil {
-		l.Errorf("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return nil, err
+	if err := tx.Model(user).Update("cash", newCash).Error; err != nil {
+		return errorHelper("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
 	}
 
-	l.Debugf("Deducted cash from user's account. New balance: %d", userCash)
+	l.Debugf("Deducted cash from user's account. New balance: %d", newCash)
 
-	if err := tx.Save(stock).Error; err != nil {
-		l.Errorf("Error transfering stocks from exchange to market. Rolling back.")
-		stock.StocksInExchange += stockQuantityRemoved
-		stock.StocksInMarket -= stockQuantityRemoved
-		return nil, err
+	if err := tx.Model(stock).Updates(Stock{
+		StocksInExchange: newStocksInExchange,
+		StocksInMarket:   newStocksInMarket,
+		UpdatedAt:        utils.GetCurrentTimeISO8601(),
+	}).Error; err != nil {
+		return errorHelper("Error transfering stocks from exchange to market. Rolling back.")
 	}
 
 	l.Debugf("Transferred stocks from Exchange to Market")
 
 	if err := tx.Commit().Error; err != nil {
-		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return nil, err
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
-
-	user.Cash = userCash
 
 	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
 
@@ -1230,15 +1237,25 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -int32(stockTradeQty), stockTradePrice, total)
 	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, int32(stockTradeQty), stockTradePrice, -total)
 
+	// save old cash for rolling back
+	askingUserOldCash := askingUser.Cash
+	biddingUserOldCash := biddingUser.Cash
+
 	//calculate user's updated cash
 	askingUserCash := askingUser.Cash + uint32(stockTradeQty)*stockTradePrice
 	biddingUserCash := biddingUser.Cash - uint32(stockTradeQty)*stockTradePrice
 
+	// in case things go wrong and we've to roll back
+	oldAskStockQuantityFulfilled := ask.StockQuantityFulfilled
+	oldBidStockQuantityFulfilled := bid.StockQuantityFulfilled
+	oldAskIsClosed := ask.IsClosed
+	oldBidIsClosed := bid.IsClosed
+
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
 	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
 	bidStockQuantityFulfilled := bid.StockQuantityFulfilled + uint32(stockTradeQty)
-	askIsClosed := (ask.StockQuantity == askStockQuantityFulfilled)
-	bidIsClosed := (bid.StockQuantity == bidStockQuantityFulfilled)
+	askIsClosed := (ask.StockQuantity == ask.StockQuantityFulfilled)
+	bidIsClosed := (bid.StockQuantity == bid.StockQuantityFulfilled)
 
 	//Committing to database
 	db := getDB()
@@ -1248,6 +1265,15 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 
 	var errorHelper = func(fmt string, args ...interface{}) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
 		l.Errorf(fmt, args...)
+		askingUser.Cash = askingUserOldCash
+		biddingUser.Cash = biddingUserOldCash
+
+		ask.StockQuantityFulfilled = oldAskStockQuantityFulfilled
+		bid.StockQuantityFulfilled = oldBidStockQuantityFulfilled
+
+		ask.IsClosed = oldAskIsClosed
+		bid.IsClosed = oldBidIsClosed
+
 		tx.Rollback()
 		return AskUndone, BidUndone, nil
 	}
@@ -1416,35 +1442,36 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	// A lock on user and stock has been acquired.
 	// Safe to make changes to this user and this stock
 
-	userCash := uint32(int32(user.Cash) + trTotal)
+	oldCash := user.Cash
+	newCash := uint32(int32(user.Cash) + trTotal)
 
 	/* Committing to database */
 	db := getDB()
 
 	tx := db.Begin()
 
-	if err := tx.Save(transaction).Error; err != nil {
-		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
+	errorHelper := func(format string, args ...interface{}) (*Transaction, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
 		tx.Rollback()
-		return nil, err
+		return nil, InternalError
+	}
+
+	if err := tx.Save(transaction).Error; err != nil {
+		return errorHelper("Error creating the transaction. Rolling back. Error: %+v", err)
 	}
 
 	l.Debugf("Added transaction to Transactions table")
 
-	if err := tx.Save(user).Error; err != nil {
-		l.Errorf("Error updating user's cash. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return nil, err
+	if err := tx.Model(user).Update("cash", newCash).Error; err != nil {
+		return errorHelper("Error updating user's cash. Rolling back. Error: %+v", err)
 	}
 
 	l.Debugf("Updated user's cash. New balance: %d", user.Cash)
 
 	if err := tx.Commit().Error; err != nil {
-		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return nil, err
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
-
-	user.Cash = userCash
 
 	l.Debugf("Committed transaction. Success.")
 
