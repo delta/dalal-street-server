@@ -16,7 +16,7 @@ func OpenMarket() {
 	notificationsStream.SendNotification(notif.ToProto())
 }
 
-func CloseMarket() {
+func CloseMarket(updatePreviousDayClose bool) error {
 	isMarketOpen = false
 
 	db := getDB()
@@ -29,6 +29,13 @@ func CloseMarket() {
 
 	notificationsStream := datastreamsManager.GetNotificationsStream()
 	notificationsStream.SendNotification(notif.ToProto())
+
+	var err error
+	if updatePreviousDayClose {
+		err = SetPreviousDayClose()
+	}
+
+	return err
 }
 
 func IsMarketOpen() bool {

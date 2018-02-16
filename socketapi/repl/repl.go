@@ -113,8 +113,22 @@ var replCmds = map[string]replCmdFn{
 
 		c := 'N'
 		s.read("%c", &c)
+
 		if c == 'Y' {
-			models.CloseMarket()
+			updatePrevDayClose := 'N'
+
+			s.print("Do you want to update previous day close?")
+			s.read("%c", &updatePrevDayClose)
+
+			if updatePrevDayClose == 'Y' {
+				s.print("Think twice. There's no going back. Update previous day close?")
+				s.read("%c", &updatePrevDayClose)
+			}
+
+			err := models.CloseMarket(updatePrevDayClose == 'Y')
+			if err != nil {
+				s.error("Error setting previous day close")
+			}
 			models.AdminLog(aun, "Closed market")
 			s.finish("Done")
 		}
