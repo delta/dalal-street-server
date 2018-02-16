@@ -686,8 +686,8 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 		l.Debugf("Releasing lock for ask order threshold check with stock id : %v ", ask.StockId)
 
-		var upperLimit = uint32(1.2 * float32(currentPrice))
-		var lowerLimit = uint32(0.8 * float32(currentPrice))
+		var upperLimit = uint32((1 + ORDER_PRICE_WINDOW/100) * float32(currentPrice))
+		var lowerLimit = uint32((1 - ORDER_PRICE_WINDOW/100) * float32(currentPrice))
 
 		if ask.Price > upperLimit || ask.Price < lowerLimit {
 			l.Debugf("Threshold price check failed for ask order")
@@ -793,8 +793,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 		l.Debugf("Releasing lock for bid order threshold check with stock id : %v ", bid.StockId)
 
-		var upperLimit = uint32(1.2 * float32(currentPrice))
-		var lowerLimit = uint32(0.8 * float32(currentPrice))
+		var upperLimit = uint32((1 + ORDER_PRICE_WINDOW/100) * float32(currentPrice))
+		var lowerLimit = uint32((1 - ORDER_PRICE_WINDOW/100) * float32(currentPrice))
 
 		if bid.Price > upperLimit || bid.Price < lowerLimit {
 			l.Debugf("Threshold price check failed for bid order")
