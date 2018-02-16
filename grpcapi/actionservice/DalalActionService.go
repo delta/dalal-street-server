@@ -295,6 +295,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		"BUY_LIMIT":               models.BUY_LIMIT,
 		"MINIMUM_CASH_LIMIT":      models.MINIMUM_CASH_LIMIT,
 		"BUY_FROM_EXCHANGE_LIMIT": models.BUY_FROM_EXCHANGE_LIMIT,
+		"ORDER_PRICE_WINDOW":      models.ORDER_PRICE_WINDOW,
 		"STARTING_CASH":           models.STARTING_CASH,
 		"MORTGAGE_RETRIEVE_RATE":  models.MORTGAGE_RETRIEVE_RATE,
 		"MORTGAGE_DEPOSIT_RATE":   models.MORTGAGE_DEPOSIT_RATE,
