@@ -134,7 +134,7 @@ func GetAskTransactionsForStock(stockID, count uint32) ([]*Transaction, error) {
 	var transactions []*Transaction
 
 	//get latest events if lastId is zero
-	db = db.Where("stockID = ?", stockID).Where("total < 0")
+	db = db.Where("stockID = ?", stockID).Where("stockQuantity < 0").Where("OrderType = ?", "OrderFillTransaction")
 	if err := db.Order("id desc").Limit(count).Find(&transactions).Error; err != nil {
 		return nil, err
 	}
