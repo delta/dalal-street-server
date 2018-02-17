@@ -1161,6 +1161,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 			myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
 				Id:            ask.Id,
 				IsAsk:         true,
+				StockQuantity: ask.StockQuantity,
 				TradeQuantity: stockTradeQty,
 				IsClosed:      ask.IsClosed,
 			})
@@ -1169,6 +1170,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 			myOrdersStream.SendOrder(bid.UserId, &datastreams_pb.MyOrderUpdate{
 				Id:            bid.Id,
 				IsAsk:         false,
+				StockQuantity: bid.StockQuantity,
 				TradeQuantity: stockTradeQty,
 				IsClosed:      bid.IsClosed,
 			})
@@ -1249,8 +1251,8 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
 	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
 	bidStockQuantityFulfilled := bid.StockQuantityFulfilled + uint32(stockTradeQty)
-	askIsClosed := (ask.StockQuantity == ask.StockQuantityFulfilled)
-	bidIsClosed := (bid.StockQuantity == bid.StockQuantityFulfilled)
+	askIsClosed := (ask.StockQuantity == askStockQuantityFulfilled)
+	bidIsClosed := (bid.StockQuantity == bidStockQuantityFulfilled)
 
 	//Committing to database
 	db := getDB()
