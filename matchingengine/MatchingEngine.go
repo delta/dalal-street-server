@@ -39,6 +39,7 @@ func Init(config *utils.Config) {
 
 // NewMatchingEngine returns an instance of MatchingEngine
 // It calls StartStockmatching for all the stocks in concurrent goroutines.
+// WARNING: Do NOT call this again for a given stock, once the server has restarted
 func NewMatchingEngine(dsm datastreams.Manager) MatchingEngine {
 	engine := &matchingEngine{
 		logger: utils.Logger.WithFields(logrus.Fields{
@@ -120,6 +121,12 @@ func (m *matchingEngine) loadOldOrders() {
 	for _, stockID := range stockIDs {
 		marketDepth := m.datastreamsManager.GetMarketDepthStream(stockID)
 		m.orderBooks[stockID] = NewOrderBook(stockID, marketDepth)
+		tx, err := models.GetAskTransactionsForStock(stockID, 15)
+		if err != nil {
+			l.Errorf("Unable to load old transactions for stockid %d", stockID)
+		} else {
+			m.orderBooks[stockID].LoadOldTransactions(tx)
+		}
 	}
 
 	//Load open ask orders into priority queue

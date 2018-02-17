@@ -17,6 +17,7 @@ var fillOrderFn FillOrder = models.PerformOrderFillTransaction
 
 // OrderBook stores the order book for a given stock
 type OrderBook interface {
+	LoadOldTransactions(txs []*models.Transaction)
 	LoadOldAsk(*models.Ask)
 	LoadOldBid(*models.Bid)
 	AddAskOrder(*models.Ask)
@@ -75,6 +76,12 @@ func (ob *orderBook) addBidToDepth(bid *models.Bid) {
 	// use unfulfilled qty here, because depth should have only the unfulfilled qty
 	bidUnfulfilledQuantity := bid.StockQuantity - bid.StockQuantityFulfilled
 	ob.depth.AddOrder(isMarket(bid.OrderType), false, bid.Price, bidUnfulfilledQuantity)
+}
+
+func (ob *orderBook) LoadOldTransactions(txs []*models.Transaction) {
+	for _, tx := range txs {
+		ob.depth.AddTrade(tx.Price, uint32(-tx.StockQuantity), tx.CreatedAt)
+	}
 }
 
 // LoadOldAsk loads an old ask into the order book
