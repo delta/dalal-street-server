@@ -40,8 +40,10 @@ func getTradePriceAndQty(ask *models.Ask, bid *models.Bid) (uint32, uint32) {
 		stockTradePrice = bid.Price
 	} else if isMarket(bid.OrderType) {
 		stockTradePrice = ask.Price
+	} else if ask.CreatedAt < bid.CreatedAt {
+		stockTradePrice = ask.Price
 	} else {
-		stockTradePrice = utils.MinInt(ask.Price, bid.Price)
+		stockTradePrice = bid.Price
 	}
 
 	return stockTradePrice, stockTradeQty
