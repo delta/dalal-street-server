@@ -284,6 +284,8 @@ func AddStocksToExchange(stockId, count uint32) error {
 	return nil
 }
 
+// SetPreviousDayClose will be called when market
+// is closing for the day to update the day closing
 func SetPreviousDayClose() (err error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "SetPreviousDayClose",
@@ -307,6 +309,48 @@ func SetPreviousDayClose() (err error) {
 
 	for _, stockNLock := range allStocks.m {
 		stockNLock.stock.PreviousDayClose = stockNLock.stock.CurrentPrice
+		if err = tx.Save(stockNLock.stock).Error; err != nil {
+			l.Errorf("Error occured : %v", err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		l.Errorf("Error while commiting transaction : %v", err)
+		return err
+	}
+
+	return err
+}
+
+// SetDayHighAndLow will be called when market
+// is opening for the day
+func SetDayHighAndLow() (err error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "SetDayHighAndLow",
+	})
+
+	db := getDB()
+	tx := db.Begin()
+
+	l.Info("Attempting to set previous day close")
+
+	l.Info("Locking allStocks in SetDayHighAndLow")
+	allStocks.Lock()
+	defer func() {
+		l.Info("Unlocking allStocks in SetDayHighAndLow")
+		allStocks.Unlock()
+
+		// Calling LoadStocks to prevent inconsistency
+		// between db and allStocks
+		err = LoadStocks()
+	}()
+
+	for _, stockNLock := range allStocks.m {
+		stockNLock.stock.DayHigh = stockNLock.stock.CurrentPrice
+		stockNLock.stock.DayLow = stockNLock.stock.CurrentPrice
+
 		if err = tx.Save(stockNLock.stock).Error; err != nil {
 			l.Errorf("Error occured : %v", err)
 			tx.Rollback()

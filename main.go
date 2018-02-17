@@ -46,7 +46,7 @@ func RealMain() {
 	grpcapi.Init(config, matchingEngine, datastreamsManager)
 
 	// TODO: Close before deploying!
-	models.OpenMarket()
+	models.OpenMarket(false)
 
 	httpServer := http.Server{
 		Addr: config.ServerPort,

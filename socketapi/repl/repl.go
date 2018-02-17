@@ -99,7 +99,19 @@ var replCmds = map[string]replCmdFn{
 		c := 'N'
 		s.read("%c", &c)
 		if c == 'Y' {
-			models.OpenMarket()
+			updateDayHighAndLow := 'N'
+
+			s.print("Do you want to update day high and low?")
+			s.read("%c", &updateDayHighAndLow)
+
+			if updateDayHighAndLow == 'Y' {
+				s.print("Think twice. There's no going back. Update day high and low?")
+				s.read("%c", &updateDayHighAndLow)
+			}
+			err := models.OpenMarket(updateDayHighAndLow == 'Y')
+			if err != nil {
+				s.error("Error setting Dayhigh and DayLow")
+			}
 			models.AdminLog(aun, "Opened market")
 			s.finish("Done")
 		}
