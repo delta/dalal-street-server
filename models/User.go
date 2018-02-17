@@ -424,7 +424,7 @@ func getSingleStockCount(u *User, stockId uint32) (int32, error) {
 type OrderStockLimitExceeded struct{}
 
 func (e OrderStockLimitExceeded) Error() string {
-	return fmt.Sprintf("An order can involve a trade of %d stocks at most", ASK_LIMIT)
+	return fmt.Sprintf("An order can involve a trade of min 1 and max %d stocks", ASK_LIMIT)
 }
 
 // OrderPriceOutOfWindowError is sent when the order's price is outside the allowed price window
@@ -703,7 +703,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	// First check: Order size should be less than ASK_LIMIT
 	l.Debugf("Check1: Order size vs ASK_LIMIT (%d)", ASK_LIMIT)
-	if ask.StockQuantity > ASK_LIMIT {
+	if ask.StockQuantity > ASK_LIMIT || ask.StockQuantity < 1 {
 		l.Debugf("Check1: Failed.")
 		return 0, OrderStockLimitExceeded{}
 	}
@@ -809,7 +809,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	// First check: Order size should be less than BID_LIMIT
 	l.Debugf("Check1: Order size vs BID_LIMIT (%d)", BID_LIMIT)
-	if bid.StockQuantity > BID_LIMIT {
+	if bid.StockQuantity > BID_LIMIT || bid.StockQuantity < 1 {
 		l.Debugf("Check1: Failed.")
 		return 0, OrderStockLimitExceeded{}
 	}
