@@ -94,7 +94,7 @@ func (mds *marketDepthStream) run() {
 	for {
 		if mds.broadcastStream.GetListenersCount() == 0 {
 			l.Debugf("No listeners. Sleeping for 15 seconds")
-			time.Sleep(time.Minute / 4)
+			time.Sleep(time.Second * 2)
 			continue
 		}
 
@@ -131,13 +131,13 @@ func (mds *marketDepthStream) run() {
 
 		if !shouldSend {
 			l.Debugf("No update to send. Sleeping for 15 seconds")
-			time.Sleep(time.Minute / 4)
+			time.Sleep(time.Second * 2)
 			continue
 		}
 
 		mds.broadcastStream.BroadcastUpdate(mdUpdate)
 		l.Debugf("Sent %+v to %d listeners! Sleeping for 15 seconds", mdUpdate, mds.broadcastStream.GetListenersCount())
-		time.Sleep(time.Minute / 4)
+		time.Sleep(time.Second * 2)
 	}
 }
 

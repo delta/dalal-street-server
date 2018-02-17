@@ -58,7 +58,7 @@ func (ses *stockExchangeStream) Run() {
 		if len(ses.dirtyStocksInExchange) == 0 {
 			ses.stockExchangeMutex.Unlock()
 			l.Debugf("Nothing dirty yet. Sleeping for 15 seconds")
-			time.Sleep(time.Minute / 4)
+			time.Sleep(time.Second * 5)
 			continue
 		}
 
@@ -72,7 +72,7 @@ func (ses *stockExchangeStream) Run() {
 		ses.broadcastStream.BroadcastUpdate(updateProto)
 		l.Debugf("Sent to %d listeners!. Sleeping for 15 seconds", ses.broadcastStream.GetListenersCount())
 
-		time.Sleep(time.Minute / 4)
+		time.Sleep(time.Second * 5)
 	}
 }
 
