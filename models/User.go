@@ -53,10 +53,9 @@ func (u *User) ToProto() *models_pb.User {
 
 // pragyanUser is the structure returned by Pragyan API
 type pragyanUser struct {
-	Id       uint32 `json:"user_id"`
-	Name     string `json:"user_fullname"`
-	UserName string `json:"user_name"`
-	Country  string `json:"user_country"`
+	Id      uint32 `json:"user_id"`
+	Name    string `json:"user_fullname"`
+	Country string `json:"user_country"`
 }
 
 // User.TableName() is for letting Gorm know the correct table name.
@@ -108,7 +107,6 @@ func Login(email, password string) (User, error) {
 			IsPragyan:  true,
 			IsVerified: true,
 			Name:       pu.Name,
-			UserName:   pu.UserName,
 			UserId:     u.Id,
 		}
 
@@ -168,7 +166,7 @@ func Login(email, password string) (User, error) {
 }
 
 // RegisterUser is called when a user tries to sign up in our site
-func RegisterUser(email, password, userName, fullName string) error {
+func RegisterUser(email, password, fullName string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "Register",
 		"param_email":    email,
@@ -198,7 +196,7 @@ func RegisterUser(email, password, userName, fullName string) error {
 		l.Errorf("Unexpected error: %+v", err)
 		return err
 	}
-	u, err := createUser(userName, email)
+	u, err := createUser(fullName, email)
 	if err != nil {
 		l.Errorf("Server error in Create user while logging in Pragyan user for the first time: %+v", err)
 		return err
@@ -210,7 +208,6 @@ func RegisterUser(email, password, userName, fullName string) error {
 		IsPragyan:  false,
 		IsVerified: false,
 		Name:       fullName,
-		UserName:   userName,
 		UserId:     u.Id,
 	}
 	err = db.Save(register).Error
@@ -345,7 +342,6 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 		userInfoMap := r.Message.(map[string]interface{})
 		pu.Id = uint32(userInfoMap["user_id"].(float64)) // sigh. Have to do this because Message is interface{}
 		pu.Name = userInfoMap["user_fullname"].(string)
-		pu.UserName = userInfoMap["user_name"].(string)
 		switch country := userInfoMap["user_country"].(type) {
 		case string:
 			pu.Country = country
