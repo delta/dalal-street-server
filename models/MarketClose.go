@@ -2,7 +2,7 @@ package models
 
 var isMarketOpen = false
 
-func OpenMarket() {
+func OpenMarket(updateDayHighAndLow bool) error {
 	isMarketOpen = true
 
 	db := getDB()
@@ -14,6 +14,11 @@ func OpenMarket() {
 	}
 	notificationsStream := datastreamsManager.GetNotificationsStream()
 	notificationsStream.SendNotification(notif.ToProto())
+
+	if updateDayHighAndLow {
+		return SetDayHighAndLow()
+	}
+	return nil
 }
 
 func CloseMarket(updatePreviousDayClose bool) error {
@@ -30,12 +35,11 @@ func CloseMarket(updatePreviousDayClose bool) error {
 	notificationsStream := datastreamsManager.GetNotificationsStream()
 	notificationsStream.SendNotification(notif.ToProto())
 
-	var err error
 	if updatePreviousDayClose {
-		err = SetPreviousDayClose()
+		return SetPreviousDayClose()
 	}
 
-	return err
+	return nil
 }
 
 func IsMarketOpen() bool {
