@@ -226,7 +226,7 @@ func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.Regis
 		return resp, nil
 	}
 
-	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetUserName(), req.GetFullName())
+	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetFullName())
 	if err == models.AlreadyRegisteredError {
 		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredError, "Already registered please Login")
 	}
