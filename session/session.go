@@ -113,6 +113,13 @@ func New() (Session, error) {
 	return sess, nil
 }
 
+func (sess *session) String() string {
+	sess.mutex.RLock()
+	defer sess.mutex.RUnlock()
+
+	return fmt.Sprintf("Session[Id=%s, %+v]", sess.Id, sess.m)
+}
+
 // GetId returns the ID of the session
 func (sess *session) GetID() string {
 	return sess.Id
