@@ -45,9 +45,7 @@ func RealMain() {
 	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
 	grpcapi.Init(config, matchingEngine, datastreamsManager)
 
-	if utils.IsProdEnv() {
-		models.CloseMarket(false)
-	} else {
+	if !utils.IsProdEnv() {
 		models.OpenMarket(false)
 	}
 
