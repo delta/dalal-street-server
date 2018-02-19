@@ -502,7 +502,7 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		}
 
 		ob.asks.Push(topAskStoploss)
-		// do not add to the market depth. It's stoplossactive, meaning market order now
+		ob.depth.AddOrder(true, true, topAskStoploss.Price, topAskStoploss.StockQuantity)
 		topAskStoploss = ob.askStoploss.Head()
 	}
 
@@ -519,7 +519,7 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		}
 
 		ob.bids.Push(topBidStoploss)
-		// do not add to the market depth. It's stoplossactive, meaning market order now
+		ob.depth.AddOrder(true, false, topBidStoploss.Price, topBidStoploss.StockQuantity)
 		topBidStoploss = ob.bidStoploss.Head()
 	}
 }

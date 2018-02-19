@@ -122,8 +122,10 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 	askOrder, bidOrder, err := models.CancelOrder(userId, orderId, isAsk)
 
 	switch err.(type) {
-	case models.InvalidOrderIdError:
-		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId, "Invalid Order ID. Cannot cancel order.")
+	case models.InvalidOrderIDError:
+		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId, "Invalid Order ID. Cannot cancel this order.")
+	case models.AlreadyClosedError:
+		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId, err.Error())
 	}
 
 	if err != nil {

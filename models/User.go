@@ -466,9 +466,10 @@ func (e NotEnoughCashError) Error() string {
 	return fmt.Sprintf("Not enough cash to place this order")
 }
 
-type InvalidOrderIdError struct{}
+// InvalidOrderIDError is given out when a user tries to cancel an order he didn't make or that didn't exist
+type InvalidOrderIDError struct{}
 
-func (e InvalidOrderIdError) Error() string {
+func (e InvalidOrderIDError) Error() string {
 	return fmt.Sprintf("Invalid order id")
 }
 
@@ -887,14 +888,19 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		askOrder, err := getAsk(orderId)
 		if askOrder == nil || askOrder.UserId != userId {
 			l.Errorf("Invalid ask id provided")
-			return nil, nil, InvalidOrderIdError{}
+			return nil, nil, InvalidOrderIDError{}
 		} else if err != nil {
 			l.Errorf("Unknown error in getAsk: %+v", err)
 			return nil, nil, err
 		}
 
-		if err := askOrder.Close(); err != nil {
+		err = askOrder.Close()
+		// don't log if order is already closed
+		if _, ok := err.(AlreadyClosedError); !ok {
 			l.Errorf("Unknown error while saving that ask is cancelled %+v", err)
+		}
+		// return the error anyway
+		if err != nil {
 			return nil, nil, err
 		}
 
@@ -905,14 +911,19 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		bidOrder, err := getBid(orderId)
 		if bidOrder == nil || bidOrder.UserId != userId {
 			l.Errorf("Invalid bid id provided")
-			return nil, nil, InvalidOrderIdError{}
+			return nil, nil, InvalidOrderIDError{}
 		} else if err != nil {
 			l.Errorf("Unknown error in getBid")
 			return nil, nil, err
 		}
 
-		if err := bidOrder.Close(); err != nil {
+		err = bidOrder.Close()
+		// don't log if order is already closed
+		if _, ok := err.(AlreadyClosedError); !ok {
 			l.Errorf("Unknown error while saving that bid is cancelled %+v", err)
+		}
+		// return the error anyway
+		if err != nil {
 			return nil, nil, err
 		}
 
