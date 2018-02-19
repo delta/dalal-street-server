@@ -682,7 +682,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 		if ask.Price > upperLimit || ask.Price < lowerLimit {
 			l.Debugf("Threshold price check failed for ask order")
-			return 0, &OrderPriceOutOfWindowError{currentPrice}
+			return 0, OrderPriceOutOfWindowError{currentPrice}
 		}
 	}
 
@@ -1000,12 +1000,14 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	}
 
 	oldCash := user.Cash
-	newCash := uint32(int32(user.Cash) + transaction.Total)
+	user.Cash = uint32(int32(user.Cash) + transaction.Total)
 
 	oldStocksInExchange := stock.StocksInExchange
 	oldStocksInMarket := stock.StocksInMarket
-	newStocksInExchange := stock.StocksInExchange - stockQuantityRemoved
-	newStocksInMarket := stock.StocksInMarket + stockQuantityRemoved
+	oldUpdatedAt := stock.UpdatedAt
+	stock.StocksInExchange -= stockQuantityRemoved
+	stock.StocksInMarket += stockQuantityRemoved
+	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
 
 	/* Committing to database */
 	db := getDB()
@@ -1017,6 +1019,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		user.Cash = oldCash
 		stock.StocksInExchange = oldStocksInExchange
 		stock.StocksInMarket = oldStocksInMarket
+		stock.UpdatedAt = oldUpdatedAt
 		tx.Rollback()
 		return nil, fmt.Errorf(format, args...)
 	}
@@ -1027,17 +1030,13 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 
 	l.Debugf("Added transaction to Transactions table")
 
-	if err := tx.Model(user).Update("cash", newCash).Error; err != nil {
+	if err := tx.Save(user).Error; err != nil {
 		return errorHelper("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
 	}
 
-	l.Debugf("Deducted cash from user's account. New balance: %d", newCash)
+	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
 
-	if err := tx.Model(stock).Updates(Stock{
-		StocksInExchange: newStocksInExchange,
-		StocksInMarket:   newStocksInMarket,
-		UpdatedAt:        utils.GetCurrentTimeISO8601(),
-	}).Error; err != nil {
+	if err := tx.Save(stock).Error; err != nil {
 		return errorHelper("Error transfering stocks from exchange to market. Rolling back.")
 	}
 
@@ -1250,8 +1249,8 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	biddingUserOldCash := biddingUser.Cash
 
 	//calculate user's updated cash
-	askingUserCash := askingUser.Cash + uint32(stockTradeQty)*stockTradePrice
-	biddingUserCash := biddingUser.Cash - uint32(stockTradeQty)*stockTradePrice
+	askingUser.Cash += uint32(stockTradeQty) * stockTradePrice
+	biddingUser.Cash -= uint32(stockTradeQty) * stockTradePrice
 
 	// in case things go wrong and we've to roll back
 	oldAskStockQuantityFulfilled := ask.StockQuantityFulfilled
@@ -1260,10 +1259,10 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	oldBidIsClosed := bid.IsClosed
 
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
-	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
-	bidStockQuantityFulfilled := bid.StockQuantityFulfilled + uint32(stockTradeQty)
-	askIsClosed := (ask.StockQuantity == askStockQuantityFulfilled)
-	bidIsClosed := (bid.StockQuantity == bidStockQuantityFulfilled)
+	ask.StockQuantityFulfilled += uint32(stockTradeQty)
+	bid.StockQuantityFulfilled += uint32(stockTradeQty)
+	ask.IsClosed = ask.StockQuantity == ask.StockQuantityFulfilled
+	bid.IsClosed = bid.StockQuantity == bid.StockQuantityFulfilled
 
 	//Committing to database
 	db := getDB()
@@ -1299,22 +1298,22 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	l.Debugf("Added bidTransaction to Transactions table")
 
 	//update askingUser
-	if err := tx.Model(askingUser).Update("cash", askingUserCash).Error; err != nil {
+	if err := tx.Save(askingUser).Error; err != nil {
 		return errorHelper("Error updating askingUser.Cash Rolling back. Error: %+v", err)
 	}
 
 	//update biddingUserCash
-	if err := tx.Model(biddingUser).Update("cash", biddingUserCash).Error; err != nil {
+	if err := tx.Save(biddingUser).Error; err != nil {
 		return errorHelper("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
 	}
 
 	//update StockQuantityFulfilled and IsClosed for ask order
-	if err := tx.Model(ask).Updates(Ask{StockQuantityFulfilled: askStockQuantityFulfilled, IsClosed: askIsClosed}).Error; err != nil {
+	if err := tx.Save(ask).Error; err != nil {
 		return errorHelper("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 	}
 
 	//update StockQuantityFulfilled and IsClosed for bid order
-	if err := tx.Model(bid).Updates(Bid{StockQuantityFulfilled: bidStockQuantityFulfilled, IsClosed: bidIsClosed}).Error; err != nil {
+	if err := tx.Save(bid).Error; err != nil {
 		return errorHelper("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 	}
 
@@ -1451,7 +1450,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	// Safe to make changes to this user and this stock
 
 	oldCash := user.Cash
-	newCash := uint32(int32(user.Cash) + trTotal)
+	user.Cash = uint32(int32(user.Cash) + trTotal)
 
 	/* Committing to database */
 	db := getDB()
@@ -1471,7 +1470,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 
 	l.Debugf("Added transaction to Transactions table")
 
-	if err := tx.Model(user).Update("cash", newCash).Error; err != nil {
+	if err := tx.Save(user).Error; err != nil {
 		return errorHelper("Error updating user's cash. Rolling back. Error: %+v", err)
 	}
 
