@@ -202,6 +202,15 @@ func createAsk(ask *Ask) error {
 	return nil
 }
 
+// AlreadyClosedError is given out when user tries to Cancel an already closed order.
+// Unlikely to happen, but still possible
+type AlreadyClosedError struct{ orderID uint32 }
+
+func (e AlreadyClosedError) Error() string {
+	return fmt.Sprintf("Order#%d is already closed. Cannot cancel now.", e.orderID)
+}
+
+
 // Marks an ask as closed and removes it from asksMap
 func (ask *Ask) Close() error {
 	var l = logger.WithFields(logrus.Fields{
@@ -212,6 +221,10 @@ func (ask *Ask) Close() error {
 	l.Debugf("Attempting")
 
 	ask.Lock()
+	if ask.IsClosed {
+		ask.Unlock()
+		return AlreadyClosedError{ask.Id}
+	}
 	ask.IsClosed = true
 	ask.UpdatedAt = utils.GetCurrentTimeISO8601()
 	ask.Unlock()

@@ -199,7 +199,7 @@ func (mds *marketDepthStream) RemoveListener(sessionId string) {
 func (mds *marketDepthStream) AddOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
 	// Do not add Market orders to depth
 	if isMarket {
-		return
+		price = 0 // special value for market orders
 	}
 
 	var l = mds.logger.WithFields(logrus.Fields{
@@ -261,7 +261,7 @@ func (mds *marketDepthStream) AddTrade(price, qty uint32, createdAt string) {
 func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
 	// Market orders have not even been added to depth
 	if isMarket {
-		return
+		price = 0 // special value for market orders.
 	}
 	if isAsk {
 		mds.askDepthLock.Lock()

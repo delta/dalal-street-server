@@ -160,6 +160,10 @@ func (bid *Bid) Close() error {
 	db := getDB()
 
 	bid.Lock()
+	if bid.IsClosed {
+		bid.Unlock()
+		return AlreadyClosedError{bid.Id}
+	}
 	bid.IsClosed = true
 	bid.UpdatedAt = utils.GetCurrentTimeISO8601()
 	bid.Unlock()
