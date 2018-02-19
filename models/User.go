@@ -438,6 +438,13 @@ func (e OrderPriceOutOfWindowError) Error() string {
 	)
 }
 
+// MinimumPriceThresholdError is sent when the order's price is below MINIMUM_ORDER_PRICE
+type MinimumPriceThresholdError struct{}
+
+func (e MinimumPriceThresholdError) Error() string {
+	return fmt.Sprintf("Order price must be above %d", MINIMUM_ORDER_PRICE)
+}
+
 // BuyLimitExceededError is generated when an Bid's StockQuantity is greater
 // than BUY_LIMIT (for BuyFromExchange orders)
 type BuyLimitExceededError struct{}
@@ -669,6 +676,11 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	// Place cap on order price only for limit orders
 	if ask.OrderType == Limit {
+		if ask.Price <= MINIMUM_ORDER_PRICE {
+			l.Debugf("Minimum price check failed for ask order")
+			return 0, MinimumPriceThresholdError{}
+		}
+
 		l.Debugf("Acquiring lock for ask order threshold check with stock id : %v ", ask.StockId)
 
 		allStocks.m[ask.StockId].RLock()
@@ -776,6 +788,11 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	// Place cap on order price only for limit orders
 	if bid.OrderType == Limit {
+		if bid.Price <= MINIMUM_ORDER_PRICE {
+			l.Debugf("Minimum price check failed for ask order")
+			return 0, MinimumPriceThresholdError{}
+		}
+
 		l.Debugf("Acquiring lock for bid order threshold check with stock id : %v ", bid.StockId)
 
 		allStocks.m[bid.StockId].RLock()
