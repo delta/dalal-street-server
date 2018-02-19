@@ -5,8 +5,6 @@
 package models
 
 import (
-	"time"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/utils"
@@ -27,7 +25,4 @@ func Init(conf *utils.Config, dsm datastreams.Manager) {
 	datastreamsManager = dsm
 
 	LoadStocks()
-	go startStockHistoryRecorder(time.Minute)
-	//OpenMarket()
-	//CloseMarket()
 }

@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 var isMarketOpen = false
 
 func OpenMarket(updateDayHighAndLow bool) error {
@@ -18,6 +20,9 @@ func OpenMarket(updateDayHighAndLow bool) error {
 	if updateDayHighAndLow {
 		return SetDayHighAndLow()
 	}
+
+	go startStockHistoryRecorder(time.Minute)
+
 	return nil
 }
 
@@ -38,6 +43,8 @@ func CloseMarket(updatePreviousDayClose bool) error {
 	if updatePreviousDayClose {
 		return SetPreviousDayClose()
 	}
+
+	stopStockHistoryRecorder()
 
 	return nil
 }

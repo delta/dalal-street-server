@@ -45,8 +45,11 @@ func RealMain() {
 	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
 	grpcapi.Init(config, matchingEngine, datastreamsManager)
 
-	// TODO: Close before deploying!
-	models.OpenMarket(false)
+	if utils.IsProdEnv() {
+		models.CloseMarket(false)
+	} else {
+		models.OpenMarket(false)
+	}
 
 	httpServer := http.Server{
 		Addr: config.ServerPort,
