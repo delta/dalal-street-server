@@ -170,6 +170,11 @@ func (ob *orderBook) AddBidOrder(bid *models.Bid) {
 //		 2. It accesses StockQuantityFulfilled but this will be called only after
 //		    models.CancelOrder has been called, so the ask's properties won't be modified now
 func (ob *orderBook) CancelAskOrder(ask *models.Ask) {
+	// stopLoss orders haven't even been added to the depth. So they shouldn't be removed.
+	if ask.OrderType == models.StopLoss {
+		return
+	}
+	// Others have been added. So remove those.
 	unfulfilled := ask.StockQuantity - ask.StockQuantityFulfilled
 	ob.depth.CloseOrder(isMarket(ask.OrderType), true, ask.Price, unfulfilled)
 }
@@ -182,6 +187,11 @@ func (ob *orderBook) CancelAskOrder(ask *models.Ask) {
 // 		 2. It accesses StockQuantityFulfilled but this will be called only after
 //		    models.CancelOrder has been called, so the bid's properties won't be modified now
 func (ob *orderBook) CancelBidOrder(bid *models.Bid) {
+	// stopLoss orders haven't even been added to the depth. So they shouldn't be removed.
+	if bid.OrderType == models.StopLoss {
+		return
+	}
+	// Others have been added. So remove those.
 	unfulfilled := bid.StockQuantity - bid.StockQuantityFulfilled
 	ob.depth.CloseOrder(isMarket(bid.OrderType), false, bid.Price, unfulfilled)
 }
