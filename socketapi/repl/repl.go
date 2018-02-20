@@ -297,6 +297,31 @@ var replCmds = map[string]replCmdFn{
 		}
 		s.finish("Not doing")
 	},
+	"change_mortgage_limit": func(userSess session.Session, s cmdSession) {
+		aun, _ := userSess.Get("repl_Username")
+
+		s.print("New limit?")
+		models.MortgagePutLimitRWMutex.RLock()
+		oldLim := models.MortgagePutLimit
+		models.MortgagePutLimitRWMutex.RUnlock()
+
+		var newLim int32
+		s.read("%d", &newLim)
+
+		s.print("Are you sure you want to change the limit from %d to %d?", oldLim, newLim)
+
+		c := 'N'
+		s.read("%c", &c)
+		if c == 'Y' {
+			models.MortgagePutLimitRWMutex.Lock()
+			models.MortgagePutLimit = newLim
+			models.MortgagePutLimitRWMutex.Unlock()
+			models.AdminLog(aun, fmt.Sprintf("Updated mortgage limit from %d to %d", oldLim, newLim))
+			s.finish("Done")
+		}
+
+		s.finish("Not doing")
+	},
 }
 
 func InitREPL() {
