@@ -97,8 +97,10 @@ func UpdateLeaderboard() {
 	var leaderboardEntries []*LeaderboardRow
 
 	db := getDB()
+	//begin transaction
+	tx := db.Begin()
 
-	db.Raw(`
+	tx.Raw(`
 		SELECT U.id as user_id, U.name as user_name, U.cash as cash,
 			ifNull(SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)),0) AS stock_worth,
 			ifnull((U.cash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed))),U.cash) AS total
@@ -138,13 +140,7 @@ func UpdateLeaderboard() {
 		}
 	}
 
-	db.Exec("LOCK TABLES Leaderboard WRITE")
-	defer db.Exec("UNLOCK TABLES")
-
-	//begin transaction
-	tx := db.Begin()
-
-	db.Exec("TRUNCATE TABLE Leaderboard")
+	tx.Exec("TRUNCATE TABLE Leaderboard")
 
 	for _, leaderboardEntry := range leaderboardEntries {
 		if err := db.Save(leaderboardEntry).Error; err != nil {
@@ -163,10 +159,10 @@ func UpdateLeaderboard() {
 	l.Infof("Successfully updated leaderboard")
 }
 
-//helper function to update leaderboard every two minutes
+//helper function to update leaderboard every thirty seconds
 func UpdateLeaderboardTicker() {
 	for {
 		UpdateLeaderboard()
-		time.Sleep(2 * time.Minute)
+		time.Sleep(30 * time.Second)
 	}
 }
