@@ -1376,6 +1376,16 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	return askStatus, bidStatus, askTransaction
 }
 
+var MortgagePutLimitRWMutex sync.RWMutex
+var MortgagePutLimit int32 = 4000000
+
+type WayTooMuchCashError struct {
+}
+
+func (e WayTooMuchCashError) Error() string {
+	return "You already have more than enough cash. You cannot mortgage stocks right now."
+}
+
 func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "PerformMortgageTransaction",
@@ -1399,10 +1409,10 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	}()
 
 	allStocks.m[stockId].RLock()
-	currentStockPrice := allStocks.m[stockId].stock.CurrentPrice
+	mortgagePrice := allStocks.m[stockId].stock.AvgLastPrice
 	allStocks.m[stockId].RUnlock()
 
-	l.Debugf("Taking current price of stock as %d", currentStockPrice)
+	l.Debugf("Taking current price of stock as %d", mortgagePrice)
 
 	var rate int32
 
@@ -1432,6 +1442,13 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		}
 
 	} else {
+		MortgagePutLimitRWMutex.RLock()
+		lim := MortgagePutLimit
+		MortgagePutLimitRWMutex.RUnlock()
+		if user.Total < lim {
+			return nil, WayTooMuchCashError{}
+		}
+
 		rate = MORTGAGE_DEPOSIT_RATE
 		l.Debugf("stockQuantity negative. Depositing stocks to mortgage @ %d%%", rate)
 
@@ -1447,7 +1464,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		}
 	}
 
-	trTotal := -int32(currentStockPrice) * stockQuantity * rate / 100
+	trTotal := -int32(mortgagePrice) * stockQuantity * rate / 100
 	if int32(user.Cash)+trTotal < 0 {
 		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", trTotal, user.Cash)
 		return nil, NotEnoughCashError{}

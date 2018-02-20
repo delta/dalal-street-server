@@ -398,6 +398,8 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 	switch e := err.(type) {
 	case models.NotEnoughStocksError:
 		return makeError(actions_pb.MortgageStocksResponse_NotEnoughStocksError, e.Error())
+	case models.WayTooMuchCashError:
+		return makeError(actions_pb.MortgageStocksResponse_NotEnoughStocksError, e.Error())
 	}
 	if err != nil {
 		l.Errorf("Request failed due to: %+v", err)

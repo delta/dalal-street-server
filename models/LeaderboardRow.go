@@ -124,6 +124,14 @@ func UpdateLeaderboard() {
 			TotalWorth: result.Total,
 		})
 
+		ch, user, err := getUserExclusively(result.UserId)
+		if err != nil {
+			l.Errorf("Error updating leaderboard. Failing. %+v", err)
+			return
+		}
+		user.Total = result.Total
+		close(ch)
+
 		counter += 1
 		if index+1 < len(results) && results[index+1].Total < result.Total {
 			rank = counter
