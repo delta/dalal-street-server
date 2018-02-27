@@ -5,15 +5,13 @@
 package models
 
 import (
-	"time"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 var logger *logrus.Entry
-var DbOpen = utils.DbOpen
+var getDB = utils.GetDB
 var config *utils.Config
 var datastreamsManager datastreams.Manager
 
@@ -26,9 +24,5 @@ func Init(conf *utils.Config, dsm datastreams.Manager) {
 	config = conf
 	datastreamsManager = dsm
 
-	lookupIsMarketOpenFromDb()
 	LoadStocks()
-	go startStockHistoryRecorder(time.Minute)
-	//OpenMarket()
-	//CloseMarket()
 }

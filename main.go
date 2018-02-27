@@ -21,6 +21,7 @@ func RealMain() {
 		if r := recover(); r != nil {
 			fmt.Printf("Error: '%+v'\n", r)
 		}
+		utils.CloseDB()
 	}()
 
 	if config.Stage != "prod" {
@@ -44,6 +45,10 @@ func RealMain() {
 	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
 	grpcapi.Init(config, matchingEngine, datastreamsManager)
 
+	if !utils.IsProdEnv() {
+		models.OpenMarket(false)
+	}
+
 	httpServer := http.Server{
 		Addr: config.ServerPort,
 		Handler: http.HandlerFunc(
@@ -61,6 +66,7 @@ func RealMain() {
 					resp.Header().Add("Access-Control-Allow-Origin", "*")
 					resp.Header().Add("Access-Control-Allow-Methods", "*")
 					resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web,sessionid")
+					resp.Header().Add("Access-Control-Max-Age", "600")
 					resp.Write([]byte("OK"))
 					return
 				}

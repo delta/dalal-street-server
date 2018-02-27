@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-
 	"github.com/Sirupsen/logrus"
+	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 const TIMES_RESOLUTION = 60
@@ -31,9 +31,10 @@ type Stock struct {
 	UpdatedAt        string `gorm:"column:updatedAt;not null" json:"updated_at"`
 
 	// HACK: Getting last minute's hl from transactions used by stock history
-	open uint32 // Used to store Open for the last minute
-	high uint32 // Used to store High for the last minute
-	low  uint32 // Used to store Low for the last minute
+	open   uint32 // Used to store Open for the last minute
+	high   uint32 // Used to store High for the last minute
+	low    uint32 // Used to store Low for the last minute
+	volume uint32 //Used to store trade volume for the last minute
 }
 
 func (Stock) TableName() string {
@@ -159,6 +160,8 @@ func UpdateStockPrice(stockId, price uint32) error {
 		stock.UpOrDown = false
 	}
 
+	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
+
 	avgLastPrice.Lock()
 	avgLastPrice.m[stock.Id] -= uint32((avgLastPrice.m[stock.Id] / 20))
 	avgLastPrice.m[stock.Id] += uint32((stock.CurrentPrice) / 20)
@@ -166,12 +169,7 @@ func UpdateStockPrice(stockId, price uint32) error {
 	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
 	avgLastPrice.Unlock()
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	if err := db.Save(stock).Error; err != nil {
 		*stock = oldStockCopy
@@ -185,6 +183,11 @@ func UpdateStockPrice(stockId, price uint32) error {
 
 	return nil
 }
+func UpdateStockVolume(stockId uint32, volume uint32) {
+	allStocks.Lock()
+	allStocks.m[stockId].stock.volume += volume
+	allStocks.Unlock()
+}
 
 func LoadStocks() error {
 	var l = logger.WithFields(logrus.Fields{
@@ -193,12 +196,7 @@ func LoadStocks() error {
 
 	l.Infof("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var stocks []*Stock
 	if err := db.Find(&stocks).Error; err != nil {
@@ -235,13 +233,6 @@ func GetCompanyDetails(stockId uint32) (*Stock, error) {
 
 	l.Infof("Attempting to get company profile for stockId : %v", stockId)
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
-
 	allStocks.m[stockId].RLock()
 	defer allStocks.m[stockId].RUnlock()
 
@@ -272,13 +263,9 @@ func AddStocksToExchange(stockId, count uint32) error {
 	stock := stockNLock.stock
 
 	stock.StocksInExchange += count
+	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	if err := db.Save(stock).Error; err != nil {
 		stock.StocksInExchange -= count
@@ -295,4 +282,86 @@ func AddStocksToExchange(stockId, count uint32) error {
 	l.Infof("Done")
 
 	return nil
+}
+
+// SetPreviousDayClose will be called when market
+// is closing for the day to update the day closing
+func SetPreviousDayClose() (err error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "SetPreviousDayClose",
+	})
+
+	db := getDB()
+	tx := db.Begin()
+
+	l.Info("Attempting to set previous day close")
+
+	l.Info("Locking allStocks in SetPreviousDayClose")
+	allStocks.Lock()
+	defer func() {
+		l.Info("Unlocking allStocks in SetPreviousDayClose")
+		allStocks.Unlock()
+
+		// Calling LoadStocks to prevent inconsistency
+		// between db and allStocks
+		err = LoadStocks()
+	}()
+
+	for _, stockNLock := range allStocks.m {
+		stockNLock.stock.PreviousDayClose = stockNLock.stock.CurrentPrice
+		if err = tx.Save(stockNLock.stock).Error; err != nil {
+			l.Errorf("Error occured : %v", err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		l.Errorf("Error while commiting transaction : %v", err)
+		return err
+	}
+
+	return err
+}
+
+// SetDayHighAndLow will be called when market
+// is opening for the day
+func SetDayHighAndLow() (err error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "SetDayHighAndLow",
+	})
+
+	db := getDB()
+	tx := db.Begin()
+
+	l.Info("Attempting to set previous day close")
+
+	l.Info("Locking allStocks in SetDayHighAndLow")
+	allStocks.Lock()
+	defer func() {
+		l.Info("Unlocking allStocks in SetDayHighAndLow")
+		allStocks.Unlock()
+
+		// Calling LoadStocks to prevent inconsistency
+		// between db and allStocks
+		err = LoadStocks()
+	}()
+
+	for _, stockNLock := range allStocks.m {
+		stockNLock.stock.DayHigh = stockNLock.stock.CurrentPrice
+		stockNLock.stock.DayLow = stockNLock.stock.CurrentPrice
+
+		if err = tx.Save(stockNLock.stock).Error; err != nil {
+			l.Errorf("Error occured : %v", err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		l.Errorf("Error while commiting transaction : %v", err)
+		return err
+	}
+
+	return err
 }

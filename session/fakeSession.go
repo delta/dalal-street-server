@@ -27,7 +27,7 @@ func Fake() (Session, error) {
 	return sess, nil
 }
 
-func (sess *fakeSession) GetId() string {
+func (sess *fakeSession) GetID() string {
 	return sess.Id
 }
 
@@ -42,6 +42,10 @@ func (sess *fakeSession) Set(k string, v string) error {
 	sess.mutex.Lock()
 	sess.m[k] = v
 	sess.mutex.Unlock()
+	return nil
+}
+
+func (sess *fakeSession) Touch() error {
 	return nil
 }
 

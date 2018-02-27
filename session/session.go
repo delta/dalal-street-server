@@ -2,15 +2,14 @@ package session
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	_ "github.com/go-sql-driver/mysql" // mysql package needs to be included like this as required by sqlx
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/jmoiron/sqlx"
 
 	"github.com/thakkarparth007/dalal-street-server/utils"
 )
@@ -21,21 +20,16 @@ var logger *logrus.Entry
 
 // Session provides an interface to access a session of a user
 type Session interface {
-	GetId() string
+	GetID() string
 	Get(string) (string, bool)
 	Set(string, string) error
+	Touch() error // updates the LastAccessTime of the session
 	Delete(string) error
 	Destroy() error
 }
 
 // cache is a cache of sessions
 var cache *lru.Cache
-
-// variables to store the db credentials
-var dbUser string
-var dbPass string
-var dbName string
-var dbHost string
 
 // session implements the Session interface
 type session struct {
@@ -60,28 +54,30 @@ func Load(id string) (Session, error) {
 		results map[string]string
 	)
 
-	db, err := dbConn()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+	db := utils.GetDB()
 
 	l.Debugf("SessionId: %s", id)
-	rows, err := db.Queryx("SELECT `key`, `value` FROM Sessions WHERE id=?", id)
-	if err != nil {
-		l.Errorf("Error loading session: '%s'", err)
-		return nil, err
+
+	var rows []struct {
+		Key   string
+		Value string
+	}
+
+	db = db.Raw("SELECT `key`, `value` FROM Sessions WHERE id=?", id).Scan(&rows)
+	if db.Error != nil {
+		// db won't give error in case the session doesn't exist
+		l.Errorf("Error loading session: '%s'", db.Error)
+		return nil, db.Error
+	}
+
+	// so we should give that error :)
+	if len(rows) == 0 {
+		return nil, errors.New("Invalid session ID")
 	}
 
 	results = make(map[string]string)
-
-	for rows.Next() {
-		var key, value string
-		err = rows.Scan(&key, &value)
-		if err != nil {
-			return nil, err
-		}
-		results[key] = value
+	for _, row := range rows {
+		results[row.Key] = row.Value
 	}
 
 	sess.Id = id
@@ -109,13 +105,23 @@ func New() (Session, error) {
 	sess.Id = base64.URLEncoding.EncodeToString(rb)
 	sess.m = make(map[string]string)
 
+	sess.Set("CreatedAt", utils.GetCurrentTimeISO8601())
+	sess.Set("LastAccessTime", utils.GetCurrentTimeISO8601())
+
 	l.Debugf("Created session: %+v", sess)
 	cache.Add(sess.Id, sess)
 	return sess, nil
 }
 
-// GetId returns the Id of the session
-func (sess *session) GetId() string {
+func (sess *session) String() string {
+	sess.mutex.RLock()
+	defer sess.mutex.RUnlock()
+
+	return fmt.Sprintf("Session[Id=%s, %+v]", sess.Id, sess.m)
+}
+
+// GetId returns the ID of the session
+func (sess *session) GetID() string {
 	return sess.Id
 }
 
@@ -128,18 +134,14 @@ func (sess *session) Set(k string, v string) error {
 		"v":       v,
 	})
 
-	db, err := dbConn()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+	db := utils.GetDB()
 
-	sql := "INSERT INTO Sessions VALUES (?,?,?) ON DUPLICATE KEY UPDATE `id`=?, `key`=?, `value`=?"
-	_, err = db.Exec(sql, sess.Id, k, v, sess.Id, k, v)
+	db = db.Exec("INSERT INTO Sessions VALUES (?,?,?) ON DUPLICATE KEY UPDATE `id`=?, `key`=?, `value`=?",
+		sess.Id, k, v, sess.Id, k, v)
 
-	if err != nil {
-		l.Errorf("Error in setting-value query: '%s'", err)
-		return err
+	if db.Error != nil {
+		l.Errorf("Error in setting-value query: '%s'", db.Error)
+		return db.Error
 	}
 
 	l.Debugf("Set key in database")
@@ -157,6 +159,10 @@ func (sess *session) Get(str string) (string, bool) {
 	return value, ok
 }
 
+func (sess *session) Touch() error {
+	return sess.Set("LastAccessTime", utils.GetCurrentTimeISO8601())
+}
+
 // Delete deletes a particular key in a given session
 func (sess *session) Delete(str string) error {
 	var l = logger.WithFields(logrus.Fields{
@@ -166,17 +172,11 @@ func (sess *session) Delete(str string) error {
 	})
 	l.Debug("Deleting")
 
-	db, err := dbConn()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+	db := utils.GetDB()
+	db = db.Exec("Delete FROM Sessions WHERE id=? AND `key`=?", sess.Id, str)
 
-	sql := "Delete FROM Sessions WHERE id=? AND `key`=?"
-	_, err = db.Exec(sql, sess.Id, str)
-
-	if err != nil {
-		return err
+	if db.Error != nil {
+		return db.Error
 	}
 
 	sess.mutex.Lock()
@@ -194,34 +194,19 @@ func (sess *session) Destroy() error {
 	})
 	l.Debug("Destroying")
 
-	db, err := dbConn()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+	db := utils.GetDB()
 
-	sql := "DELETE FROM Sessions WHERE id=?"
-	_, err = db.Exec(sql, sess.Id)
-	if err != nil {
-		return err
+	db = db.Exec("DELETE FROM Sessions WHERE id=?", sess.Id)
+	if db.Error != nil {
+		return db.Error
 	}
 
-	sess.m = make(map[string]string)
+	sess.mutex.Lock()
+	sess.m = nil
+	sess.mutex.Unlock()
+	cache.Remove(sess.Id)
 
-	return err
-}
-
-func dbConn() (*sqlx.DB, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "dbConn",
-	})
-
-	var db *sqlx.DB
-	db, err := sqlx.Open("mysql", dbUser+":"+dbPass+"@"+dbHost+"/"+dbName)
-	if err != nil {
-		l.Errorf("Error opening database: '%s'", err)
-	}
-	return db, err
+	return nil
 }
 
 // Init initializes the session package
@@ -229,11 +214,6 @@ func Init(config *utils.Config) {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "session",
 	})
-
-	dbUser = config.DbUser
-	dbPass = config.DbPassword
-	dbName = config.DbName
-	dbHost = config.DbHost
 
 	cache, _ = lru.New(config.CacheSize)
 

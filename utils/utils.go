@@ -3,6 +3,7 @@ package utils
 import (
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -45,5 +46,13 @@ func IsGrpcRequest(req *http.Request) bool {
 }
 
 func GetCurrentTimeISO8601() string {
-	return time.Now().Format(time.RFC3339);
+	return time.Now().Format(time.RFC3339)
+}
+
+func GetImageBasePath() string {
+	return os.Getenv("GOPATH") + "/src/github.com/thakkarparth007/dalal-street-server/frontend/public/src/images/news/"
+}
+
+func IsProdEnv() bool {
+	return strings.Contains(strings.ToLower(config.Stage), "prod")
 }

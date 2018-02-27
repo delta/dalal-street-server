@@ -37,12 +37,7 @@ func GetNotifications(userId, lastId, count uint32) (bool, []*Notification, erro
 
 	l.Infof("Attempting to get notifications")
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
-	db.LogMode(true)
+	db := getDB()
 
 	var notifications []*Notification
 
@@ -77,16 +72,13 @@ func SendNotification(userId uint32, text string, isBroadcast bool) error {
 
 	l.Infof("Sending notification")
 
-	db, err := DbOpen()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+	db := getDB()
 
 	n := &Notification{
 		UserId:      userId,
 		Text:        text,
 		IsBroadcast: isBroadcast,
+		CreatedAt:   utils.GetCurrentTimeISO8601(),
 	}
 
 	if err := db.Save(n).Error; err != nil {

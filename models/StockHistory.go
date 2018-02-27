@@ -16,8 +16,9 @@ type StockHistory struct {
 	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
 	Interval  uint32 `gorm:"column:intervalRecord;not null" json:"interval"`
 	Open      uint32 `gorm:"column:open;not null" json:"open"`
-	High      uint32 `gorm:"high:close;not null" json:"high"`
-	Low       uint32 `gorm:"low:close;not null" json:"low"`
+	High      uint32 `gorm:"column:high;not null" json:"high"`
+	Low       uint32 `gorm:"column:low;not null" json:"low"`
+	Volume    uint32 `gorm:"column:volume;not null" json:"volume"`
 }
 
 func (StockHistory) TableName() string {
@@ -33,6 +34,7 @@ func (gStockHistory *StockHistory) ToProto() *models_pb.StockHistory {
 		Open:      gStockHistory.Open,
 		High:      gStockHistory.High,
 		Low:       gStockHistory.Low,
+		Volume:    gStockHistory.Volume,
 	}
 }
 
@@ -40,13 +42,13 @@ func (gStockHistory *StockHistory) ToProto() *models_pb.StockHistory {
 type Resolution uint32
 
 const (
-	OneMinute     Resolution = 1   // Range will be 60*Resolution
-	FiveMinutes   Resolution = 5   // Range will be 60*Resolution
-	TenMinutes    Resolution = 10  // Range will be 60*Resolution
-	ThirtyMinutes Resolution = 30  // Range will be 60*Resolution
-	SixtyMinutes  Resolution = 60  // Range will be 60*Resolution
-	OneDay        Resolution = 0   // Range will be 60*Resolution
-	Other         Resolution = 123 //For individual transaction entries if reqd
+	OneMinute      Resolution = 1   // Range will be 60*Resolution
+	FiveMinutes    Resolution = 5   // Range will be 60*Resolution
+	FifteenMinutes Resolution = 15  // Range will be 60*Resolution
+	ThirtyMinutes  Resolution = 30  // Range will be 60*Resolution
+	SixtyMinutes   Resolution = 60  // Range will be 60*Resolution
+	OneDay         Resolution = 0   // Range will be 60*Resolution
+	Other          Resolution = 123 //For individual transaction entries if reqd
 )
 
 // ResolutionFromProto converts proto StockHistoryResolution to a model's Resolution value
@@ -55,8 +57,8 @@ func ResolutionFromProto(s actions_pb.StockHistoryResolution) Resolution {
 		return OneMinute
 	} else if s == actions_pb.StockHistoryResolution_FiveMinutes {
 		return FiveMinutes
-	} else if s == actions_pb.StockHistoryResolution_TenMinutes {
-		return TenMinutes
+	} else if s == actions_pb.StockHistoryResolution_FifteenMinutes {
+		return FifteenMinutes
 	} else if s == actions_pb.StockHistoryResolution_ThirtyMinutes {
 		return ThirtyMinutes
 	} else if s == actions_pb.StockHistoryResolution_SixtyMinutes {
@@ -68,11 +70,12 @@ func ResolutionFromProto(s actions_pb.StockHistoryResolution) Resolution {
 }
 
 // ohlc represents ohlc for a given stock
-type ohlc struct {
-	open  uint32
-	high  uint32
-	low   uint32
-	close uint32
+type ohlcv struct {
+	open   uint32
+	high   uint32
+	low    uint32
+	close  uint32
+	volume uint32
 }
 
 var stopStockHistoryRecorderChan chan struct{}
@@ -87,6 +90,12 @@ func stopStockHistoryRecorder() {
 	close(stopStockHistoryRecorderChan)
 
 	l.Info("Stopped")
+}
+
+func stockHistoryStreamUpdate(stockId uint32, stockHistory *StockHistory) {
+	stockStream := datastreamsManager.GetStockHistoryStream(stockId)
+	pbStockHistory := stockHistory.ToProto()
+	stockStream.SendStockHistoryUpdate(stockId, pbStockHistory)
 }
 
 // recordOneMinuteOHLC records one minute ohlc for each stock
@@ -104,34 +113,38 @@ func recordOneMinuteOHLC(db *gorm.DB, recordingTime time.Time) error {
 	for stockId := range allStocks.m {
 		allStocks.m[stockId].Lock()
 
-		currentMinuteOHLC := &ohlc{
+		currentMinuteOHLCV := &ohlcv{
 			allStocks.m[stockId].stock.open,
 			allStocks.m[stockId].stock.high,
 			allStocks.m[stockId].stock.low,
 			allStocks.m[stockId].stock.CurrentPrice,
+			allStocks.m[stockId].stock.volume,
 		}
 
 		// Reset Open to previous Close
 		// Set High,Low to Closing Price
-		allStocks.m[stockId].stock.open = currentMinuteOHLC.close
-		allStocks.m[stockId].stock.high = currentMinuteOHLC.close
-		allStocks.m[stockId].stock.low = currentMinuteOHLC.close
+		allStocks.m[stockId].stock.open = currentMinuteOHLCV.close
+		allStocks.m[stockId].stock.high = currentMinuteOHLCV.close
+		allStocks.m[stockId].stock.low = currentMinuteOHLCV.close
+		allStocks.m[stockId].stock.volume = 0
 		allStocks.m[stockId].Unlock()
 
 		stkHistoryPoint := &StockHistory{
 			StockId:   stockId,
-			Close:     currentMinuteOHLC.close,
+			Close:     currentMinuteOHLCV.close,
 			Interval:  1,
 			CreatedAt: recordingTime.UTC().Format(time.RFC3339), // TODO: Change to IST,
-			Open:      currentMinuteOHLC.open,
-			High:      currentMinuteOHLC.high,
-			Low:       currentMinuteOHLC.low,
+			Open:      currentMinuteOHLCV.open,
+			High:      currentMinuteOHLCV.high,
+			Low:       currentMinuteOHLCV.low,
+			Volume:    currentMinuteOHLCV.volume,
 		}
 		err := db.Save(stkHistoryPoint).Error
 		if err != nil {
 			l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
 			return err
 		}
+		stockHistoryStreamUpdate(stockId, stkHistoryPoint)
 	}
 
 	l.Debugf("Recorded")
@@ -139,7 +152,7 @@ func recordOneMinuteOHLC(db *gorm.DB, recordingTime time.Time) error {
 	return nil
 }
 
-func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHistory, N uint32, recordingTime time.Time) error {
+func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHistory, N Resolution, recordingTime time.Time) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "recordNMinuteOHLC",
 	})
@@ -161,36 +174,41 @@ func recordNMinuteOHLC(db *gorm.DB, stockId uint32, retrievedHistories []StockHi
 		}
 	}
 	//Initialize open to open of chronologically first open within range and close to close of the chronologically last history
-	ohlcRecord := &ohlc{
+	ohlcvRecord := &ohlcv{
 		retrievedHistories[limitedRange].Open,
 		retrievedHistories[limitedRange].Open,
 		retrievedHistories[limitedRange].Open,
 		retrievedHistories[0].Close,
+		0,
 	}
 	// Iterate and find max of all max and min of all min
 	for i := 0; i <= limitedRange; i++ {
-		if ohlcRecord.high < retrievedHistories[i].High {
-			ohlcRecord.high = retrievedHistories[i].High
+		if ohlcvRecord.high < retrievedHistories[i].High {
+			ohlcvRecord.high = retrievedHistories[i].High
 		}
-		if ohlcRecord.low > retrievedHistories[i].Low {
-			ohlcRecord.low = retrievedHistories[i].Low
+		if ohlcvRecord.low > retrievedHistories[i].Low {
+			ohlcvRecord.low = retrievedHistories[i].Low
 		}
+		ohlcvRecord.volume += retrievedHistories[i].Volume
 	}
 	// Save it
 	stkHistoryPoint := &StockHistory{
 		StockId:   stockId,
-		Close:     ohlcRecord.close,
-		Interval:  N,
+		Close:     ohlcvRecord.close,
+		Interval:  uint32(N),
 		CreatedAt: recordingTime.UTC().Format(time.RFC3339), // TODO: Change to IST,
-		Open:      ohlcRecord.open,
-		High:      ohlcRecord.high,
-		Low:       ohlcRecord.low,
+		Open:      ohlcvRecord.open,
+		High:      ohlcvRecord.high,
+		Low:       ohlcvRecord.low,
+		Volume:    ohlcvRecord.volume,
 	}
 
 	if err := db.Save(stkHistoryPoint).Error; err != nil {
 		l.Errorf("Error registering stock history point %+v. Error: %+v", stkHistoryPoint, err)
 		return err
 	}
+	stockHistoryStreamUpdate(stockId, stkHistoryPoint)
+
 	return nil
 }
 
@@ -208,9 +226,9 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 	} else if currMin%30 == 0 {
 		//Go through last 30 1 Minute recordings
 		minReqdTime = minReqdTime.Add(-30 * time.Minute)
-	} else if currMin%10 == 0 {
-		//Go through last 10 1 Minute recordings
-		minReqdTime = minReqdTime.Add(-10 * time.Minute)
+	} else if currMin%15 == 0 {
+		//Go through last 15 1 Minute recordings
+		minReqdTime = minReqdTime.Add(-15 * time.Minute)
 	} else if currMin%5 == 0 {
 		//Go through last 5 1 Minute recordings
 		minReqdTime = minReqdTime.Add(-5 * time.Minute)
@@ -225,17 +243,17 @@ func recorderHigherIntervalOHLCs(db *gorm.DB, recordingTime time.Time) error {
 
 	for stockId := range allStocks.m {
 		var retrievedHistories []StockHistory
-
-		db = db.Where("intervalRecord = ? AND stockId = ? AND createdAt >= ?", 1, stockId, maxTimeRangeStr)
-		db.Order("createdAt desc").Limit(TIMES_RESOLUTION).Find(&retrievedHistories)
+		// Need to do this because db = db. chains the wheres
+		dbCurrStock := db.Where("intervalRecord = ? AND stockId = ? AND createdAt >= ?", 1, stockId, maxTimeRangeStr)
+		dbCurrStock.Order("createdAt desc").Limit(TIMES_RESOLUTION).Find(&retrievedHistories)
 
 		if currMin%5 == 0 {
 			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 5, recordingTime); err != nil {
 				return err
 			}
 		}
-		if currMin%10 == 0 {
-			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 10, recordingTime); err != nil {
+		if currMin%15 == 0 {
+			if err := recordNMinuteOHLC(db, stockId, retrievedHistories, 15, recordingTime); err != nil {
 				return err
 			}
 		}
@@ -263,12 +281,7 @@ func GetStockHistory(stockId uint32, interval Resolution) ([]*StockHistory, erro
 
 	l.Infof("Attempting to get stock History for stockId : %v", stockId)
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	allStocks.m[stockId].RLock()
 	defer allStocks.m[stockId].RUnlock()
@@ -308,12 +321,7 @@ loop:
 			// since multiple history records might be inserted, grabbing it here to keep times consistent
 			currentTime := time.Now()
 
-			db, err := DbOpen()
-			if err != nil {
-				l.Error(err)
-				return
-			}
-			defer db.Close()
+			db := getDB()
 
 			// TODO: handle errors better
 			// record the current minute's interval

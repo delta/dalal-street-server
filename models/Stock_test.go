@@ -43,11 +43,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 		AllTimeHigh:      1000,
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Opening Database for inserting stocks failed  %v", err)
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Save(stock)
 	defer func() {
@@ -56,7 +52,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 	}()
 
 	LoadStocks()
-	err = UpdateStockPrice(1, 2000)
+	err := UpdateStockPrice(1, 2000)
 	if err != nil {
 		t.Fatalf("UpdateStockPrice failed with %+v", err)
 	}
@@ -72,6 +68,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 		UpOrDown:         true,
 		AvgLastPrice:     1050,
 		PreviousDayClose: 1000,
+		UpdatedAt: retrievedStock.UpdatedAt,
 	}
 	if !testutils.AssertEqual(t, stock1, retrievedStock) {
 		t.Fatalf("Expected %v but got %v", stock1, retrievedStock)
@@ -97,11 +94,7 @@ func Test_GetCompanyDetails(t *testing.T) {
 		UpdatedAt:        utils.GetCurrentTimeISO8601(),
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Opening data base for inserting stocks failed %v", err)
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Save(stock)
 	defer func() {
@@ -123,11 +116,7 @@ func Test_GetCompanyDetails(t *testing.T) {
 
 func Test_AddStocksToExchange(t *testing.T) {
 	var stock = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 234}
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Opening data base for inserting stocks failed %v", err)
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Save(stock)
 	defer func() {
@@ -140,7 +129,7 @@ func Test_AddStocksToExchange(t *testing.T) {
 
 	var retrievedStock = &Stock{Id: 1}
 	db.First(retrievedStock)
-	var stockEqual = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 244}
+	var stockEqual = &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 244, UpdatedAt: retrievedStock.UpdatedAt}
 
 	if !testutils.AssertEqual(t, retrievedStock, stockEqual) {
 		t.Fatalf("Expected %v but got %v", stockEqual, retrievedStock)

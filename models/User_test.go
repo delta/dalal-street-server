@@ -13,8 +13,8 @@ import (
 func Test_Login(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" }}`))
+	//Tests case for first time pragyan login
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India" }}`))
 
 	u, err := Login("test@testmail.com", "password")
 	if err != nil {
@@ -22,17 +22,13 @@ func Test_Login(t *testing.T) {
 	}
 
 	defer func() {
-		db, err := DbOpen()
-		if err != nil {
-			t.Fatal("Failed opening DB for cleaning up test user")
-		}
-		defer db.Close()
-
+		db := getDB()
+		db.Delete(&Registration{UserId: u.Id})
 		db.Delete(u)
 	}()
 
 	exU := User{
-		Id:        2,
+		Id:        u.Id,
 		Email:     "test@testmail.com",
 		Name:      "TestName",
 		Cash:      STARTING_CASH,
@@ -43,13 +39,77 @@ func Test_Login(t *testing.T) {
 	if reflect.DeepEqual(u, exU) != true {
 		t.Fatalf("Expected Login to return %+v, instead, got %+v", exU, u)
 	}
-
 	_, err = Login("test@testmail.com", "TestName")
 	if err != nil {
 		t.Fatalf("Login failed: '%s'", err)
 	}
 
+	//The email should be Registrationed with the previous login attempt
+	u, err = Login("test@testmail.com", "password")
+
+	if reflect.DeepEqual(u, exU) != true {
+		t.Fatalf("Expected Login to return %+v, instead, got %+v", exU, u)
+	}
+	_, err = Login("test@testmail.com", "TestName")
+	if err != nil {
+		t.Fatalf("Login failed: '%s'", err)
+	}
 	//allErrors, ok = migrate.DownSync(connStr, "../migrations")
+}
+
+func Test_Regsiter(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+	//Tests case for first time pragyan login
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India"}}`))
+	err := RegisterUser("test@testname.com", "password", "FullName")
+	defer func() {
+		db := getDB()
+		db.Exec("DELETE FROM Registrations")
+		db.Exec("DELETE FROM Users")
+	}()
+	if err != AlreadyRegisteredError {
+		t.Fatalf("Expected %+v but got %+v", AlreadyRegisteredError, err)
+	}
+	httpmock.DeactivateAndReset()
+	httpmock.Activate()
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(401, `{"status_code":401,"message": "Invalid Credentials"}`))
+	err = RegisterUser("test@testname.com", "password", "FullName")
+
+	if err != AlreadyRegisteredError {
+		t.Fatalf("Expected %+v but got %+v", AlreadyRegisteredError, err)
+	}
+	httpmock.DeactivateAndReset()
+	httpmock.Activate()
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(400, `{"status_code":400,"message": "Account Not Registered"}`))
+	err = RegisterUser("test@testname.com", "password", "FullName")
+	db := getDB()
+	registeredTestUser := &Registration{
+		Email: "test@testname.com",
+	}
+	if err != nil {
+		t.Fatalf("Expected %+v but got %+v", nil, err)
+	}
+	err = db.Find(registeredTestUser).Error
+	if !checkPasswordHash("password", registeredTestUser.Password) {
+		t.Fatalf("Incorrect password")
+	}
+	expectedUser := &Registration{
+		Id:         registeredTestUser.Id,
+		UserId:     registeredTestUser.UserId,
+		Email:      "test@testname.com",
+		Password:   registeredTestUser.Password,
+		Name:       "FullName",
+		IsPragyan:  false,
+		IsVerified: false,
+	}
+	if !testutils.AssertEqual(t, expectedUser, registeredTestUser) {
+		t.Fatalf("Expected %+v but got %+v", expectedUser, registeredTestUser)
+	}
+	if err != nil {
+		t.Fatalf("Retrieving from db failed with %v", err)
+	}
+
 }
 
 func TestUserToProto(t *testing.T) {
@@ -114,10 +174,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		{makeAsk(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			db.Delete(tr)
@@ -128,7 +185,6 @@ func Test_PlaceAskOrder(t *testing.T) {
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
-		db.Close()
 
 		delete(userLocks.m, 2)
 	}()
@@ -227,10 +283,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 		{makeBid(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			db.Delete(tr)
@@ -241,7 +294,6 @@ func Test_PlaceBidOrder(t *testing.T) {
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
-		db.Close()
 
 		delete(userLocks.m, 2)
 	}()
@@ -347,10 +399,7 @@ func Test_CancelOrder(t *testing.T) {
 		{2, 260, false, false},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, a := range asks {
 			db.Delete(a)
@@ -361,7 +410,6 @@ func Test_CancelOrder(t *testing.T) {
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
-		db.Close()
 
 		delete(userLocks.m, 2)
 	}()
@@ -393,11 +441,21 @@ func Test_CancelOrder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := CancelOrder(tc.userId, tc.orderId, tc.isAsk)
-			if tc.pass == true && err != nil {
-				fm.Lock()
-				defer fm.Unlock()
-				t.Fatalf("Did not expect error. Got %+v", err)
+			askOrder, bidOrder, err := CancelOrder(tc.userId, tc.orderId, tc.isAsk)
+			if tc.pass == true {
+				if err != nil {
+					fm.Lock()
+					defer fm.Unlock()
+					t.Fatalf("Did not expect error. Got %+v", err)
+				} else if tc.isAsk && (askOrder == nil || bidOrder != nil) {
+					fm.Lock()
+					defer fm.Unlock()
+					t.Fatalf("For tc.isAsk, only askOrder should be not-nil")
+				} else if !tc.isAsk && (askOrder != nil || bidOrder == nil) {
+					fm.Lock()
+					defer fm.Unlock()
+					t.Fatalf("For !tc.isAsk, only bidOrder should be not-nil")
+				}
 			} else if tc.pass == false && err == nil {
 				fm.Lock()
 				defer fm.Unlock()
@@ -457,10 +515,7 @@ func Test_GetStocksOwned(t *testing.T) {
 		{userId: 4, expected: map[uint32]int32{2: -10, 3: 10}},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			if err := db.Delete(tr).Error; err != nil {
@@ -479,8 +534,6 @@ func Test_GetStocksOwned(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {
@@ -583,10 +636,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 	transactions.m[3] = &lockedTrList{}
 	transactions.m[4] = &lockedTrList{}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, ltrlist := range transactions.m {
 			for _, tr := range ltrlist.trlist {
@@ -607,8 +657,6 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {
@@ -767,10 +815,7 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 		{4, 1, 5, 5 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 0, true},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			if err := db.Delete(tr).Error; err != nil {
@@ -789,8 +834,6 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {
@@ -906,10 +949,7 @@ func Test_PerformMortgageDepositTransaction(t *testing.T) {
 		{4, 1, -5, 5 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 0, true},
 	}
 
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatal("Failed opening DB to insert dummy data")
-	}
+	db := getDB()
 	defer func() {
 		for _, tr := range transactions {
 			if err := db.Delete(tr).Error; err != nil {
@@ -928,8 +968,6 @@ func Test_PerformMortgageDepositTransaction(t *testing.T) {
 			}
 			delete(userLocks.m, user.Id)
 		}
-
-		db.Close()
 	}()
 
 	for _, user := range users {

@@ -14,6 +14,7 @@ func TestMarketEventToProto(t *testing.T) {
 		Text:         "Hello World",
 		IsGlobal:     true,
 		EmotionScore: -54,
+		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
 	}
 
@@ -32,15 +33,12 @@ func Test_GetMarketEvents(t *testing.T) {
 		Text:         "Hello World",
 		IsGlobal:     true,
 		EmotionScore: -54,
+		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
 	}
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Opening Database for inserting MarketEvents failed with error %v", err)
-	}
+	db := getDB()
 	defer func() {
 		db.Exec("DELETE FROM MarketEvents")
-		db.Close()
 	}()
 	count := 0
 	for ; marketEvent.Id <= MARKET_EVENT_COUNT+1; marketEvent.Id++ {
@@ -75,25 +73,23 @@ func Test_GetMarketEvents(t *testing.T) {
 
 func Test_AddMarketEvent(t *testing.T) {
 	marketEvent := &MarketEvent{
-		Id:       1,
-		StockId:  3,
-		Headline: "Hello",
-		Text:     "Hello World",
-		IsGlobal: true,
+		Id:        1,
+		StockId:   3,
+		Headline:  "Hello",
+		Text:      "Hello World",
+		IsGlobal:  true,
+		ImagePath: "bitcoin_1516197589.jpg",
 	}
-	db, err := DbOpen()
-	if err != nil {
-		t.Fatalf("Error Opening the Db")
-	}
+	db := getDB()
 	defer func() {
 		db.Exec("DELETE FROM MarketEvents")
-		db.Close()
 	}()
+
+	err := AddMarketEvent(3, "Hello", "Hello World", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
 	if err != nil {
-		t.Fatalf("GetMarketEvents returned an error %v", err)
+		t.Fatalf("AddMarketEvent failed with error: %+v", err)
 	}
 
-	AddMarketEvent(3, "Hello", "Hello World", true)
 	retrievedEvent := &MarketEvent{}
 	db.First(retrievedEvent)
 	if retrievedEvent == nil {

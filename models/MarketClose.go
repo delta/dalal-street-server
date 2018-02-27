@@ -1,19 +1,13 @@
 package models
 
-import (
-	"fmt"
-)
+import "time"
 
 var isMarketOpen = false
 
-func OpenMarket() {
+func OpenMarket(updateDayHighAndLow bool) error {
 	isMarketOpen = true
 
-	db, err := DbOpen()
-	if err != nil {
-		return
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Exec("Update Config set isMarketOpen = true")
 
@@ -22,16 +16,20 @@ func OpenMarket() {
 	}
 	notificationsStream := datastreamsManager.GetNotificationsStream()
 	notificationsStream.SendNotification(notif.ToProto())
+
+	if updateDayHighAndLow {
+		return SetDayHighAndLow()
+	}
+
+	go startStockHistoryRecorder(time.Minute)
+
+	return nil
 }
 
-func CloseMarket() {
+func CloseMarket(updatePreviousDayClose bool) error {
 	isMarketOpen = false
 
-	db, err := DbOpen()
-	if err != nil {
-		return
-	}
-	defer db.Close()
+	db := getDB()
 
 	db.Exec("Update Config set isMarketOpen = false")
 
@@ -41,24 +39,16 @@ func CloseMarket() {
 
 	notificationsStream := datastreamsManager.GetNotificationsStream()
 	notificationsStream.SendNotification(notif.ToProto())
+
+	if updatePreviousDayClose {
+		return SetPreviousDayClose()
+	}
+
+	stopStockHistoryRecorder()
+
+	return nil
 }
 
 func IsMarketOpen() bool {
 	return isMarketOpen
-}
-
-func lookupIsMarketOpenFromDb() {
-	db, err := DbOpen()
-	if err != nil {
-		return
-	}
-	defer db.Close()
-
-	resp := struct {
-		Open bool
-	}{}
-
-	db.Raw("Select isMarketOpen as open from Config").Scan(&resp)
-	fmt.Printf("resp %+v", resp)
-	isMarketOpen = resp.Open
 }

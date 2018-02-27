@@ -21,6 +21,13 @@ import (
 
 var logger *logrus.Entry
 
+func getInternalErrorMessage(err error) string {
+	if utils.IsProdEnv() {
+		return "Oops! Something went wrong. Please try again in some time."
+	}
+	return err.Error()
+}
+
 func getUserId(ctx context.Context) uint32 {
 	sess := ctx.Value("session").(session.Session)
 	userId, _ := sess.Get("userId")
@@ -32,6 +39,7 @@ type dalalActionService struct {
 	matchingEngine matchingengine.MatchingEngine
 }
 
+// NewDalalActionService returns instance of DalalActionServiceServer
 func NewDalalActionService(me matchingengine.MatchingEngine) pb.DalalActionServiceServer {
 	logger = utils.Logger.WithFields(logrus.Fields{
 		"module": "grpcapi.actions",
@@ -51,13 +59,14 @@ func (d *dalalActionService) BuyStocksFromExchange(ctx context.Context, req *act
 	l.Infof("BuyStocksFromExchange requested")
 
 	resp := &actions_pb.BuyStocksFromExchangeResponse{}
-	makeError := func(st actions_pb.BuyStocksFromExchangeResponse_StatusCode) (*actions_pb.BuyStocksFromExchangeResponse, error) {
+	makeError := func(st actions_pb.BuyStocksFromExchangeResponse_StatusCode, msg string) (*actions_pb.BuyStocksFromExchangeResponse, error) {
 		resp.StatusCode = st
+		resp.StatusMessage = msg
 		return resp, nil
 	}
 
 	if !models.IsMarketOpen() {
-		return makeError(actions_pb.BuyStocksFromExchangeResponse_MarketClosedError)
+		return makeError(actions_pb.BuyStocksFromExchangeResponse_MarketClosedError, "Market is currently closed. You cannot buy stocks right now.")
 	}
 
 	userId := getUserId(ctx)
@@ -66,17 +75,18 @@ func (d *dalalActionService) BuyStocksFromExchange(ctx context.Context, req *act
 
 	transaction, err := models.PerformBuyFromExchangeTransaction(userId, stockId, stockQty)
 
-	switch err.(type) {
+	switch e := err.(type) {
 	case models.BuyLimitExceededError:
-		return makeError(actions_pb.BuyStocksFromExchangeResponse_BuyLimitExceededError)
+		return makeError(actions_pb.BuyStocksFromExchangeResponse_BuyLimitExceededError, e.Error())
 	case models.NotEnoughCashError:
-		return makeError(actions_pb.BuyStocksFromExchangeResponse_NotEnoughCashError)
+		return makeError(actions_pb.BuyStocksFromExchangeResponse_NotEnoughCashError, e.Error())
 	case models.NotEnoughStocksError:
-		return makeError(actions_pb.BuyStocksFromExchangeResponse_NotEnoughStocksError)
+		return makeError(actions_pb.BuyStocksFromExchangeResponse_NotEnoughStocksError, e.Error())
 	}
 
 	if err != nil {
-		return makeError(actions_pb.BuyStocksFromExchangeResponse_InternalServerError)
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.BuyStocksFromExchangeResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	resp.Transaction = transaction.ToProto()
@@ -95,29 +105,39 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 	l.Infof("CancelOrder requested")
 
 	resp := &actions_pb.CancelOrderResponse{}
-	makeError := func(st actions_pb.CancelOrderResponse_StatusCode) (*actions_pb.CancelOrderResponse, error) {
+	makeError := func(st actions_pb.CancelOrderResponse_StatusCode, msg string) (*actions_pb.CancelOrderResponse, error) {
 		resp.StatusCode = st
+		resp.StatusMessage = msg
 		return resp, nil
 	}
 
 	if !models.IsMarketOpen() {
-		return makeError(actions_pb.CancelOrderResponse_MarketClosedError)
+		return makeError(actions_pb.CancelOrderResponse_MarketClosedError, "Market is closed. You cannot cancel orders right now.")
 	}
 
 	userId := getUserId(ctx)
 	orderId := req.OrderId
 	isAsk := req.IsAsk
 
-	err := models.CancelOrder(userId, orderId, isAsk)
+	askOrder, bidOrder, err := models.CancelOrder(userId, orderId, isAsk)
 
 	switch err.(type) {
-	case models.InvalidAskIdError:
-	case models.InvalidBidIdError:
-		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId)
+	case models.InvalidOrderIDError:
+		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId, "Invalid Order ID. Cannot cancel this order.")
+	case models.AlreadyClosedError:
+		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId, err.Error())
 	}
 
 	if err != nil {
-		return makeError(actions_pb.CancelOrderResponse_InternalServerError)
+		l.Errorf("Request failed due to %+v", err)
+		return makeError(actions_pb.CancelOrderResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	// remove the order from matching engine
+	if isAsk {
+		d.matchingEngine.CancelAskOrder(askOrder)
+	} else {
+		d.matchingEngine.CancelBidOrder(bidOrder)
 	}
 
 	l.Infof("Request completed successfully")
@@ -143,7 +163,7 @@ func (d *dalalActionService) CreateBot(ctx context.Context, req *actions_pb.Crea
 	user, err := models.CreateBot(req.GetBotUserId())
 	if err != nil {
 		l.Errorf("Unable to Create bot models.CreateBot threw error %+v", err)
-		return makeError(actions_pb.CreateBotResponse_InternalServerError, "")
+		return makeError(actions_pb.CreateBotResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	resp.User = user.ToProto()
@@ -157,6 +177,7 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("Getting Portfolio")
 
 	resp := &actions_pb.GetPortfolioResponse{}
@@ -171,8 +192,11 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 
 	user, err := models.GetUserCopy(userId)
 	if err != nil {
-		l.Errorf("User for Id does not exist. Error: %+v", err)
-		return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "")
+		l.Errorf("Request failed. User for Id does not exist. Error: %+v", err)
+		if utils.IsProdEnv() {
+			return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, "Invalid credentials given")
+		}
+		return makeError(actions_pb.GetPortfolioResponse_InvalidCredentialsError, fmt.Sprintf("User for ID does not exist: %+v", err))
 	}
 
 	stocksOwned, err := models.GetStocksOwned(user.Id)
@@ -181,9 +205,39 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 		return makeError(actions_pb.GetPortfolioResponse_InternalServerError, "")
 	}
 
-	resp.SessionId = sess.GetId()
+	resp.SessionId = sess.GetID()
 	resp.User = user.ToProto()
 	resp.StocksOwned = stocksOwned
+
+	return resp, nil
+}
+
+func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.RegisterRequest) (*actions_pb.RegisterResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "Register",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Register requested")
+
+	resp := &actions_pb.RegisterResponse{}
+	makeError := func(st actions_pb.RegisterResponse_StatusCode, msg string) (*actions_pb.RegisterResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetFullName())
+	if err == models.AlreadyRegisteredError {
+		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredError, "Already registered please Login")
+	}
+	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.RegisterResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	l.Infof("Done")
 
 	return resp, nil
 }
@@ -194,6 +248,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("Login requested")
 
 	resp := &actions_pb.LoginResponse{}
@@ -215,7 +270,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		password := req.GetPassword()
 
 		if email == "" || password == "" {
-			return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "")
+			return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "Invalid Credentials")
 		}
 
 		user, err = models.Login(email, password)
@@ -229,29 +284,29 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 
 	switch {
 	case err == models.UnauthorizedError:
-		return makeError(actions_pb.LoginResponse_InternalServerError, "Incorrect username/password combination. Please use your Pragyan credentials.")
+		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "Incorrect username/password combination. Please use your Pragyan credentials.")
 	case err == models.NotRegisteredError:
 		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "You have not registered for Dalal Street on the Pragyan website")
 	case err != nil:
-		l.Errorln(err)
-		return makeError(actions_pb.LoginResponse_InternalServerError, "")
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	l.Debugf("models.Login returned without error %+v", user)
 
 	if !alreadyLoggedIn {
 		if err := sess.Set("userId", strconv.Itoa(int(user.Id))); err != nil {
-			l.Errorln(err)
-			return makeError(actions_pb.LoginResponse_InternalServerError, "")
+			l.Errorf("Request failed due to: %+v", err)
+			return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
 		}
 	}
 
-	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetId())
+	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetID())
 
 	stocksOwned, err := models.GetStocksOwned(user.Id)
 	if err != nil {
-		l.Errorln(err)
-		return makeError(actions_pb.LoginResponse_InternalServerError, "")
+		l.Errorf("Request failed due to %+v", err)
+		return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	stockList := models.GetAllStocks()
@@ -267,6 +322,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		"BUY_LIMIT":               models.BUY_LIMIT,
 		"MINIMUM_CASH_LIMIT":      models.MINIMUM_CASH_LIMIT,
 		"BUY_FROM_EXCHANGE_LIMIT": models.BUY_FROM_EXCHANGE_LIMIT,
+		"ORDER_PRICE_WINDOW":      models.ORDER_PRICE_WINDOW,
 		"STARTING_CASH":           models.STARTING_CASH,
 		"MORTGAGE_RETRIEVE_RATE":  models.MORTGAGE_RETRIEVE_RATE,
 		"MORTGAGE_DEPOSIT_RATE":   models.MORTGAGE_DEPOSIT_RATE,
@@ -279,7 +335,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 	}
 
 	resp = &actions_pb.LoginResponse{
-		SessionId:                sess.GetId(),
+		SessionId:                sess.GetID(),
 		User:                     user.ToProto(),
 		StocksOwned:              stocksOwned,
 		StockList:                stockListProto,
@@ -300,9 +356,12 @@ func (d *dalalActionService) Logout(ctx context.Context, req *actions_pb.LogoutR
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("Logout requested")
 
 	sess := ctx.Value("session").(session.Session)
+	userId := getUserId(ctx)
+	models.Logout(userId)
 	sess.Destroy()
 
 	l.Infof("Request completed successfully")
@@ -316,6 +375,7 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("MortgageStocks requested")
 
 	resp := &actions_pb.MortgageStocksResponse{}
@@ -326,7 +386,7 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 	}
 
 	if !models.IsMarketOpen() {
-		return makeError(actions_pb.MortgageStocksResponse_MarketClosedError, "")
+		return makeError(actions_pb.MortgageStocksResponse_MarketClosedError, "Market is closed. You cannot mortgage stocks right now.")
 	}
 
 	userId := getUserId(ctx)
@@ -338,9 +398,12 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 	switch e := err.(type) {
 	case models.NotEnoughStocksError:
 		return makeError(actions_pb.MortgageStocksResponse_NotEnoughStocksError, e.Error())
+	case models.WayTooMuchCashError:
+		return makeError(actions_pb.MortgageStocksResponse_NotEnoughStocksError, e.Error())
 	}
 	if err != nil {
-		return makeError(actions_pb.MortgageStocksResponse_InternalServerError, "")
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.MortgageStocksResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	resp.Transaction = transaction.ToProto()
@@ -356,6 +419,7 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("PlaceOrder requested")
 
 	resp := &actions_pb.PlaceOrderResponse{}
@@ -366,7 +430,7 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 	}
 
 	if !models.IsMarketOpen() {
-		return makeError(actions_pb.PlaceOrderResponse_MarketClosedError, "")
+		return makeError(actions_pb.PlaceOrderResponse_MarketClosedError, "Market Is closed. You cannot place orders right now.")
 	}
 
 	userId := getUserId(ctx)
@@ -382,7 +446,7 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 			StockQuantity: req.StockQuantity,
 		}
 		orderId, err = models.PlaceAskOrder(userId, ask)
-		if err != nil {
+		if err == nil {
 			go d.matchingEngine.AddAskOrder(ask)
 		}
 	} else {
@@ -394,14 +458,15 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 			StockQuantity: req.StockQuantity,
 		}
 		orderId, err = models.PlaceBidOrder(userId, bid)
-		if err != nil {
+		if err == nil {
 			go d.matchingEngine.AddBidOrder(bid)
 		}
 	}
 
 	switch e := err.(type) {
-	case models.AskLimitExceededError:
-	case models.BidLimitExceededError:
+	case models.OrderStockLimitExceeded:
+		return makeError(actions_pb.PlaceOrderResponse_StockQuantityLimitExceeded, e.Error())
+	case models.OrderPriceOutOfWindowError: // should update proto as well ideally. This is how it is for now.
 		return makeError(actions_pb.PlaceOrderResponse_StockQuantityLimitExceeded, e.Error())
 	case models.NotEnoughStocksError:
 		return makeError(actions_pb.PlaceOrderResponse_NotEnoughStocksError, e.Error())
@@ -410,7 +475,8 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 	}
 
 	if err != nil {
-		return makeError(actions_pb.PlaceOrderResponse_InternalServerError, "")
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.PlaceOrderResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	resp.OrderId = orderId
@@ -426,6 +492,7 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("RetrieveMortgageStocks requested")
 
 	resp := &actions_pb.RetrieveMortgageStocksResponse{}
@@ -436,7 +503,7 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 	}
 
 	if !models.IsMarketOpen() {
-		return makeError(actions_pb.RetrieveMortgageStocksResponse_MarketClosedError, "")
+		return makeError(actions_pb.RetrieveMortgageStocksResponse_MarketClosedError, "Market is closed. You cannot retrieve your mortgaged stocks right now.")
 	}
 
 	userId := getUserId(ctx)
@@ -452,7 +519,8 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 		return makeError(actions_pb.RetrieveMortgageStocksResponse_NotEnoughCashError, e.Error())
 	}
 	if err != nil {
-		return makeError(actions_pb.RetrieveMortgageStocksResponse_InternalServerError, "")
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.RetrieveMortgageStocksResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	resp.Transaction = transaction.ToProto()
@@ -474,7 +542,9 @@ func (d *dalalActionService) GetCompanyProfile(ctx context.Context, req *actions
 
 	stockDetails, err := models.GetCompanyDetails(req.StockId)
 	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetCompanyProfileResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 
@@ -491,6 +561,7 @@ func (d *dalalActionService) GetStockHistory(ctx context.Context, req *actions_p
 		"param_session": fmt.Sprintf("%v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%v", req),
 	})
+
 	l.Infof("Getting StockHistory")
 
 	resp := &actions_pb.GetStockHistoryResponse{}
@@ -498,17 +569,17 @@ func (d *dalalActionService) GetStockHistory(ctx context.Context, req *actions_p
 	stockHistory, err := models.GetStockHistory(req.StockId, models.ResolutionFromProto(req.GetResolution())) // Check if this works
 
 	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetStockHistoryResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 
-	stockHistoryMap := make(map[string]*models_pb.StockHistory)
+	resp.StockHistoryMap = make(map[string]*models_pb.StockHistory)
 
 	for _, stockData := range stockHistory {
-		stockHistoryMap[stockData.CreatedAt] = stockData.ToProto()
+		resp.StockHistoryMap[stockData.CreatedAt] = stockData.ToProto()
 	}
-
-	resp.StockHistoryMap = stockHistoryMap
 
 	l.Infof("StockHistory Returned")
 
@@ -530,7 +601,9 @@ func (d *dalalActionService) GetMarketEvents(ctx context.Context, req *actions_p
 
 	moreExists, marketEvents, err := models.GetMarketEvents(lastId, count)
 	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetMarketEventsResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 
@@ -564,33 +637,27 @@ func (d *dalalActionService) GetMyOpenOrders(ctx context.Context, req *actions_p
 
 	//get open ask orders
 	myOpenAskOrders, err := models.GetMyOpenAsks(userId)
-
 	if err != nil {
-		return makeError(actions_pb.GetMyOpenOrdersResponse_InternalServerError, "")
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.GetMyOpenOrdersResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	//convert open ask orders to proto
-	var myOpenAskOrdersProto []*models_pb.Ask
 	for _, ask := range myOpenAskOrders {
-		myOpenAskOrdersProto = append(myOpenAskOrdersProto, ask.ToProto())
+		resp.OpenAskOrders = append(resp.OpenAskOrders, ask.ToProto())
 	}
 
 	//get open bid orders
 	myOpenBidOrders, err := models.GetMyOpenBids(userId)
-
 	if err != nil {
-		return makeError(actions_pb.GetMyOpenOrdersResponse_InternalServerError, "")
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.GetMyOpenOrdersResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	//convert open bid orders to proto
-	var myOpenBidOrdersProto []*models_pb.Bid
-
 	for _, bid := range myOpenBidOrders {
-		myOpenBidOrdersProto = append(myOpenBidOrdersProto, bid.ToProto())
+		resp.OpenBidOrders = append(resp.OpenBidOrders, bid.ToProto())
 	}
-
-	resp.OpenAskOrders = myOpenAskOrdersProto
-	resp.OpenBidOrders = myOpenBidOrdersProto
 
 	l.Infof("Request completed successfully")
 
@@ -604,6 +671,7 @@ func (d *dalalActionService) GetMyClosedAsks(ctx context.Context, req *actions_p
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("GetMyClosedAsks requested")
 
 	resp := &actions_pb.GetMyClosedAsksResponse{}
@@ -618,20 +686,16 @@ func (d *dalalActionService) GetMyClosedAsks(ctx context.Context, req *actions_p
 	count := req.Count
 
 	moreExists, myClosedAskOrders, err := models.GetMyClosedAsks(userId, lastId, count)
-
 	if err != nil {
-		return makeError(actions_pb.GetMyClosedAsksResponse_InternalServerError, "")
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.GetMyClosedAsksResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	//Convert to proto
-	var myClosedAskOrdersProto []*models_pb.Ask
-
-	for _, ask := range myClosedAskOrders {
-		myClosedAskOrdersProto = append(myClosedAskOrdersProto, ask.ToProto())
-	}
-
 	resp.MoreExists = moreExists
-	resp.ClosedAskOrders = myClosedAskOrdersProto
+	for _, ask := range myClosedAskOrders {
+		resp.ClosedAskOrders = append(resp.ClosedAskOrders, ask.ToProto())
+	}
 
 	l.Infof("Request completed successfully")
 
@@ -644,6 +708,7 @@ func (d *dalalActionService) GetMyClosedBids(ctx context.Context, req *actions_p
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("GetMyClosedBids requested")
 
 	resp := &actions_pb.GetMyClosedBidsResponse{}
@@ -658,20 +723,16 @@ func (d *dalalActionService) GetMyClosedBids(ctx context.Context, req *actions_p
 	count := req.Count
 
 	moreExists, myClosedBidOrders, err := models.GetMyClosedBids(userId, lastId, count)
-
 	if err != nil {
-		return makeError(actions_pb.GetMyClosedBidsResponse_InternalServerError, "")
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.GetMyClosedBidsResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	//Convert to proto
-	var myClosedBidOrdersProto []*models_pb.Bid
-
-	for _, bid := range myClosedBidOrders {
-		myClosedBidOrdersProto = append(myClosedBidOrdersProto, bid.ToProto())
-	}
-
 	resp.MoreExists = moreExists
-	resp.ClosedBidOrders = myClosedBidOrdersProto
+	for _, bid := range myClosedBidOrders {
+		resp.ClosedBidOrders = append(resp.ClosedBidOrders, bid.ToProto())
+	}
 
 	l.Infof("Request completed successfully")
 
@@ -693,7 +754,9 @@ func (d *dalalActionService) GetNotifications(ctx context.Context, req *actions_
 
 	moreExists, notifications, err := models.GetNotifications(getUserId(ctx), lastId, count)
 	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetNotificationsResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 
@@ -714,6 +777,7 @@ func (d *dalalActionService) GetTransactions(ctx context.Context, req *actions_p
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
+
 	l.Infof("GetTransactions requested")
 
 	resp := &actions_pb.GetTransactionsResponse{}
@@ -724,7 +788,9 @@ func (d *dalalActionService) GetTransactions(ctx context.Context, req *actions_p
 
 	moreExists, transactions, err := models.GetTransactions(userId, lastId, count)
 	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetTransactionsResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 
@@ -752,7 +818,9 @@ func (d *dalalActionService) GetMortgageDetails(ctx context.Context, req *action
 	userId := getUserId(ctx)
 	mortgages, err := models.GetMortgageDetails(userId)
 	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetMortgageDetailsResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 
@@ -782,7 +850,9 @@ func (d *dalalActionService) GetLeaderboard(ctx context.Context, req *actions_pb
 
 	leaderboard, currentUserLeaderboard, totalUsers, err := models.GetLeaderboard(userId, startingId, count)
 	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetLeaderboardResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 

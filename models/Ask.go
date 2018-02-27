@@ -62,6 +62,7 @@ func OrderTypeFromProto(pOt models_pb.OrderType) OrderType {
 }
 
 type Ask struct {
+	sync.Mutex
 	Id                     uint32    `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId                 uint32    `gorm:"column:userId;not null" json:"user_id"`
 	StockId                uint32    `gorm:"column:stockId;not null" json:"stock_id"`
@@ -78,33 +79,54 @@ func (Ask) TableName() string {
 	return "Asks"
 }
 
-func (gAsk *Ask) ToProto() *models_pb.Ask {
+func (ask *Ask) ToProto() *models_pb.Ask {
 	m := make(map[OrderType]models_pb.OrderType)
 	m[Limit] = models_pb.OrderType_LIMIT
 	m[Market] = models_pb.OrderType_MARKET
 	m[StopLoss] = models_pb.OrderType_STOPLOSS
 
 	pAsk := &models_pb.Ask{
-		Id:                     gAsk.Id,
-		UserId:                 gAsk.UserId,
-		StockId:                gAsk.StockId,
-		Price:                  gAsk.Price,
-		OrderType:              m[gAsk.OrderType],
-		StockQuantity:          gAsk.StockQuantity,
-		StockQuantityFulfilled: gAsk.StockQuantityFulfilled,
-		IsClosed:               gAsk.IsClosed,
-		CreatedAt:              gAsk.CreatedAt,
-		UpdatedAt:              gAsk.UpdatedAt,
-	}
-	if gAsk.OrderType == Limit {
-		pAsk.OrderType = models_pb.OrderType_LIMIT
-	} else if gAsk.OrderType == Market {
-		pAsk.OrderType = models_pb.OrderType_MARKET
-	} else if gAsk.OrderType == StopLoss {
-		pAsk.OrderType = models_pb.OrderType_STOPLOSS
+		Id:                     ask.Id,
+		UserId:                 ask.UserId,
+		StockId:                ask.StockId,
+		Price:                  ask.Price,
+		OrderType:              m[ask.OrderType],
+		StockQuantity:          ask.StockQuantity,
+		StockQuantityFulfilled: ask.StockQuantityFulfilled,
+		IsClosed:               ask.IsClosed,
+		CreatedAt:              ask.CreatedAt,
+		UpdatedAt:              ask.UpdatedAt,
 	}
 
 	return pAsk
+}
+
+// TriggerStoploss will set OrderType to StopLossActive if the ordertype is StopLoss
+// Error is returned if that wasn't done successfully.
+func (ask *Ask) TriggerStoploss() error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":      "TriggerStoploss",
+		"param_askId": ask.Id,
+	})
+
+	l.Debugf("Attempting")
+
+	db := getDB()
+	if ask.OrderType == StopLoss {
+		ask.Lock()
+		ask.OrderType = StopLossActive
+		ask.UpdatedAt = utils.GetCurrentTimeISO8601()
+		ask.Unlock()
+		if err := db.Save(ask).Error; err != nil {
+			l.Errorf("Error while saving data: %+v", err)
+			return err
+		}
+		l.Debugf("Done")
+		return nil
+	}
+
+	l.Errorf("Called TriggerStoploss on order of type %s", ask.OrderType.String())
+	return nil // don't return any error here. Log is sufficient.
 }
 
 var asksMap = struct {
@@ -134,15 +156,10 @@ func getAsk(id uint32) (*Ask, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading ask from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
 
-	asksMap.m[id] = &Ask{}
-	ask = asksMap.m[id]
+	db := getDB()
+
+	ask = &Ask{}
 	db.First(ask, id)
 
 	if ask == nil {
@@ -150,73 +167,15 @@ func getAsk(id uint32) (*Ask, error) {
 		return nil, fmt.Errorf("Ask with id %d does not exist", id)
 	}
 
+	asksMap.m[id] = ask
+
 	l.Debugf("Loaded ask from db: %+v", ask)
 
 	return ask, nil
 }
 
-/*
-func getAskCopy(id uint32) (chan struct{}, *Ask, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "getAskCopy",
-		"param_id": id,
-	})
-
-	var (
-		a *askAndLock
-		ch = make(chan struct{})
-	)
-
-	l.Debugf("Attempting")
-
-	/* Try to see if the ask is there in the map * /
-	askLocks.RLock()
-	a, ok := askLocks.m[id]
-	askLocks.Unlock()
-	if ok {
-		l.Debugf("Found ask in askLocks map. Locking.")
-		a.Lock()
-		go func() {
-			l.Debugf("Waiting for caller to release lock")
-			<-ch
-			a.Unlock()
-			l.Debugf("Lock released")
-		}()
-		return ch, a.ask, nil
-	}
-
-	/* Otherwise load from database * /
-	l.Debugf("Loading ask from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, nil, err
-	}
-	defer db.Close()
-
-	askLocks.Lock()
-	db.First(a.ask, id)
-	askLocks.Unlock()
-
-	if a.ask == nil {
-		l.Errorf("Attempted to get non-existing Ask")
-		return nil, nil, fmt.Errorf("Ask with id %d does not exist", id)
-	}
-
-	l.Debugf("Loaded ask from db. Locking")
-	a.RLock()
-	go func() {
-		l.Debugf("Waiting for caller to release lock")
-		<-ch
-		askLocks.m[id].Unlock()
-		l.Debugf("Lock released")
-	}()
-
-	l.Debugf("Ask: %+v", a.ask)
-
-	return ch, a.ask, nil
-}
-*/
+// createAsk adds the ask to the database, fills the Id field of the ask
+// and adds it to the asksMap
 func createAsk(ask *Ask) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "CreateAsk",
@@ -225,25 +184,35 @@ func createAsk(ask *Ask) error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
-
 	ask.CreatedAt = utils.GetCurrentTimeISO8601()
 	ask.UpdatedAt = ask.CreatedAt
+
+	db := getDB()
 
 	if err := db.Create(ask).Error; err != nil {
 		return err
 	}
+
+	// add it to the asksMap
+	asksMap.Lock()
+	asksMap.m[ask.Id] = ask
+	asksMap.Unlock()
 
 	l.Debugf("Created ask. Id: %d", ask.Id)
 
 	return nil
 }
 
+// AlreadyClosedError is given out when user tries to Cancel an already closed order.
+// Unlikely to happen, but still possible
+type AlreadyClosedError struct{ orderID uint32 }
+
+func (e AlreadyClosedError) Error() string {
+	return fmt.Sprintf("Order#%d is already closed. Cannot cancel now.", e.orderID)
+}
+
+
+// Marks an ask as closed and removes it from asksMap
 func (ask *Ask) Close() error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "Ask.Close",
@@ -252,21 +221,57 @@ func (ask *Ask) Close() error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
+	ask.Lock()
+	if ask.IsClosed {
+		ask.Unlock()
+		return AlreadyClosedError{ask.Id}
 	}
-	defer db.Close()
 	ask.IsClosed = true
 	ask.UpdatedAt = utils.GetCurrentTimeISO8601()
+	ask.Unlock()
 
+	db := getDB()
 	if err := db.Save(ask).Error; err != nil {
 		l.Error(err)
 		return err
 	}
+
+	// pointless to have a pointer to this now.
+	asksMap.Lock()
+	delete(asksMap.m, ask.Id)
+	asksMap.Unlock()
+
 	l.Debugf("Done")
 	return nil
+}
+
+// GetAllOpenAsks returns all open asks. This will be called by MatchingEngine while initializing.
+func GetAllOpenAsks() ([]*Ask, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetAllOpenAsks",
+	})
+
+	l.Infof("Attempting to get all open ask orders")
+
+	db := getDB()
+
+	var openAsks []*Ask
+
+	//Load open ask orders from database
+	if err := db.Where("isClosed = ?", 0).Find(&openAsks).Error; err != nil {
+		panic("Error loading open ask orders in matching engine: " + err.Error())
+	}
+
+	asksMap.Lock()
+	defer asksMap.Unlock()
+
+	for _, ask := range openAsks {
+		asksMap.m[ask.Id] = ask
+	}
+
+	l.Infof("Done")
+
+	return openAsks, nil
 }
 
 func GetMyOpenAsks(userId uint32) ([]*Ask, error) {
@@ -277,11 +282,7 @@ func GetMyOpenAsks(userId uint32) ([]*Ask, error) {
 
 	l.Infof("Attempting to get open ask orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myOpenAsks []*Ask
 
@@ -303,11 +304,7 @@ func GetMyClosedAsks(userId, lastId, count uint32) (bool, []*Ask, error) {
 
 	l.Infof("Attempting to get closed ask orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myClosedAsks []*Ask
 

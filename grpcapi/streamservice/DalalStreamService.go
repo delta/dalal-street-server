@@ -60,6 +60,7 @@ func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer 
 		datastreams_pb.DataStreamType_STOCK_EXCHANGE,
 		datastreams_pb.DataStreamType_STOCK_PRICES,
 		datastreams_pb.DataStreamType_TRANSACTIONS,
+		datastreams_pb.DataStreamType_STOCK_HISTORY,
 	}
 
 	for _, t := range types {
@@ -72,6 +73,25 @@ func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer 
 	return dss
 }
 
+// will be called whenever Unsubscribe is called, or when doneChan gets closed due to network error or something
+// returns a subscription. It'll be nil in case the subscription doesn't exist. If it exists, it means
+// that was called by Unsubscribe. So it can close the doneChan. Otherwise this got called from one
+// of the GetXUpdates()...and that happened because doneChan got closed due to network issue.
+func (d *dalalStreamService) removeSubscriptionFromMap(subId *datastreams_pb.SubscriptionId) *subscription {
+	id := subId.Id
+	dataStreamType := subId.DataStreamType
+
+	d.subscriptionsMap[dataStreamType].Lock()
+	subscription, ok := d.subscriptionsMap[dataStreamType].m[id]
+	if !ok {
+		d.subscriptionsMap[dataStreamType].Unlock()
+		return nil
+	}
+	delete(d.subscriptionsMap[dataStreamType].m, id)
+	d.subscriptionsMap[dataStreamType].Unlock()
+	return subscription
+}
+
 func (d *dalalStreamService) Unsubscribe(ctx context.Context, req *datastreams_pb.UnsubscribeRequest) (*datastreams_pb.UnsubscribeResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Unsubscribe",
@@ -81,20 +101,12 @@ func (d *dalalStreamService) Unsubscribe(ctx context.Context, req *datastreams_p
 	l.Infof("Unsubscribe requested")
 
 	resp := &datastreams_pb.UnsubscribeResponse{}
-	id := req.SubscriptionId.Id
-	dataStreamType := req.SubscriptionId.DataStreamType
+	subscription := d.removeSubscriptionFromMap(req.GetSubscriptionId())
 
-	d.subscriptionsMap[dataStreamType].Lock()
-	subscription, ok := d.subscriptionsMap[dataStreamType].m[id]
-	if !ok {
-		d.subscriptionsMap[dataStreamType].Unlock()
-		return resp, nil
+	if subscription != nil {
+		// closing the done channel will automatically remove the user from the stream
+		close(subscription.doneChan)
 	}
-	delete(d.subscriptionsMap[dataStreamType].m, id)
-	d.subscriptionsMap[dataStreamType].Unlock()
-
-	// closing the done channel will automatically remove the user from the stream
-	close(subscription.doneChan)
 
 	l.Infof("Request completed successfully")
 
@@ -151,6 +163,50 @@ func (d *dalalStreamService) getSubscription(req *datastreams_pb.SubscriptionId,
 	return subscription, nil
 }
 
+func (d *dalalStreamService) GetStockHistoryUpdates(req *datastreams_pb.SubscriptionId, stream pb.DalalStreamService_GetStockHistoryUpdatesServer) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetStockHistoryUpdates",
+		"param_session": fmt.Sprintf("%+v", stream.Context().Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("GetStockHistoryUpdates requested")
+
+	subscription, err := d.getSubscription(req, datastreams_pb.DataStreamType_STOCK_HISTORY)
+	if err != nil {
+		return err
+	}
+
+	subscribeReq := subscription.subscribeReq
+	done := subscription.doneChan
+	updates := make(chan interface{})
+
+	stockId, _ := strconv.ParseUint(subscribeReq.DataStreamId, 10, 32)
+
+	historyStream := d.datastreamsManager.GetStockHistoryStream(uint32(stockId))
+	historyStream.AddListener(done, updates, req.Id)
+
+loop:
+	for {
+		select {
+		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
+			break loop
+		case update := <-updates:
+			err := stream.Send(update.(*datastreams_pb.StockHistoryUpdate))
+			if err != nil {
+				// log the error
+				break
+			}
+		}
+	}
+	l.Infof("Request completed successfully")
+
+	return nil
+}
+
 func (d *dalalStreamService) GetMarketDepthUpdates(req *datastreams_pb.SubscriptionId, stream pb.DalalStreamService_GetMarketDepthUpdatesServer) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "GetMarketDepthUpdates",
@@ -177,6 +233,10 @@ loop:
 	for {
 		select {
 		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketDepthUpdate))
@@ -214,6 +274,10 @@ loop:
 	for {
 		select {
 		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MarketEventUpdate))
@@ -253,6 +317,10 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.MyOrderUpdate))
 			if err != nil {
@@ -291,6 +359,10 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.NotificationUpdate))
 			if err != nil {
@@ -327,6 +399,10 @@ loop:
 	for {
 		select {
 		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockExchangeUpdate))
@@ -366,6 +442,10 @@ loop:
 		select {
 		case <-done:
 			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
+			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.StockPricesUpdate))
 			if err != nil {
@@ -404,6 +484,10 @@ loop:
 	for {
 		select {
 		case <-done:
+			break loop
+		case <-stream.Context().Done():
+			d.removeSubscriptionFromMap(req)
+			close(done)
 			break loop
 		case update := <-updates:
 			err := stream.Send(update.(*datastreams_pb.TransactionUpdate))

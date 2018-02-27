@@ -11,6 +11,7 @@ import (
 )
 
 type Bid struct {
+	sync.Mutex
 	Id                     uint32    `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId                 uint32    `gorm:"column:userId;not null" json:"user_id"`
 	StockId                uint32    `gorm:"column:stockId;not null" json:"stock_id"`
@@ -27,32 +28,54 @@ func (Bid) TableName() string {
 	return "Bids"
 }
 
-func (gBid *Bid) ToProto() *models_pb.Bid {
+func (bid *Bid) ToProto() *models_pb.Bid {
 	m := make(map[OrderType]models_pb.OrderType)
 	m[Limit] = models_pb.OrderType_LIMIT
 	m[Market] = models_pb.OrderType_MARKET
 	m[StopLoss] = models_pb.OrderType_STOPLOSS
 
 	pBid := &models_pb.Bid{
-		Id:                     gBid.Id,
-		UserId:                 gBid.UserId,
-		StockId:                gBid.StockId,
-		Price:                  gBid.Price,
-		OrderType:              m[gBid.OrderType],
-		StockQuantity:          gBid.StockQuantity,
-		StockQuantityFulfilled: gBid.StockQuantityFulfilled,
-		IsClosed:               gBid.IsClosed,
-		CreatedAt:              gBid.CreatedAt,
-		UpdatedAt:              gBid.UpdatedAt,
+		Id:                     bid.Id,
+		UserId:                 bid.UserId,
+		StockId:                bid.StockId,
+		Price:                  bid.Price,
+		OrderType:              m[bid.OrderType],
+		StockQuantity:          bid.StockQuantity,
+		StockQuantityFulfilled: bid.StockQuantityFulfilled,
+		IsClosed:               bid.IsClosed,
+		CreatedAt:              bid.CreatedAt,
+		UpdatedAt:              bid.UpdatedAt,
 	}
-	if gBid.OrderType == Limit {
-		pBid.OrderType = models_pb.OrderType_LIMIT
-	} else if gBid.OrderType == Market {
-		pBid.OrderType = models_pb.OrderType_MARKET
-	} else if gBid.OrderType == StopLoss {
-		pBid.OrderType = models_pb.OrderType_STOPLOSS
-	}
+
 	return pBid
+}
+
+// TriggerStoploss will set OrderType to StopLossActive if the ordertype is StopLoss
+// Error is returned if that wasn't done successfully.
+func (bid *Bid) TriggerStoploss() error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":      "TriggerStoploss",
+		"param_bidId": bid.Id,
+	})
+
+	l.Debugf("Attempting")
+
+	db := getDB()
+	if bid.OrderType == StopLoss {
+		bid.Lock()
+		bid.OrderType = StopLossActive
+		bid.UpdatedAt = utils.GetCurrentTimeISO8601()
+		bid.Unlock()
+		if err := db.Save(bid).Error; err != nil {
+			l.Errorf("Error while saving data: %+v", err)
+			return err
+		}
+		l.Debugf("Done")
+		return nil
+	}
+
+	l.Errorf("Called TriggerStoploss on order of type %s", bid.OrderType.String())
+	return nil // don't return any error here. Log is sufficient.
 }
 
 var bidsMap = struct {
@@ -83,15 +106,9 @@ func getBid(id uint32) (*Bid, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading bid from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
-	bidsMap.m[id] = &Bid{}
-	bid := bidsMap.m[id]
+	bid := &Bid{}
 	db.First(bid, id)
 
 	if bid == nil {
@@ -99,73 +116,13 @@ func getBid(id uint32) (*Bid, error) {
 		return nil, fmt.Errorf("Bid with id %d does not exist", id)
 	}
 
+	bidsMap.m[id] = bid
+
 	l.Debugf("Loaded bid from db: %+v", bid)
 
 	return bid, nil
 }
 
-/*
-func getBidCopy(id uint32) (chan struct{}, *Bid, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "getBidCopy",
-		"param_id": id,
-	})
-
-	var (
-		a *bidAndLock
-		ch = make(chan struct{})
-	)
-
-	l.Debugf("Attempting")
-
-	/* Try to see if the bid is there in the map * /
-	bidLocks.RLock()
-	a, ok := bidLocks.m[id]
-	bidLocks.Unlock()
-	if ok {
-		l.Debugf("Found bid in bidLocks map. Locking.")
-		a.Lock()
-		go func() {
-			l.Debugf("Waiting for caller to release lock")
-			<-ch
-			a.Unlock()
-			l.Debugf("Lock released")
-		}()
-		return ch, a.bid, nil
-	}
-
-	/* Otherwise load from database * /
-	l.Debugf("Loading bid from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, nil, err
-	}
-	defer db.Close()
-
-	bidLocks.Lock()
-	db.First(a.bid, id)
-	bidLocks.Unlock()
-
-	if a.bid == nil {
-		l.Errorf("Attempted to get non-existing Bid")
-		return nil, nil, fmt.Errorf("Bid with id %d does not exist", id)
-	}
-
-	l.Debugf("Loaded bid from db. Locking")
-	a.RLock()
-	go func() {
-		l.Debugf("Waiting for caller to release lock")
-		<-ch
-		bidLocks.m[id].Unlock()
-		l.Debugf("Lock released")
-	}()
-
-	l.Debugf("Bid: %+v", a.bid)
-
-	return ch, a.bid, nil
-}
-*/
 func createBid(bid *Bid) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "CreateBid",
@@ -174,12 +131,10 @@ func createBid(bid *Bid) error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
-	}
-	defer db.Close()
+	db := getDB()
+
+	bid.CreatedAt = utils.GetCurrentTimeISO8601()
+	bid.UpdatedAt = bid.CreatedAt
 
 	bid.CreatedAt = utils.GetCurrentTimeISO8601()
 	bid.UpdatedAt = bid.CreatedAt
@@ -187,6 +142,10 @@ func createBid(bid *Bid) error {
 	if err := db.Create(bid).Error; err != nil {
 		return err
 	}
+
+	bidsMap.Lock()
+	bidsMap.m[bid.Id] = bid
+	bidsMap.Unlock()
 
 	l.Debugf("Created bid. Id: %d", bid.Id)
 
@@ -201,22 +160,57 @@ func (bid *Bid) Close() error {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err
+	db := getDB()
+
+	bid.Lock()
+	if bid.IsClosed {
+		bid.Unlock()
+		return AlreadyClosedError{bid.Id}
 	}
-	defer db.Close()
-	
 	bid.IsClosed = true
 	bid.UpdatedAt = utils.GetCurrentTimeISO8601()
+	bid.Unlock()
 
 	if err := db.Save(bid).Error; err != nil {
 		l.Error(err)
 		return err
 	}
+
+	bidsMap.Lock()
+	delete(bidsMap.m, bid.Id)
+	bidsMap.Unlock()
+
 	l.Debugf("Done")
 	return nil
+}
+
+// GetAllOpenBids returns all open bids. This will be called by MatchingEngine while initializing.
+func GetAllOpenBids() ([]*Bid, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetAllOpenBids",
+	})
+
+	l.Infof("Attempting to get all open bid orders")
+
+	db := getDB()
+
+	var openBids []*Bid
+
+	//Load open bid orders from database
+	if err := db.Where("isClosed = ?", 0).Find(&openBids).Error; err != nil {
+		panic("Error loading open bid orders in matching engine: " + err.Error())
+	}
+
+	l.Infof("Done")
+
+	bidsMap.Lock()
+	defer bidsMap.Unlock()
+
+	for _, bid := range openBids {
+		bidsMap.m[bid.Id] = bid
+	}
+
+	return openBids, nil
 }
 
 func GetMyOpenBids(userId uint32) ([]*Bid, error) {
@@ -227,11 +221,7 @@ func GetMyOpenBids(userId uint32) ([]*Bid, error) {
 
 	l.Infof("Attempting to get open bid orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myOpenBids []*Bid
 
@@ -253,11 +243,7 @@ func GetMyClosedBids(userId, lastId, count uint32) (bool, []*Bid, error) {
 
 	l.Infof("Attempting to get closed bid orders for userId : %v", userId)
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var myClosedBids []*Bid
 

@@ -36,7 +36,7 @@ docker/
 
 # proto files
 proto_build/*
-protoc-3.2.0rc2-linux-x86_64.zip
+protoc-3.2.0rc2-linux-x86_64.zip*
 protobuf/
 
 tls_keys/prod/*

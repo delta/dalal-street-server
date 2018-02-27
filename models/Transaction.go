@@ -97,11 +97,7 @@ func GetTransactions(userId, lastId, count uint32) (bool, []*Transaction, error)
 
 	l.Infof("Attempting to get transactions")
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var transactions []*Transaction
 
@@ -123,4 +119,26 @@ func GetTransactions(userId, lastId, count uint32) (bool, []*Transaction, error)
 	var moreExists = len(transactions) >= int(count)
 	l.Infof("Successfully fetched transactions")
 	return moreExists, transactions, nil
+}
+
+func GetAskTransactionsForStock(stockID, count uint32) ([]*Transaction, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetTransactionsForStock",
+		"count":  count,
+	})
+
+	l.Debugf("Attempting")
+
+	db := getDB()
+
+	var transactions []*Transaction
+
+	//get latest events if lastId is zero
+	db = db.Where("stockID = ?", stockID).Where("stockQuantity < 0").Where("`type` = ?", "OrderFillTransaction")
+	if err := db.Order("id desc").Limit(count).Find(&transactions).Error; err != nil {
+		return nil, err
+	}
+
+	l.Debugf("Done")
+	return transactions, nil
 }

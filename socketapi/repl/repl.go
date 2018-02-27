@@ -99,7 +99,19 @@ var replCmds = map[string]replCmdFn{
 		c := 'N'
 		s.read("%c", &c)
 		if c == 'Y' {
-			models.OpenMarket()
+			updateDayHighAndLow := 'N'
+
+			s.print("Do you want to update day high and low?")
+			s.read("%c", &updateDayHighAndLow)
+
+			if updateDayHighAndLow == 'Y' {
+				s.print("Think twice. There's no going back. Update day high and low?")
+				s.read("%c", &updateDayHighAndLow)
+			}
+			err := models.OpenMarket(updateDayHighAndLow == 'Y')
+			if err != nil {
+				s.error("Error setting Dayhigh and DayLow")
+			}
 			models.AdminLog(aun, "Opened market")
 			s.finish("Done")
 		}
@@ -113,8 +125,22 @@ var replCmds = map[string]replCmdFn{
 
 		c := 'N'
 		s.read("%c", &c)
+
 		if c == 'Y' {
-			models.CloseMarket()
+			updatePrevDayClose := 'N'
+
+			s.print("Do you want to update previous day close?")
+			s.read("%c", &updatePrevDayClose)
+
+			if updatePrevDayClose == 'Y' {
+				s.print("Think twice. There's no going back. Update previous day close?")
+				s.read("%c", &updatePrevDayClose)
+			}
+
+			err := models.CloseMarket(updatePrevDayClose == 'Y')
+			if err != nil {
+				s.error("Error setting previous day close")
+			}
 			models.AdminLog(aun, "Closed market")
 			s.finish("Done")
 		}
@@ -234,6 +260,7 @@ var replCmds = map[string]replCmdFn{
 		var headline string
 		var text string
 		var isGlobal bool
+		var imageURL string
 
 		aun, _ := userSess.Get("repl_Username")
 
@@ -242,6 +269,9 @@ var replCmds = map[string]replCmdFn{
 
 		s.print("Enter brief text:")
 		s.read("%q", &text)
+
+		s.print("Enter image URL:")
+		s.read("%q", &imageURL)
 
 		if stockId == 0 {
 			isGlobal = true
@@ -257,7 +287,7 @@ var replCmds = map[string]replCmdFn{
 		c := 'N'
 		s.read("%c", &c)
 		if c == 'Y' {
-			err := models.AddMarketEvent(stockId, headline, text, isGlobal)
+			err := models.AddMarketEvent(stockId, headline, text, isGlobal, imageURL)
 			if err != nil {
 				models.AdminLog(aun, fmt.Sprintf("Adding market event '%s'[%s] for %d failed due to '%+v'", headline, text, stockId, err))
 				s.error(err)
@@ -265,6 +295,31 @@ var replCmds = map[string]replCmdFn{
 			models.AdminLog(aun, fmt.Sprintf("Added market event '%s'[%s] for %d", headline, text, stockId))
 			s.finish("Done")
 		}
+		s.finish("Not doing")
+	},
+	"change_mortgage_limit": func(userSess session.Session, s cmdSession) {
+		aun, _ := userSess.Get("repl_Username")
+
+		s.print("New limit?")
+		models.MortgagePutLimitRWMutex.RLock()
+		oldLim := models.MortgagePutLimit
+		models.MortgagePutLimitRWMutex.RUnlock()
+
+		var newLim int32
+		s.read("%d", &newLim)
+
+		s.print("Are you sure you want to change the limit from %d to %d?", oldLim, newLim)
+
+		c := 'N'
+		s.read("%c", &c)
+		if c == 'Y' {
+			models.MortgagePutLimitRWMutex.Lock()
+			models.MortgagePutLimit = newLim
+			models.MortgagePutLimitRWMutex.Unlock()
+			models.AdminLog(aun, fmt.Sprintf("Updated mortgage limit from %d to %d", oldLim, newLim))
+			s.finish("Done")
+		}
+
 		s.finish("Not doing")
 	},
 }
@@ -293,7 +348,7 @@ func Handle(done <-chan struct{}, userSess session.Session, cmd string) (ret str
 		}
 	}()
 
-	sid := userSess.GetId()
+	sid := userSess.GetID()
 
 	cmdSessionsMutex.Lock()
 	defer cmdSessionsMutex.Unlock()

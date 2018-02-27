@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,9 +21,9 @@ import (
 )
 
 var (
-	UnauthorizedError  = errors.New("Invalid credentials")
-	NotRegisteredError = errors.New("Not registered on main site")
-	InternalError      = errors.New("Internal server error")
+	UnauthorizedError      = errors.New("Invalid credentials")
+	NotRegisteredError     = errors.New("Not registered")
+	AlreadyRegisteredError = errors.New("Already registered")
 )
 
 var TotalUserCount uint32
@@ -51,8 +53,9 @@ func (u *User) ToProto() *models_pb.User {
 
 // pragyanUser is the structure returned by Pragyan API
 type pragyanUser struct {
-	Id   uint32 `json:"user_id"`
-	Name string `json:"user_fullname"`
+	Id      uint32 `json:"user_id"`
+	Name    string `json:"user_fullname"`
+	Country string `json:"user_country"`
 }
 
 // User.TableName() is for letting Gorm know the correct table name.
@@ -72,73 +75,185 @@ func Login(email, password string) (User, error) {
 
 	l.Infof("Attempting to login user")
 
-	l.Debugf("Trying to call Pragyan API for logging in")
+	db := getDB()
 
-	pu, err := postLoginToPragyan(email, password)
-	if err != nil {
-		l.Debugf("Pragyan API call failed")
-		return User{}, err
+	var registeredUser = Registration{
+		Email: email,
 	}
 
-	l.Debugf("Trying to get user from database. UserId: %d, Name: %s", pu.Id, pu.Name)
+	err := db.Where("email = ?", email).First(&registeredUser).Error
+	l.Debugf("Got %v while searching for registeredUser", err)
 
-	db, err := DbOpen()
+	// User was not found in our local db
+	// Thus, he's logging in with pragyan for the first time
 	if err != nil {
-		l.Error(err)
-		return User{}, InternalError
-	}
-	defer db.Close()
+		//So register him if pragyan returns 200
+		l.Debugf("Trying to call Pragyan API for logging in")
 
-	u := &User{}
-	if result := db.First(u, pu.Id); result.Error != nil {
-		if !result.RecordNotFound() {
-			l.Errorf("Error in loading user info from database: '%s'", result.Error)
-			return User{}, InternalError
-		}
+		pu, err := postLoginToPragyan(email, password)
 
-		l.Infof("User (%d, %s, %s) not found in database. Registering new user", pu.Id, email, pu.Name)
-
-		u, err = createUser(pu, email)
 		if err != nil {
-			return User{}, InternalError
+			return User{}, err
 		}
+
+		// Pragyan returned 200
+		// Add entry to Users table
+		u, err := createUser(pu.Name, email)
+		if err != nil {
+			return User{}, err
+		}
+		register := &Registration{
+			Email:      email,
+			IsPragyan:  true,
+			IsVerified: true,
+			Name:       pu.Name,
+			UserId:     u.Id,
+		}
+
+		// Add entry to Registrations table
+		err = db.Save(register).Error
+		if err != nil {
+			// If registration failed, remove user from Users table as well
+			db.Delete(u)
+			return User{}, err
+		}
+		return *u, nil
 	}
 
-	l.Infof("Found user (%d, %s, %s). Logging him in.", u.Id, u.Email, u.Name)
+	getUserFromDB := func(userId uint32) (User, error) {
+		l.Debugf("Trying to get user from database. UserId: %d", userId)
+		u := User{}
+		if result := db.First(&u, userId); result.Error != nil {
+			if !result.RecordNotFound() {
+				l.Errorf("Error in loading user info from database: '%s'", result.Error)
+				return User{}, result.Error
+			}
+			// This case shouldn't happen!
+			l.Warnf("User (%d, %s) not found in database", userId, email)
+		}
+		return u, nil
+	}
 
-	return *u, nil
+	// Found in our local database
+	// If he's not registered with Pragyan, match password
+	if registeredUser.IsPragyan == false {
+		if checkPasswordHash(password, registeredUser.Password) {
+			return getUserFromDB(registeredUser.UserId)
+		}
+		return User{}, UnauthorizedError
+	}
+	//Registered with pragyan so hit pragyan with the username and password
+	_, err = postLoginToPragyan(email, password)
+
+	if err != nil {
+		switch err {
+		case UnauthorizedError:
+			// Pragyan returned unauthorized
+			// Thus, wrong password but user is registered
+			return User{}, UnauthorizedError
+		case NotRegisteredError:
+			// Should never happen but is handled just in case
+			// User once registered with pragyan creds but has now been deleted from the pragyan db
+			db.Delete(&User{Id: registeredUser.Id})
+			db.Delete(&registeredUser)
+			return User{}, NotRegisteredError
+		default:
+			return User{}, err
+		}
+	}
+	// Pragyan returned 200 hence use our db's user Id to load User
+	return getUserFromDB(registeredUser.UserId)
+}
+
+// RegisterUser is called when a user tries to sign up in our site
+func RegisterUser(email, password, fullName string) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":         "Register",
+		"param_email":    email,
+		"param_password": password,
+	})
+	l.Debugf("Attempting to register user")
+
+	db := getDB()
+
+	var registeredUser = Registration{
+		Email: email,
+	}
+
+	err := db.Where("email = ?", email).First(&registeredUser).Error
+
+	if err == nil {
+		return AlreadyRegisteredError
+	}
+	l.Debugf("Trying to call Pragyan API for checking if email available with Pragyan")
+	_, err = postLoginToPragyan(email, password)
+
+	if err == UnauthorizedError || err == nil {
+		l.Error("User registered with pragyan ask to login with Pragyan")
+		return AlreadyRegisteredError
+	}
+	if err != NotRegisteredError {
+		l.Errorf("Unexpected error: %+v", err)
+		return err
+	}
+	u, err := createUser(fullName, email)
+	if err != nil {
+		l.Errorf("Server error in Create user while logging in Pragyan user for the first time: %+v", err)
+		return err
+	}
+	password, _ = hashPassword(password)
+	register := &Registration{
+		Email:      email,
+		Password:   password,
+		IsPragyan:  false,
+		IsVerified: false,
+		Name:       fullName,
+		UserId:     u.Id,
+	}
+	err = db.Save(register).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func hashPassword(password string) (string, error) {
+	h := sha1.New()
+	h.Write([]byte(password))
+	sha1Hash := hex.EncodeToString(h.Sum(nil))
+	return sha1Hash, nil
+}
+
+func checkPasswordHash(password, hash string) bool {
+	h := sha1.New()
+	h.Write([]byte(password))
+	sha1Hash := hex.EncodeToString(h.Sum(nil))
+	return hash == sha1Hash
 }
 
 // createUser() creates a user given his email and name.
-func createUser(pu pragyanUser, email string) (*User, error) {
+func createUser(name string, email string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":      "createUser",
-		"param_id":    pu.Id,
 		"param_email": email,
-		"param_name":  pu.Name,
+		"param_name":  name,
 	})
 
 	l.Infof("Creating user")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	u := &User{
-		Id:        pu.Id,
 		Email:     email,
-		Name:      pu.Name,
+		Name:      name,
 		Cash:      STARTING_CASH,
 		Total:     STARTING_CASH,
 		CreatedAt: utils.GetCurrentTimeISO8601(),
 		IsHuman:   true,
 	}
 
-	err = db.Save(u).Error
-
+	err := db.Save(u).Error
 	if err != nil {
 		l.Errorf("Failed: %+v", err)
 		return nil, err
@@ -151,7 +266,7 @@ func createUser(pu pragyanUser, email string) (*User, error) {
 	return u, nil
 }
 
-//CreateBot() creates a bot from the botName
+// CreateBot creates a bot from the botName
 func CreateBot(botName string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":   "createUser",
@@ -160,12 +275,7 @@ func CreateBot(botName string) (*User, error) {
 
 	l.Infof("Creating user")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	u := &User{
 		Email:     botName + "@bot",
@@ -175,7 +285,7 @@ func CreateBot(botName string) (*User, error) {
 		CreatedAt: utils.GetCurrentTimeISO8601(),
 	}
 
-	err = db.Save(u).Error
+	err := db.Save(u).Error
 
 	if err != nil {
 		l.Errorf("Failed: %+v", err)
@@ -220,21 +330,23 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	}
 	l.Debugf("Pragyan API call response: '%s'", string(body))
 
-	type message_t struct {
-		Id   uint32 `json:"user_id"`
-		Name string `json:"user_fullname"`
-	}
 	r := struct {
-		StatusCode int       `json:"status_code"`
-		Message    message_t `json:"message"`
+		StatusCode int         `json:"status_code"`
+		Message    interface{} `json:"message"` // sometimes a pragyanUser, sometimes a string. :(
 	}{}
 	json.Unmarshal(body, &r)
 
 	switch r.StatusCode {
 	case 200:
-		pu := pragyanUser{
-			Id:   r.Message.Id,
-			Name: r.Message.Name,
+		pu := pragyanUser{}
+		userInfoMap := r.Message.(map[string]interface{})
+		pu.Id = uint32(userInfoMap["user_id"].(float64)) // sigh. Have to do this because Message is interface{}
+		pu.Name = userInfoMap["user_fullname"].(string)
+		switch country := userInfoMap["user_country"].(type) {
+		case string:
+			pu.Country = country
+		case nil:
+			pu.Country = "India"
 		}
 
 		l.Debugf("Credentials verified. UserId: %d, Name: %s", pu.Id, pu.Name)
@@ -243,12 +355,17 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	case 401:
 		l.Debugf("Bad credentials")
 		return pragyanUser{}, UnauthorizedError
-	case 412:
+	case 412: // Not sure if this is needed. Unaware of the current API changes
 		l.Debugf("Not registered on main site")
 		return pragyanUser{}, NotRegisteredError
+	case 400:
+		if r.Message == "Account Not Registered" {
+			return pragyanUser{}, NotRegisteredError
+		}
+		fallthrough
 	default:
 		l.Errorf("Pragyan rejected API call with (%d, %s)", r.StatusCode, r.Message)
-		return pragyanUser{}, InternalError
+		return pragyanUser{}, fmt.Errorf("Unexpected response from Pragyan: %+v", r)
 	}
 }
 
@@ -281,12 +398,7 @@ func getSingleStockCount(u *User, stockId uint32) (int32, error) {
 
 	l.Debugf("Attempting")
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return 0, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var stockCount = struct{ Sc int32 }{0}
 	sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=?"
@@ -308,12 +420,29 @@ func getSingleStockCount(u *User, stockId uint32) (int32, error) {
 // List of errors
 //
 
-// AskLimitExceededError is generated when an Ask's StockQuantity is greater
-// than ASK_LIMIT
-type AskLimitExceededError struct{}
+// OrderStockLimitExceeded is generated when an order's StockQuantity is greater than ASK/BID_LIMIT
+type OrderStockLimitExceeded struct{}
 
-func (e AskLimitExceededError) Error() string {
-	return fmt.Sprintf("Ask orders must not exceed %d stocks per order", ASK_LIMIT)
+func (e OrderStockLimitExceeded) Error() string {
+	return fmt.Sprintf("An order can involve a trade of min 1 and max %d stocks", ASK_LIMIT)
+}
+
+// OrderPriceOutOfWindowError is sent when the order's price is outside the allowed price window
+type OrderPriceOutOfWindowError struct{ price uint32 }
+
+func (e OrderPriceOutOfWindowError) Error() string {
+	return fmt.Sprintf("Order price must be within %d%% of the current price - currently between %d and %d",
+		ORDER_PRICE_WINDOW,
+		uint32((1-ORDER_PRICE_WINDOW/100.0)*float32(e.price)),
+		uint32((1+ORDER_PRICE_WINDOW/100.0)*float32(e.price)),
+	)
+}
+
+// MinimumPriceThresholdError is sent when the order's price is below MINIMUM_ORDER_PRICE
+type MinimumPriceThresholdError struct{}
+
+func (e MinimumPriceThresholdError) Error() string {
+	return fmt.Sprintf("Order price must be above %d", MINIMUM_ORDER_PRICE)
 }
 
 // BuyLimitExceededError is generated when an Bid's StockQuantity is greater
@@ -324,7 +453,7 @@ func (e BuyLimitExceededError) Error() string {
 	return fmt.Sprintf("BuyFromExchange orders must not exceed %d stocks per order", BUY_LIMIT)
 }
 
-// NotEnoughCashError is generated when an Ask's StockQuantity is such that
+// NotEnoughStocksError is generated when an Ask's StockQuantity is such that
 // deducting those many stocks will leave the user with less than
 // SHORT_SELL_BORROW_LIMIT
 type NotEnoughStocksError struct {
@@ -333,13 +462,6 @@ type NotEnoughStocksError struct {
 
 func (e NotEnoughStocksError) Error() string {
 	return fmt.Sprintf("Not have enough stocks to place this order. Current maximum Ask size: %d stocks", e.currentAllowedQty)
-}
-
-// BidLimitExceededError is generated when a Bid's StockQuantity is greater than BID_LIMIT
-type BidLimitExceededError struct{}
-
-func (e BidLimitExceededError) Error() string {
-	return fmt.Sprintf("Bid orders must not exceed %d stocks per bid", BID_LIMIT)
 }
 
 // NotEnoughCashError is generated when a Bid's StockQuantity*Price is such that
@@ -351,16 +473,11 @@ func (e NotEnoughCashError) Error() string {
 	return fmt.Sprintf("Not enough cash to place this order")
 }
 
-type InvalidAskIdError struct{}
+// InvalidOrderIDError is given out when a user tries to cancel an order he didn't make or that didn't exist
+type InvalidOrderIDError struct{}
 
-func (e InvalidAskIdError) Error() string {
-	return fmt.Sprintf("Invalid ask id")
-}
-
-type InvalidBidIdError struct{}
-
-func (e InvalidBidIdError) Error() string {
-	return fmt.Sprintf("Invalid bid id")
+func (e InvalidOrderIDError) Error() string {
+	return fmt.Sprintf("Invalid order id")
 }
 
 //
@@ -406,14 +523,7 @@ func getUserExclusively(id uint32) (chan struct{}, *User, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading user from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		userLocks.Unlock()
-		l.Debugf("Unlocked userLocks map")
-		return nil, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	userLocks.m[id] = u
 	db = db.First(u.user, id)
@@ -424,9 +534,8 @@ func getUserExclusively(id uint32) (chan struct{}, *User, error) {
 		if db.RecordNotFound() {
 			l.Errorf("Attempted to get non-existing user")
 			return nil, nil, fmt.Errorf("User with Id %d does not exist", id)
-		} else {
-			return nil, nil, db.Error
 		}
+		return nil, nil, db.Error
 	}
 
 	l.Debugf("Loaded user from db. Locking.")
@@ -494,7 +603,7 @@ func getUserPairExclusive(id1, id2 uint32) (chan struct{}, *User, *User, error) 
 	return done, secondUser, firstUser, nil
 }
 
-// GetUserCopy() gets a copy of user by his id.
+// GetUserCopy gets a copy of user by his id.
 // The method returns a channel and a copy of the user object. The callee
 // is guaranteed to get read access to the user object. Once the callee
 // is done using the object, he must close the channel.
@@ -524,14 +633,7 @@ func GetUserCopy(id uint32) (User, error) {
 
 	/* Otherwise load from database */
 	l.Debugf("Loading user from database")
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		userLocks.Unlock()
-		l.Debugf("Unlocked userLocks map")
-		return User{}, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	userLocks.m[id] = u
 	db = db.First(u.user, id)
@@ -542,9 +644,8 @@ func GetUserCopy(id uint32) (User, error) {
 		if errDb.RecordNotFound() {
 			l.Errorf("Attempted to get non-existing user")
 			return User{}, fmt.Errorf("User with Id %d does not exist", id)
-		} else {
-			return User{}, errDb.Error
 		}
+		return User{}, errDb.Error
 	}
 
 	l.Debugf("Loaded user from db. Locking.")
@@ -555,7 +656,7 @@ func GetUserCopy(id uint32) (User, error) {
 	return *u.user, nil
 }
 
-// User.PlaceAskOrder() places an Ask order for the user.
+// PlaceAskOrder places an Ask order for the user.
 //
 // The method is thread-safe like other exported methods of this package.
 //
@@ -575,6 +676,11 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	// Place cap on order price only for limit orders
 	if ask.OrderType == Limit {
+		if ask.Price <= MINIMUM_ORDER_PRICE {
+			l.Debugf("Minimum price check failed for ask order")
+			return 0, MinimumPriceThresholdError{}
+		}
+
 		l.Debugf("Acquiring lock for ask order threshold check with stock id : %v ", ask.StockId)
 
 		allStocks.m[ask.StockId].RLock()
@@ -583,12 +689,12 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 		l.Debugf("Releasing lock for ask order threshold check with stock id : %v ", ask.StockId)
 
-		var upperLimit = uint32(1.2 * float32(currentPrice))
-		var lowerLimit = uint32(0.8 * float32(currentPrice))
+		var upperLimit = uint32((1 + ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
+		var lowerLimit = uint32((1 - ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
 
 		if ask.Price > upperLimit || ask.Price < lowerLimit {
 			l.Debugf("Threshold price check failed for ask order")
-			return 0, AskLimitExceededError{}
+			return 0, OrderPriceOutOfWindowError{currentPrice}
 		}
 	}
 
@@ -610,9 +716,9 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	// First check: Order size should be less than ASK_LIMIT
 	l.Debugf("Check1: Order size vs ASK_LIMIT (%d)", ASK_LIMIT)
-	if ask.StockQuantity > ASK_LIMIT {
+	if ask.StockQuantity > ASK_LIMIT || ask.StockQuantity < 1 {
 		l.Debugf("Check1: Failed.")
-		return 0, AskLimitExceededError{}
+		return 0, OrderStockLimitExceeded{}
 	}
 	l.Debugf("Check1: Passed.")
 
@@ -643,10 +749,27 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
 
+	// Update datastreams to add newly placed order in OpenOrders
+	go func(ask *Ask) {
+		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+
+		myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
+			Id:            ask.Id,
+			IsAsk:         true,
+			IsNewOrder:    true,
+			StockId:       ask.StockId,
+			OrderPrice:    ask.Price,
+			OrderType:     ask.ToProto().OrderType,
+			StockQuantity: ask.StockQuantity,
+		})
+
+		l.Infof("Sent through the datastreams")
+	}(ask)
+
 	return ask.Id, nil
 }
 
-// User.PlaceBidOrder() places a Bid order for the user.
+// PlaceBidOrder places a Bid order for the user.
 // The method is thread-safe like other exported methods of this package.
 //
 // Possible outcomes:
@@ -665,6 +788,11 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	// Place cap on order price only for limit orders
 	if bid.OrderType == Limit {
+		if bid.Price <= MINIMUM_ORDER_PRICE {
+			l.Debugf("Minimum price check failed for ask order")
+			return 0, MinimumPriceThresholdError{}
+		}
+
 		l.Debugf("Acquiring lock for bid order threshold check with stock id : %v ", bid.StockId)
 
 		allStocks.m[bid.StockId].RLock()
@@ -673,12 +801,12 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 		l.Debugf("Releasing lock for bid order threshold check with stock id : %v ", bid.StockId)
 
-		var upperLimit = uint32(1.2 * float32(currentPrice))
-		var lowerLimit = uint32(0.8 * float32(currentPrice))
+		var upperLimit = uint32((1 + ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
+		var lowerLimit = uint32((1 - ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
 
 		if bid.Price > upperLimit || bid.Price < lowerLimit {
 			l.Debugf("Threshold price check failed for bid order")
-			return 0, BidLimitExceededError{}
+			return 0, OrderPriceOutOfWindowError{currentPrice}
 		}
 	}
 
@@ -699,9 +827,9 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	// First check: Order size should be less than BID_LIMIT
 	l.Debugf("Check1: Order size vs BID_LIMIT (%d)", BID_LIMIT)
-	if bid.StockQuantity > BID_LIMIT {
+	if bid.StockQuantity > BID_LIMIT || bid.StockQuantity < 1 {
 		l.Debugf("Check1: Failed.")
-		return 0, BidLimitExceededError{}
+		return 0, OrderStockLimitExceeded{}
 	}
 	l.Debugf("Check1: Passed.")
 
@@ -724,11 +852,32 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Infof("Created Bid order. BidId: %d", bid.Id)
 
+	// Update datastreams to add newly placed order in OpenOrders
+	go func(bid *Bid) {
+		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+
+		myOrdersStream.SendOrder(bid.UserId, &datastreams_pb.MyOrderUpdate{
+			Id:            bid.Id,
+			IsAsk:         false,
+			IsNewOrder:    true,
+			StockId:       bid.StockId,
+			OrderPrice:    bid.Price,
+			OrderType:     bid.ToProto().OrderType,
+			StockQuantity: bid.StockQuantity,
+		})
+
+		l.Infof("Sent through the datastreams")
+	}(bid)
+
 	return bid.Id, nil
 
 }
 
-func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
+// CancelOrder cancels a user's order. It'll check if the user was the one who placed it.
+// It returns the pointer to Ask/Bid (whichever it was - the other is nil) that got cancelled.
+// This pointer will have to be passed to the CancelOrder of the matching engine to remove it
+// from there.
+func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "CancelOrder",
 		"userId":  userId,
@@ -743,7 +892,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 	ch, _, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
-		return err
+		return nil, nil, err
 	}
 	l.Debugf("Acquired")
 	defer func() {
@@ -756,36 +905,48 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) error {
 		askOrder, err := getAsk(orderId)
 		if askOrder == nil || askOrder.UserId != userId {
 			l.Errorf("Invalid ask id provided")
-			return InvalidAskIdError{}
+			return nil, nil, InvalidOrderIDError{}
 		} else if err != nil {
 			l.Errorf("Unknown error in getAsk: %+v", err)
-			return err
+			return nil, nil, err
 		}
 
-		if err := askOrder.Close(); err != nil {
+		err = askOrder.Close()
+		// don't log if order is already closed
+		if _, ok := err.(AlreadyClosedError); !ok {
 			l.Errorf("Unknown error while saving that ask is cancelled %+v", err)
-			return err
 		}
+		// return the error anyway
+		if err != nil {
+			return nil, nil, err
+		}
+
+		l.Infof("Cancelled order")
+		return askOrder, nil, nil
 	} else {
 		l.Debugf("Acquiring lock on bid order")
 		bidOrder, err := getBid(orderId)
 		if bidOrder == nil || bidOrder.UserId != userId {
 			l.Errorf("Invalid bid id provided")
-			return InvalidBidIdError{}
+			return nil, nil, InvalidOrderIDError{}
 		} else if err != nil {
 			l.Errorf("Unknown error in getBid")
-			return err
+			return nil, nil, err
 		}
 
-		if err := bidOrder.Close(); err != nil {
+		err = bidOrder.Close()
+		// don't log if order is already closed
+		if _, ok := err.(AlreadyClosedError); !ok {
 			l.Errorf("Unknown error while saving that bid is cancelled %+v", err)
-			return err
 		}
+		// return the error anyway
+		if err != nil {
+			return nil, nil, err
+		}
+
+		l.Infof("Cancelled order")
+		return nil, bidOrder, nil
 	}
-
-	l.Infof("Cancelled order")
-
-	return nil
 }
 
 func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*Transaction, error) {
@@ -855,51 +1016,52 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
 
-	userCash := uint32(int32(user.Cash) + transaction.Total)
+	oldCash := user.Cash
+	user.Cash = uint32(int32(user.Cash) + transaction.Total)
+
+	oldStocksInExchange := stock.StocksInExchange
+	oldStocksInMarket := stock.StocksInMarket
+	oldUpdatedAt := stock.UpdatedAt
 	stock.StocksInExchange -= stockQuantityRemoved
 	stock.StocksInMarket += stockQuantityRemoved
+	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
 
 	/* Committing to database */
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	tx := db.Begin()
 
-	if err := tx.Save(transaction).Error; err != nil {
-		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
+	var errorHelper = func(format string, args ...interface{}) (*Transaction, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
+		stock.StocksInExchange = oldStocksInExchange
+		stock.StocksInMarket = oldStocksInMarket
+		stock.UpdatedAt = oldUpdatedAt
 		tx.Rollback()
-		return nil, err
+		return nil, fmt.Errorf(format, args...)
+	}
+
+	if err := tx.Save(transaction).Error; err != nil {
+		return errorHelper("Error creating the transaction. Rolling back. Error: %+v", err)
 	}
 
 	l.Debugf("Added transaction to Transactions table")
 
-	if err := tx.Model(user).Update("cash", userCash).Error; err != nil {
-		l.Errorf("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return nil, err
+	if err := tx.Save(user).Error; err != nil {
+		return errorHelper("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
 	}
 
-	l.Debugf("Deducted cash from user's account. New balance: %d", userCash)
+	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
 
 	if err := tx.Save(stock).Error; err != nil {
-		l.Errorf("Error transfering stocks from exchange to market. Rolling back.")
-		stock.StocksInExchange += stockQuantityRemoved
-		stock.StocksInMarket -= stockQuantityRemoved
-		return nil, err
+		return errorHelper("Error transfering stocks from exchange to market. Rolling back.")
 	}
 
 	l.Debugf("Transferred stocks from Exchange to Market")
 
 	if err := tx.Commit().Error; err != nil {
-		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return nil, err
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
-
-	user.Cash = userCash
 
 	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
 
@@ -935,7 +1097,23 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 *		- if askDone is true, ask can be removed
 *		- if bidDone is true, bid can be removed
  */
-func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, stockTradeQty uint32) (bool, bool, *Transaction) {
+
+type AskOrderFillStatus uint8
+type BidOrderFillStatus uint8
+
+const (
+	AskAlreadyClosed AskOrderFillStatus = iota // Order was already cancelled before execution started!
+	AskDone                                    // Order either got fulfilled or dropped
+	AskUndone                                  // Order yet to complete
+)
+
+const (
+	BidAlreadyClosed BidOrderFillStatus = iota // Order was already cancelled before execution started!
+	BidDone                                    // Order either got fulfilled or dropped
+	BidUndone                                  // Order yet to complete
+)
+
+func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, stockTradeQty uint32) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "PerformOrderFillTransaction",
 		"askingUserId":  ask.UserId,
@@ -943,7 +1121,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 		"stockId":       ask.StockId,
 	})
 
-	l.Infof("PerformOrderFillTransaction requested for stock id %v", ask.StockId)
+	l.Infof("Attempting")
 
 	/*
 		if ask.isclosed() return askDone, bidNotDone
@@ -972,20 +1150,45 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 
 		return askdone,  biddone
 	*/
+
+	/*
+		Grab lock on user pair before checking for order cancellation,
+		since CancelOrder will otherwise have a race condition with this one
+	*/
+	done, askingUser, biddingUser, err := getUserPairExclusive(ask.UserId, bid.UserId)
+	if err != nil {
+		l.Errorf("Unable to acquire locks on the user pair: %+v", err)
+		return AskUndone, BidUndone, nil
+	}
+	defer close(done)
+
+	/* Check if either (or both) of the order(s) has been closed already */
+	askStatus := AskUndone
+	bidStatus := BidUndone
+
 	if ask.IsClosed {
-		return true, false, nil
+		askStatus = AskAlreadyClosed
 	}
 	if bid.IsClosed {
-		return false, true, nil
+		bidStatus = BidAlreadyClosed
 	}
+
+	if askStatus == AskAlreadyClosed || bidStatus == BidAlreadyClosed {
+		l.Infof("Done. One of the orders already closed. %+s and %+s", askStatus, bidStatus)
+		return askStatus, bidStatus, nil
+	}
+
+	/* We're here, so both orders are open now */
 
 	var updateDataStreams = func(askTrans, bidTrans *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+		transactionsStream := datastreamsManager.GetTransactionsStream()
 
 		if stockTradeQty != 0 || ask.IsClosed {
 			myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
 				Id:            ask.Id,
 				IsAsk:         true,
+				StockQuantity: ask.StockQuantity,
 				TradeQuantity: stockTradeQty,
 				IsClosed:      ask.IsClosed,
 			})
@@ -994,44 +1197,51 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 			myOrdersStream.SendOrder(bid.UserId, &datastreams_pb.MyOrderUpdate{
 				Id:            bid.Id,
 				IsAsk:         false,
+				StockQuantity: bid.StockQuantity,
 				TradeQuantity: stockTradeQty,
 				IsClosed:      bid.IsClosed,
 			})
+		}
+
+		if askTrans != nil {
+			transactionsStream.SendTransaction(askTrans.ToProto())
+			transactionsStream.SendTransaction(bidTrans.ToProto())
 		}
 
 		l.Infof("Sent through the datastreams")
 	}
 
 	//Check if bidder has enough cash
-	// var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice)*stockTradeQty
+	var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice*stockTradeQty)
 
-	// if cashLeft < MINIMUM_CASH_LIMIT {
-	// 	l.Debugf("Check1: Failed. Not enough cash.")
-	// 	bid.IsClosed = true
-	// 	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
-	// 	go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
-	// 	return false, true, nil
-	// }
+	if cashLeft < MINIMUM_CASH_LIMIT {
+		l.Errorf("Check1: Failed. Not enough cash.")
+		bid.Close()
+		go updateDataStreams(nil, nil)
+		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
+		return AskUndone, BidDone, nil
+	}
 
 	//Check if askingUser has enough stocks
-	// numStocks, err := getSingleStockCount(askingUser, ask.StockId)
-	// if err != nil {
-	// 	return false, false, nil
-	// }
+	numStocks, err := getSingleStockCount(askingUser, ask.StockId)
+	if err != nil {
+		l.Errorf("Error getting stock count for askingUser: %+v", err)
+		return AskUndone, BidUndone, nil
+	}
 
-	// var numStocksLeft = numStocks - int32(stockTradeQty)
+	var numStocksLeft = numStocks - int32(stockTradeQty)
 
-	// if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
-	// 	l.Debugf("Check2: Failed. Not enough stocks.")
-	// 	currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
-	// 	if currentAllowedQty > ASK_LIMIT {
-	// 		currentAllowedQty = ASK_LIMIT
-	// 	}
-	// 	ask.IsClosed = true
-	// 	go updateDataStreams(askingUser.Id, biddingUser.Id, nil, nil, ask, bid)
-	// 	go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
-	// 	return true, false, nil
-	// }
+	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
+		l.Debugf("Check2: Failed. Not enough stocks.")
+		currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
+		if currentAllowedQty > ASK_LIMIT {
+			currentAllowedQty = ASK_LIMIT
+		}
+		ask.Close()
+		go updateDataStreams(nil, nil)
+		go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
+		return AskDone, BidUndone, nil
+	}
 
 	//helper function to return a transaction object
 	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
@@ -1046,42 +1256,50 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 		}
 	}
 
-	done, askingUser, biddingUser, err := getUserPairExclusive(ask.UserId, bid.UserId)
-	if err != nil {
-		return false, false, nil
-	}
-	defer close(done)
-
 	total := int32(stockTradePrice * stockTradeQty)
 
 	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -int32(stockTradeQty), stockTradePrice, total)
 	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, int32(stockTradeQty), stockTradePrice, -total)
 
+	// save old cash for rolling back
+	askingUserOldCash := askingUser.Cash
+	biddingUserOldCash := biddingUser.Cash
+
 	//calculate user's updated cash
-	askingUserCash := askingUser.Cash + uint32(stockTradeQty)*stockTradePrice
-	biddingUserCash := biddingUser.Cash - uint32(stockTradeQty)*stockTradePrice
+	askingUser.Cash += uint32(stockTradeQty) * stockTradePrice
+	biddingUser.Cash -= uint32(stockTradeQty) * stockTradePrice
+
+	// in case things go wrong and we've to roll back
+	oldAskStockQuantityFulfilled := ask.StockQuantityFulfilled
+	oldBidStockQuantityFulfilled := bid.StockQuantityFulfilled
+	oldAskIsClosed := ask.IsClosed
+	oldBidIsClosed := bid.IsClosed
 
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
-	askStockQuantityFulfilled := ask.StockQuantityFulfilled + uint32(stockTradeQty)
-	bidStockQuantityFulfilled := bid.StockQuantityFulfilled + uint32(stockTradeQty)
-	askIsClosed := (ask.StockQuantity == askStockQuantityFulfilled)
-	bidIsClosed := (bid.StockQuantity == bidStockQuantityFulfilled)
+	ask.StockQuantityFulfilled += uint32(stockTradeQty)
+	bid.StockQuantityFulfilled += uint32(stockTradeQty)
+	ask.IsClosed = ask.StockQuantity == ask.StockQuantityFulfilled
+	bid.IsClosed = bid.StockQuantity == bid.StockQuantityFulfilled
 
 	//Committing to database
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return false, false, nil
-	}
-	defer db.Close()
+	db := getDB()
 
 	//Begin transaction
 	tx := db.Begin()
 
-	var errorHelper = func(fmt string, args ...interface{}) (bool, bool, *Transaction) {
+	var errorHelper = func(fmt string, args ...interface{}) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
 		l.Errorf(fmt, args...)
+		askingUser.Cash = askingUserOldCash
+		biddingUser.Cash = biddingUserOldCash
+
+		ask.StockQuantityFulfilled = oldAskStockQuantityFulfilled
+		bid.StockQuantityFulfilled = oldBidStockQuantityFulfilled
+
+		ask.IsClosed = oldAskIsClosed
+		bid.IsClosed = oldBidIsClosed
+
 		tx.Rollback()
-		return false, false, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	//save askTransaction
@@ -1097,22 +1315,22 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	l.Debugf("Added bidTransaction to Transactions table")
 
 	//update askingUser
-	if err := tx.Model(askingUser).Update("cash", askingUserCash).Error; err != nil {
+	if err := tx.Save(askingUser).Error; err != nil {
 		return errorHelper("Error updating askingUser.Cash Rolling back. Error: %+v", err)
 	}
 
 	//update biddingUserCash
-	if err := tx.Model(biddingUser).Update("cash", biddingUserCash).Error; err != nil {
+	if err := tx.Save(biddingUser).Error; err != nil {
 		return errorHelper("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
 	}
 
 	//update StockQuantityFulfilled and IsClosed for ask order
-	if err := tx.Model(ask).Updates(Ask{StockQuantityFulfilled: askStockQuantityFulfilled, IsClosed: askIsClosed}).Error; err != nil {
+	if err := tx.Save(ask).Error; err != nil {
 		return errorHelper("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 	}
 
 	//update StockQuantityFulfilled and IsClosed for bid order
-	if err := tx.Model(bid).Updates(Bid{StockQuantityFulfilled: bidStockQuantityFulfilled, IsClosed: bidIsClosed}).Error; err != nil {
+	if err := tx.Save(bid).Error; err != nil {
 		return errorHelper("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
 	}
 
@@ -1129,19 +1347,43 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	//Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return false, false, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	go updateDataStreams(askTransaction, bidTransaction)
 
+	UpdateStockVolume(ask.StockId, stockTradeQty)
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
 	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
-		return ask.IsClosed, bid.IsClosed, askTransaction
 	}
 
-	return ask.IsClosed, bid.IsClosed, askTransaction
+	/* Set the order statuses */
+
+	if ask.IsClosed {
+		askStatus = AskDone
+	} else {
+		askStatus = AskUndone
+	}
+
+	if bid.IsClosed {
+		bidStatus = BidDone
+	} else {
+		bidStatus = BidUndone
+	}
+
+	return askStatus, bidStatus, askTransaction
+}
+
+var MortgagePutLimitRWMutex sync.RWMutex
+var MortgagePutLimit int32 = 4000000
+
+type WayTooMuchCashError struct {
+}
+
+func (e WayTooMuchCashError) Error() string {
+	return "You already have more than enough cash. You cannot mortgage stocks right now."
 }
 
 func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {
@@ -1167,10 +1409,10 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	}()
 
 	allStocks.m[stockId].RLock()
-	currentStockPrice := allStocks.m[stockId].stock.CurrentPrice
+	mortgagePrice := allStocks.m[stockId].stock.AvgLastPrice
 	allStocks.m[stockId].RUnlock()
 
-	l.Debugf("Taking current price of stock as %d", currentStockPrice)
+	l.Debugf("Taking current price of stock as %d", mortgagePrice)
 
 	var rate int32
 
@@ -1178,12 +1420,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		rate = MORTGAGE_RETRIEVE_RATE
 		l.Debugf("stockQuantity positive. Retrieving stocks from mortgage @ %d%%", rate)
 
-		db, err := DbOpen()
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-		defer db.Close()
+		db := getDB()
 
 		stockCount := struct{ Sc int32 }{0}
 		sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=? and Type=?"
@@ -1205,6 +1442,13 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		}
 
 	} else {
+		MortgagePutLimitRWMutex.RLock()
+		lim := MortgagePutLimit
+		MortgagePutLimitRWMutex.RUnlock()
+		if user.Total < lim {
+			return nil, WayTooMuchCashError{}
+		}
+
 		rate = MORTGAGE_DEPOSIT_RATE
 		l.Debugf("stockQuantity negative. Depositing stocks to mortgage @ %d%%", rate)
 
@@ -1220,7 +1464,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		}
 	}
 
-	trTotal := -int32(currentStockPrice) * stockQuantity * rate / 100
+	trTotal := -int32(mortgagePrice) * stockQuantity * rate / 100
 	if int32(user.Cash)+trTotal < 0 {
 		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", trTotal, user.Cash)
 		return nil, NotEnoughCashError{}
@@ -1239,40 +1483,36 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	// A lock on user and stock has been acquired.
 	// Safe to make changes to this user and this stock
 
-	userCash := uint32(int32(user.Cash) + trTotal)
+	oldCash := user.Cash
+	user.Cash = uint32(int32(user.Cash) + trTotal)
 
 	/* Committing to database */
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	tx := db.Begin()
 
-	if err := tx.Save(transaction).Error; err != nil {
-		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
+	errorHelper := func(format string, args ...interface{}) (*Transaction, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
 		tx.Rollback()
-		return nil, err
+		return nil, fmt.Errorf(format, args...)
+	}
+
+	if err := tx.Save(transaction).Error; err != nil {
+		return errorHelper("Error creating the transaction. Rolling back. Error: %+v", err)
 	}
 
 	l.Debugf("Added transaction to Transactions table")
 
 	if err := tx.Save(user).Error; err != nil {
-		l.Errorf("Error updating user's cash. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return nil, err
+		return errorHelper("Error updating user's cash. Rolling back. Error: %+v", err)
 	}
 
 	l.Debugf("Updated user's cash. New balance: %d", user.Cash)
 
 	if err := tx.Commit().Error; err != nil {
-		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return nil, err
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
-
-	user.Cash = userCash
 
 	l.Debugf("Committed transaction. Success.")
 
@@ -1283,95 +1523,6 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	}(*transaction)
 
 	return transaction, nil
-
-}
-
-/*
-func PerformDividendTransaction(stockId, dividendPercent uint32) (err error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "PerformDividendTransaction",
-		"param_stockId": stockId,
-		"param_dividendPercent": dividendPercent,
-	})
-
-	l.Info("PerformDividendTransaction requested")
-
-	l.Debug("Acquiring exclusive write on user")
-	ch, user, err := getUserExclusively(userId)
-	if err != nil {
-		l.Errorf("Errored: %+v", err)
-		return err
-	}
-	l.Debug("Acquired")
-	defer func() {
-		close(ch)
-		l.Debug("Released exclusive write on user")
-	}()
-
-	// A lock on user has been acquired.
-	// Safe to make changes to this user
-
-	stockQuantityOwned, err := getSingleStockCount(user, stockId)
-	price = stock.CurrentPrice
-
-	if price * stockQuantityRemoved > user.Cash {
-		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", price * stockQuantityRemoved, user.Cash)
-		return NotEnoughCashError{}, 0, 0
-	}
-
-	l.Debugf("%d stocks will be removed at %d per stock", stockQuantityRemoved, price)
-
-	transaction := &Transaction{
-		UserId: userId,
-		StockId: stockId,
-		Type: FromExchangeTransaction,
-		StockQuantity: int32(stockQuantityRemoved),
-		Price: price,
-		Total: -int32(price * stockQuantityRemoved),
-	}
-
-	user.Cash = uint32(int32(user.Cash) + transaction.Total)
-
-	/* Committing to database * /
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return err, 0, 0
-	}
-	defer db.Close()
-
-	tx := db.Begin()
-
-	if err := tx.Save(transaction).Error; err != nil {
-		l.Errorf("Error creating the transaction. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return err, 0, 0
-	}
-
-	l.Debugf("Added transaction to Transactions table")
-
-	if err := tx.Save(user).Error; err != nil {
-		l.Errorf("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
-		tx.Rollback()
-		return err, 0, 0
-	}
-
-	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
-
-	if err := tx.Commit().Error; err != nil {
-		l.Errorf("Error committing the transaction. Failing. %+v", err)
-		return err, 0, 0
-	}
-
-	l.Debugf("Committed transaction. Success.")
-
-	return nil, stockQuantityRemoved, price
-}
-*/
-
-type StockOwned struct {
-	StockId       uint32
-	StockQuantity int32
 }
 
 func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
@@ -1395,12 +1546,7 @@ func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 		l.Debugf("Released lock on user")
 	}()
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return nil, InternalError
-	}
-	defer db.Close()
+	db := getDB()
 
 	sql := "Select stockId, sum(stockQuantity) as stockQuantity from Transactions where userId=? group by stockId"
 	rows, err := db.Raw(sql, userId).Rows()
@@ -1422,7 +1568,9 @@ func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 	return stocksOwned, nil
 }
 
-// Call User.Unload() when a user logs out. This will remove him from RAM
-func (u *User) Unload() {
-
+// Logout removes the user from RAM.
+func Logout(userID uint32) {
+	userLocks.Lock()
+	delete(userLocks.m, userID)
+	userLocks.Unlock()
 }

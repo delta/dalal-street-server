@@ -57,7 +57,7 @@ func (sps *stockPricesStream) Run() {
 		if len(sps.dirtyStocks) == 0 {
 			sps.stockPricesMutex.Unlock()
 			l.Debugf("Nothing dirty yet. Sleeping for 15 seconds")
-			time.Sleep(time.Minute / 4)
+			time.Sleep(time.Second * 5)
 			continue
 		}
 
@@ -72,7 +72,7 @@ func (sps *stockPricesStream) Run() {
 
 		l.Debugf("Sent to %d listeners! Sleeping for 15 seconds", sps.broadcastStream.GetListenersCount())
 
-		time.Sleep(time.Minute / 4)
+		time.Sleep(time.Second * 5)
 	}
 }
 

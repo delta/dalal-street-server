@@ -22,7 +22,12 @@ func Init(config *utils.Config) {
 
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return config.Stage == "test" || config.Stage == "dev" || config.Stage == "docker"
+			if config.Stage == "test" || config.Stage == "dev" || config.Stage == "docker" {
+				return true
+			} else if r.Header.Get("Origin") == "https://dwst.github.io" {
+				return true
+			}
+			return false
 		},
 	}
 	//actions.InitActions()
@@ -76,7 +81,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	sess.Set("IP", r.RemoteAddr)
 
-	conn, err := upgrader.Upgrade(w, r, http.Header{"Set-Cookie": {"sid=" + sess.GetId() + "; HttpOnly"}})
+	conn, err := upgrader.Upgrade(w, r, http.Header{"Set-Cookie": {"sid=" + sess.GetID() + "; HttpOnly"}})
 
 	if err != nil {
 		l.Errorf("Could not upgrade connection: '%s'", err)

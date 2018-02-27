@@ -12,7 +12,6 @@ import (
 
 // MarketDepthStream defines the interface for accessing a single stock's market depth
 type MarketDepthStream interface {
-	run()
 	AddListener(done <-chan struct{}, updates chan interface{}, sessionId string)
 	RemoveListener(sessionId string)
 
@@ -95,7 +94,7 @@ func (mds *marketDepthStream) run() {
 	for {
 		if mds.broadcastStream.GetListenersCount() == 0 {
 			l.Debugf("No listeners. Sleeping for 15 seconds")
-			time.Sleep(time.Minute / 4)
+			time.Sleep(time.Second * 2)
 			continue
 		}
 
@@ -132,13 +131,13 @@ func (mds *marketDepthStream) run() {
 
 		if !shouldSend {
 			l.Debugf("No update to send. Sleeping for 15 seconds")
-			time.Sleep(time.Minute / 4)
+			time.Sleep(time.Second * 2)
 			continue
 		}
 
 		mds.broadcastStream.BroadcastUpdate(mdUpdate)
 		l.Debugf("Sent %+v to %d listeners! Sleeping for 15 seconds", mdUpdate, mds.broadcastStream.GetListenersCount())
-		time.Sleep(time.Minute / 4)
+		time.Sleep(time.Second * 2)
 	}
 }
 
@@ -200,7 +199,7 @@ func (mds *marketDepthStream) RemoveListener(sessionId string) {
 func (mds *marketDepthStream) AddOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
 	// Do not add Market orders to depth
 	if isMarket {
-		return
+		price = 0 // special value for market orders
 	}
 
 	var l = mds.logger.WithFields(logrus.Fields{
@@ -262,7 +261,7 @@ func (mds *marketDepthStream) AddTrade(price, qty uint32, createdAt string) {
 func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
 	// Market orders have not even been added to depth
 	if isMarket {
-		return
+		price = 0 // special value for market orders.
 	}
 	if isAsk {
 		mds.askDepthLock.Lock()

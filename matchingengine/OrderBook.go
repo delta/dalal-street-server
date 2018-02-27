@@ -9,7 +9,7 @@ import (
 )
 
 // FillOrder is a type definition for a function that fills an order with given ask, bid, stockPrice and stockQty
-type FillOrder func(ask *models.Ask, bid *models.Bid, stockTradePrice uint32, stockTradeQty uint32) (askDone bool, bidDone bool, tr *models.Transaction)
+type FillOrder func(ask *models.Ask, bid *models.Bid, stockTradePrice uint32, stockTradeQty uint32) (models.AskOrderFillStatus, models.BidOrderFillStatus, *models.Transaction)
 
 // fillOrderFn is the actual function that filles an order.
 // It has been separated from implementation to ease testing.
@@ -17,8 +17,13 @@ var fillOrderFn FillOrder = models.PerformOrderFillTransaction
 
 // OrderBook stores the order book for a given stock
 type OrderBook interface {
+	LoadOldTransactions(txs []*models.Transaction)
+	LoadOldAsk(*models.Ask)
+	LoadOldBid(*models.Bid)
 	AddAskOrder(*models.Ask)
 	AddBidOrder(*models.Bid)
+	CancelAskOrder(*models.Ask)
+	CancelBidOrder(*models.Bid)
 	StartStockMatching()
 }
 
@@ -53,18 +58,148 @@ func NewOrderBook(stockId uint32, mds datastreams.MarketDepthStream) OrderBook {
 	}
 }
 
-// AddAskOrder adds an ask order to the book. It will take care of adding stopLoss, or partially filled orders automatically
+// addAskToDepth adds an ask to the depth
+// NOTE: 1. Only adds unfulfilled qty
+//		 2. It uses ask.StockQuantityFulfilled which gets written to by fillOrderFn, but this
+//			function doesn't run concurrently with fillOrderFn
+func (ob *orderBook) addAskToDepth(ask *models.Ask) {
+	// use unfulfilled qty here, because depth should have only the unfulfilled qty
+	askUnfulfilledQuantity := ask.StockQuantity - ask.StockQuantityFulfilled
+	ob.depth.AddOrder(isMarket(ask.OrderType), true, ask.Price, askUnfulfilledQuantity)
+}
+
+// addBidToDepth adds a bid to the depth.
+// NOTE: 1. Only adds unfulfilled qty
+//		 2. It uses ask.StockQuantityFulfilled which gets written to by fillOrderFn, but this
+//			function doesn't run concurrently with fillOrderFn
+func (ob *orderBook) addBidToDepth(bid *models.Bid) {
+	// use unfulfilled qty here, because depth should have only the unfulfilled qty
+	bidUnfulfilledQuantity := bid.StockQuantity - bid.StockQuantityFulfilled
+	ob.depth.AddOrder(isMarket(bid.OrderType), false, bid.Price, bidUnfulfilledQuantity)
+}
+
+func (ob *orderBook) LoadOldTransactions(txs []*models.Transaction) {
+	for _, tx := range txs {
+		ob.depth.AddTrade(tx.Price, uint32(-tx.StockQuantity), tx.CreatedAt)
+	}
+}
+
+// LoadOldAsk loads an old ask into the order book
+// NOTE: 1. If it's a stoploss order it adds to the stoploss queue
+// 		 2. Otherwise it adds it to the regular queue, and updates depth
+func (ob *orderBook) LoadOldAsk(ask *models.Ask) {
+	l := ob.logger.WithFields(logrus.Fields{
+		"method":      "LoadOldAsk",
+		"param_askId": ask.Id,
+	})
+
+	// in case of stoploss order, add it to stoploss queue and return
+	if ask.OrderType == models.StopLoss {
+		l.Debugf("Adding stopLoss with ask_id %d to the queue", ask.Id)
+		ob.askStoploss.Push(ask)
+		return
+	}
+
+	ob.asks.Push(ask)
+	ob.addAskToDepth(ask)
+}
+
+// LoadOldBid loads an old bid into the order book
+// NOTE: 1. If it's a stoploss order it adds to the stoploss queue
+// 		 2. Otherwise it adds it to the regular queue, and updates depth
+func (ob *orderBook) LoadOldBid(bid *models.Bid) {
+	l := ob.logger.WithFields(logrus.Fields{
+		"method":      "LoadOldBid",
+		"param_bidId": bid.Id,
+	})
+
+	// in case of stoploss order, add it to stoploss queue and return
+	if bid.OrderType == models.StopLoss {
+		l.Debugf("Adding stopLoss with bid_id %d to the queue", bid.Id)
+		ob.bidStoploss.Push(bid)
+		return
+	}
+
+	ob.bids.Push(bid)
+	ob.addBidToDepth(bid)
+}
+
+// AddAskOrder adds a NEW ask order to the book. It will take care of adding stopLoss.
+// It should NOT be passed partially filled orders
 func (ob *orderBook) AddAskOrder(ask *models.Ask) {
+	l := ob.logger.WithFields(logrus.Fields{
+		"method":      "AddAskOrder",
+		"param_bidId": ask.Id,
+	})
+
+	// in case of stoploss order, add it to stoploss queue and return
+	if ask.OrderType == models.StopLoss {
+		l.Debugf("Adding stopLoss with ask_id %d to the queue", ask.Id)
+		ob.askStoploss.Push(ask)
+		return
+	}
+
+	// otherwise synchronize calls to processAsk(ask)
 	ob.askChan <- ask
 }
 
-// AddBidOrder adds an bid order to the book. It will take care of adding stopLoss, or partially filled orders automatically
+// AddBidOrder adds a NEW bid order to the book. It will take care of adding stopLoss.
+// It should NOT be passed partially fulfilled orders
 func (ob *orderBook) AddBidOrder(bid *models.Bid) {
+	l := ob.logger.WithFields(logrus.Fields{
+		"method":      "AddBidOrder",
+		"param_bidId": bid.Id,
+	})
+
+	// in case of stoploss order, add it to queue and return
+	if bid.OrderType == models.StopLoss {
+		l.Debugf("Adding stopLoss with bid_id %d to the queue", bid.Id)
+		ob.bidStoploss.Push(bid)
+		return
+	}
+
+	// otherwise synchronize calls to processBid(bid)
 	ob.bidChan <- bid
 }
 
-/*
- *	StartStockMatching listens for incoming orders for a particular stock and process them
+// CancelAskOrder removes an Ask Order from the OrderBook
+// NOTE: 1. It *ONLY* removes it from the depth, and not from the queue
+// 			Removal from queue will happen when the order gets selected for trading
+// 			at some point in time. This is inefficient and needs to be fixed by moving
+// 			from pqueue to a better data structure to handle orders.
+//		 2. It accesses StockQuantityFulfilled but this will be called only after
+//		    models.CancelOrder has been called, so the ask's properties won't be modified now
+func (ob *orderBook) CancelAskOrder(ask *models.Ask) {
+	// stopLoss orders haven't even been added to the depth. So they shouldn't be removed.
+	if ask.OrderType == models.StopLoss {
+		return
+	}
+	// Others have been added. So remove those.
+	unfulfilled := ask.StockQuantity - ask.StockQuantityFulfilled
+	ob.depth.CloseOrder(isMarket(ask.OrderType), true, ask.Price, unfulfilled)
+}
+
+// CancelBidOrder removes an Bid Order from the OrderBook
+// NOTE: 1. It *ONLY* removes it from the depth, and not from the queue
+// 			Removal from queue will happen when the order gets selected for trading
+// 			at some point in time. This is inefficient and needs to be fixed by moving
+// 			from pqueue to a better data structure to handle orders
+// 		 2. It accesses StockQuantityFulfilled but this will be called only after
+//		    models.CancelOrder has been called, so the bid's properties won't be modified now
+func (ob *orderBook) CancelBidOrder(bid *models.Bid) {
+	// stopLoss orders haven't even been added to the depth. So they shouldn't be removed.
+	if bid.OrderType == models.StopLoss {
+		return
+	}
+	// Others have been added. So remove those.
+	unfulfilled := bid.StockQuantity - bid.StockQuantityFulfilled
+	ob.depth.CloseOrder(isMarket(bid.OrderType), false, bid.Price, unfulfilled)
+}
+
+/**
+ *	StartStockMatching listens for incoming orders for a particular stock and process them.
+ *  NOTE: It will spawn a new go routine. It needn't be run like "go ob.StartStockMatching()".
+ *        This function will return when it has loaded old orders and cleared existing those.
  */
 func (ob *orderBook) StartStockMatching() {
 	var l = ob.logger.WithFields(logrus.Fields{
@@ -74,13 +209,286 @@ func (ob *orderBook) StartStockMatching() {
 	l.Infof("Started with ask_count = %d, bid_count = %d", ob.asks.Size(), ob.bids.Size())
 
 	// Clear the existing orders first
-	ob.processOrder()
+	ob.clearExistingOrders()
 
 	// run infinite loop
-	for {
-		ob.waitForOrder()
-		ob.processOrder()
+	go func() {
+		for {
+			ob.waitForOrder()
+		}
+	}()
+}
+
+// getTopMatchingBid checks for a matching bid from the orderbook for an incoming ask
+// NOTE: 1. It does NOT remove the bid from the queue.
+//       2. It does NOT update the market depth
+func (ob *orderBook) getTopMatchingBid(ask *models.Ask) (*models.Bid, func()) {
+	bidTop := ob.bids.Head()
+
+	// Store the same user's bids in a slice
+	var sameUserBids []*models.Bid
+	for bidTop != nil && bidTop.UserId == ask.UserId {
+		sameUserBids = append(sameUserBids, ob.bids.Pop())
+		bidTop = ob.bids.Head()
 	}
+
+	// Function to add back the sameUserBids in the PQueue
+	addBackOrders := func() {
+		for _, bid := range sameUserBids {
+			ob.bids.Push(bid)
+			// do not add to the market depth!
+		}
+	}
+
+	// If orders don't match, push back the same user bids and return
+	if bidTop == nil || !isOrderMatching(ask, bidTop) {
+		addBackOrders()
+		return nil, func() {}
+	}
+
+	// If control reaches here, we return a non-nil matching bid
+	return bidTop, addBackOrders
+}
+
+// getTopMatchingAsk returns a matching ask from the orderbook for an incoming bid
+// NOTE: 1. It does NOT remove the ask from the queue
+//       2. It does NOT update the market depth
+func (ob *orderBook) getTopMatchingAsk(bid *models.Bid) (*models.Ask, func()) {
+	askTop := ob.asks.Head()
+
+	// Store the same user's asks in a slice
+	var sameUserAsks []*models.Ask
+	for askTop != nil && askTop.UserId == bid.UserId {
+		sameUserAsks = append(sameUserAsks, ob.asks.Pop())
+		askTop = ob.asks.Head()
+	}
+
+	// Function to add back the sameUserAsks in the PQueue
+	addBackOrders := func() {
+		for _, ask := range sameUserAsks {
+			ob.asks.Push(ask)
+			// do not add to the market depth!
+		}
+	}
+
+	// If orders don't match, push back the same user asks and return
+	if askTop == nil || !isOrderMatching(askTop, bid) {
+		addBackOrders()
+		return nil, func() {}
+	}
+
+	// If control reaches here, we return a non-nil matching ask
+	return askTop, addBackOrders
+}
+
+// processAsk tries to match an incoming ask with existing bids
+// and carry out a trade if possible.
+// NOTE: 0. The ask shouldn't be a stoploss. It's either market, or limit.
+// 		 1. The ask hasn't been added to the queue or to the depth
+// 	     2. After dealing with all possible matching bids, if the ask
+//          is still not fulfilled, it is put in the queue, and depth gets updated.
+//		 3. For every matching bid that is handled for this ask,
+//			the bid will be removed if it's either closed already, or if it got
+//			fulfilled, or if the buyer doesn't have enough cash to fulfill the
+//			trade.
+func (ob *orderBook) processAsk(ask *models.Ask) {
+	var l = ob.logger.WithFields(logrus.Fields{
+		"method":   "processAsk",
+		"paramAsk": ask,
+	})
+
+	var askDone, bidDone bool
+
+	// matchingBid is still in the queue. It must be removed once it finishes
+	matchingBid, addBackOrders := ob.getTopMatchingBid(ask)
+
+	for matchingBid != nil {
+		/*
+		 * makeTrade invokes fillOrderFn
+		 * It handles changes in market depth, closing of orders
+		 * It does not handle popping of the opposing order
+		 */
+		askDone, bidDone = ob.makeTrade(ask, matchingBid, true, false)
+		if bidDone {
+			ob.bids.Pop()
+		}
+		addBackOrders()
+
+		// Check if error occurred in acquiring locks or database transactions
+		if askDone == false && bidDone == false {
+			l.Errorf("makeTrade returned both askDone, bidDone false")
+			return
+		}
+
+		// check if ask is fulfilled
+		if askDone == true {
+			// nothing more needs to be done here. addBackOrders has been called
+			// and if the bid was fulfilled, it has been popped above already.
+			return
+		}
+
+		matchingBid, addBackOrders = ob.getTopMatchingBid(ask)
+	}
+
+	// addBackOrders doesn't need to be called here because matchingBid is nil
+
+	// if ask is still not fulfilled, add it to queue & update depth
+	if askDone == false {
+		ob.asks.Push(ask)
+		ob.addAskToDepth(ask)
+	}
+}
+
+// processBid tries to match an incoming bid with existing asks
+// and carry out a trade if possible.
+// NOTE: 0. The bid shouldn't be a stoploss. It's either market, or limit.
+// 		 1. The bid hasn't been added to the queue or to the depth
+// 	     2. After dealing with all possible matching asks, if the bid
+//          is still not fulfilled, it is put in the queue and depth gets updated.
+//		 3. For every matching ask that is handled for this bid,
+//			the ask will be removed if it's either closed already, or if it got
+//			fulfilled, or if the seller doesn't have enough stocks to fulfill the
+//			trade.
+func (ob *orderBook) processBid(bid *models.Bid) {
+	var l = ob.logger.WithFields(logrus.Fields{
+		"method":   "processBid",
+		"paramBid": bid,
+	})
+
+	// if control reaches here, it's NOT a stoploss order
+	var askDone, bidDone bool
+
+	// matchingAsk is still in the queue. It must be removed once it finishes
+	matchingAsk, addBackOrders := ob.getTopMatchingAsk(bid)
+
+	for matchingAsk != nil {
+		/*
+		 * makeTrade invokes fillOrderFn
+		 * It handles changes in market depth, closing of orders
+		 * It does not handle popping of the opposing order
+		 */
+		askDone, bidDone = ob.makeTrade(matchingAsk, bid, false, true)
+		if askDone {
+			ob.asks.Pop()
+		}
+		addBackOrders()
+
+		// Check if error occurred in acquiring locks or database transactions
+		if askDone == false && bidDone == false {
+			l.Errorf("makeTrade returned both askDone, bidDone false")
+			return
+		}
+
+		// check if bid is fulfilled
+		if bidDone == true {
+			// nothing more needs to be done here. addBackOrders has been called
+			// and if the ask was fulfilled, it has been popped above already.
+			return
+		}
+		matchingAsk, addBackOrders = ob.getTopMatchingAsk(bid)
+	}
+
+	// addBackOrders doesn't need to be called here because matchingAsk is nil
+
+	// if bid is still not fulfilled, add it to queue & update depth
+	if bidDone == false {
+		ob.bids.Push(bid)
+		ob.addBidToDepth(bid)
+	}
+}
+
+// makeTrade performs a trade between two orders
+// NOTE: 0. incoming-ness is only used to decide whether to update depth. Non-incomers update depth.
+//		 1. incomingAsk/Bid is true if the ask/bid is incoming - ie not added to queue yet
+//       2. Both incomingAsk and incomingBid SHOULDN'T be true. Usually exactly one
+//			is true, but when clearing existing orders, both will be false
+//       3. It returns two booleans: askDone, bidDone. Each is true if the ask/bid order has been
+//     		closed and is safe to remove it from the queue.
+//		 4. The *CALLER* is responsible for dealing with the queue (adding/removing)
+//			[except for triggerStoploss]
+//		 5. If transaction happens:
+//			a). A new trade is added to the depth.
+//		 	b). Stoplossess get triggered
+//			c). Non-incoming order(s) are removed from depth where removed qty==tr.qty
+//		 6. If transaction doesn't happen:
+//			a). Non-incoming order(s) are removed from depth where removed qty==unfulfilled.
+//				This is done ONLY if the order wasn't already closed (See below)
+//
+// NOTE: Whether the order was closed already has to be decided by the fillOrderFn
+// as accessing the IsClosed attribute of the Bid from here is unsafe. It
+// could lead to a race condition between OrderBook and Users.CancelOrder()
+//
+// ----------------------------------------------------------------
+// The current approach to dealing with cancellations is this:
+//
+// fillOrderFn and models.CancelOrder will *not* run concurrently if a common user is involved.
+// Therefore, fillOrderFn and models.CancelOrder are *strongly ordered*. One happens before
+// the other.
+//
+// So, if fillOrderFn returns orderstatus as AlreadyClosed, then that means
+// models.CancelOrder executed before it for that order. Since models.CancelOrder will be followed
+// by OrderBook.CancelOrder, makeTrade doesn't handle that case. Instead, OrderBook.CancelOrder will
+// be called sometime (soon, or even concurrently with makeTrade), and it'll remove the required amount
+// of stockqty from depth.
+
+// Basically, makeTrade will update depth only when it's a non-incoming order
+// AND the orderstatus is either Done or Undone, but not when it's AlreadyClosed
+func (ob *orderBook) makeTrade(ask *models.Ask, bid *models.Bid, incomingAsk bool, incomingBid bool) (bool, bool) {
+	var l = ob.logger.WithFields(logrus.Fields{
+		"method":   "makeTrade",
+		"paramAsk": ask,
+		"paramBid": bid,
+	})
+
+	/*
+	 *	fillOrderFn should
+	 *      - acquire locks on the users
+	 *		- update StockQuantityFulfilled and IsClosed
+	 *		- record the transaction in the database
+	 */
+
+	stockTradePrice, stockTradeQty := getTradePriceAndQty(ask, bid)
+	askStatus, bidStatus, tr := fillOrderFn(ask, bid, stockTradePrice, stockTradeQty)
+
+	if tr != nil {
+		l.Infof("Trade made between ask_id %d and bid %d at price %d", ask.Id, bid.Id, tr.Price)
+		// tr is always AskTransaction. So its StockQty < 0. Make it positive.
+		ob.depth.AddTrade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
+
+		// if ask is incoming, close just bid depth as ask hasn't even been added to depth
+		if !incomingBid {
+			ob.depth.CloseOrder(isMarket(bid.OrderType), false, bid.Price, uint32(-tr.StockQuantity))
+		}
+		if !incomingAsk {
+			ob.depth.CloseOrder(isMarket(ask.OrderType), true, ask.Price, uint32(-tr.StockQuantity))
+		}
+
+		// Trigger stop losses here
+		ob.triggerStopLosses(tr)
+	} else {
+		// If transaction didn't happen, but bidDone is true
+		// Thus the bid was faulty in some way or the order was cancelled
+		// Thus, the remaining stock quantity needs to be closed
+		// If the bid was already closed, then CancelOrder was called sometime before fillOrderFn
+		// was called. That means orderBook.CancelBidOrder would (have been)/(be) called. It will
+		// handle updating the depth.
+		if !incomingBid && bidStatus != models.BidAlreadyClosed {
+			unfulfilled := bid.StockQuantity - bid.StockQuantityFulfilled
+			ob.depth.CloseOrder(isMarket(bid.OrderType), false, bid.Price, unfulfilled)
+		}
+		// If transaction didn't happen, but askDone is true
+		// Thus the ask was faulty in some way or the order was cancelled
+		// Thus, the remaining stock quantity needs to be closed
+		// If the ask was already closed, then CancelOrder was called sometime before fillOrderFn
+		// was called. That means orderBook.CancelAskOrder would (have been)/(be) called. It will
+		// handle updating the depth.
+		if !incomingAsk && askStatus != models.AskAlreadyClosed {
+			unfulfilled := ask.StockQuantity - ask.StockQuantityFulfilled
+			ob.depth.CloseOrder(isMarket(ask.OrderType), true, ask.Price, unfulfilled)
+		}
+	}
+
+	return askStatus != models.AskUndone, bidStatus != models.BidUndone
 }
 
 /*
@@ -91,13 +499,6 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		"method": "triggerStopLosses",
 	})
 
-	db, err := utils.DbOpen()
-	if err != nil {
-		l.Errorf("Error while opening DB to trigger stoplosses. Not triggering them.")
-		return
-	}
-	defer db.Close()
-
 	l.Debugf("Triggering ask stoplosses")
 	topAskStoploss := ob.askStoploss.Head()
 	// We trigger asks having higher than current price. That's because if it's an ask stoploss, then we will sell
@@ -106,12 +507,11 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		l.Debugf("Triggering ask %+v", topAskStoploss)
 
 		topAskStoploss = ob.askStoploss.Pop()
-		topAskStoploss.OrderType = models.StopLossActive
-		if err := db.Save(topAskStoploss).Error; err != nil {
+		if err := topAskStoploss.TriggerStoploss(); err != nil {
 			l.Errorf("Error while changing state of %+v from StopLoss to StopLossActive", topAskStoploss)
 		}
 
-		ob.asks.Push(topAskStoploss, topAskStoploss.Price, topAskStoploss.StockQuantity)
+		ob.asks.Push(topAskStoploss)
 		ob.depth.AddOrder(true, true, topAskStoploss.Price, topAskStoploss.StockQuantity)
 		topAskStoploss = ob.askStoploss.Head()
 	}
@@ -124,121 +524,65 @@ func (ob *orderBook) triggerStopLosses(tr *models.Transaction) {
 		l.Debugf("Triggering bid %+v", topBidStoploss)
 
 		topBidStoploss = ob.bidStoploss.Pop()
-		topBidStoploss.OrderType = models.StopLossActive
-		if err := db.Save(topBidStoploss).Error; err != nil {
+		if err := topBidStoploss.TriggerStoploss(); err != nil {
 			l.Errorf("Error while changing state of %+v from StopLoss to StopLossActive", topBidStoploss)
 		}
 
-		ob.bids.Push(topBidStoploss, topBidStoploss.Price, topBidStoploss.StockQuantity)
+		ob.bids.Push(topBidStoploss)
 		ob.depth.AddOrder(true, false, topBidStoploss.Price, topBidStoploss.StockQuantity)
 		topBidStoploss = ob.bidStoploss.Head()
 	}
 }
 
 /*
- *	Method to return a matching ask and bid belonging to distinct users
+ *	Method to clear the existing orders for a particular stock
  */
-func (ob *orderBook) getTopMatchingOrders() (*models.Ask, *models.Bid, func()) {
-	askTop, bidTop := ob.asks.Head(), ob.bids.Head()
-
-	// If either one is nil, there are no matching orders
-	if askTop == nil || bidTop == nil {
-		return askTop, bidTop, func() {}
-	}
-
-	// Store the same user's bids in a slice
-	var sameUserBids []*models.Bid
-	for bidTop != nil && bidTop.UserId == askTop.UserId {
-		sameUserBids = append(sameUserBids, ob.bids.Pop())
-		bidTop = ob.bids.Head()
-	}
-
-	// Function to add back the sameUserBids in the PQueue
-	addBackOrders := func() {
-		for _, bid := range sameUserBids {
-			ob.bids.Push(bid, bid.Price, bid.StockQuantity)
-		}
-	}
-
-	// If orders don't match, push back the same user bids and return
-	if bidTop == nil || !isOrderMatching(askTop, bidTop) {
-		addBackOrders()
-		return nil, nil, func() {}
-	}
-
-	// If control reaches here, we return a non-nil matching pair of orders
-	return askTop, bidTop, addBackOrders
-}
-
-/*
- *	Method to process the orders for a particular stock and carry out transactions
- */
-func (ob *orderBook) processOrder() {
+func (ob *orderBook) clearExistingOrders() {
 	var l = ob.logger.WithFields(logrus.Fields{
-		"method": "processOrder",
+		"method": "clearExistingOrders",
 	})
 
-	var (
-		askDone bool
-		bidDone bool
-		tr      *models.Transaction
-	)
+	if ob.bids.Head() == nil {
+		return
+	}
 
-	askTop, bidTop, addBackOrders := ob.getTopMatchingOrders()
+	var askDone, bidDone bool
+
+	bidTop := ob.bids.Pop()
+	askTop, addBackOrders := ob.getTopMatchingAsk(bidTop)
 
 	for bidTop != nil && askTop != nil {
-
-		l.Debugf("Performing OrderFill transaction")
-
-		/*
-		 *	fillOrderFn should
-		 *		- acquire locks on the users
-		 *		- update StockQuantityFulfilled and IsClosed
-		 *		- record the transaction in the database
-		 */
-		stockTradePrice, stockTradeQty := getTradePriceAndQty(askTop, bidTop)
-		askDone, bidDone, tr = fillOrderFn(askTop, bidTop, stockTradePrice, stockTradeQty)
-
-		if tr != nil {
-			l.Infof("Trade made between ask_id %d and bid %d", askTop.Id, bidTop.Id)
-			// tr is always AskTransaction. So its StockQty < 0. Make it positive.
-			ob.depth.AddTrade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
-
-			ob.depth.CloseOrder(isMarket(askTop.OrderType), true, askTop.Price, uint32(-tr.StockQuantity))
-			ob.depth.CloseOrder(isMarket(bidTop.OrderType), false, bidTop.Price, uint32(-tr.StockQuantity))
-
-			// Trigger stop losses here
-			ob.triggerStopLosses(tr)
-		}
-
-		if askDone {
-			// If transaction didn't happen, but askDone is true
-			// Thus the ask was faulty in some way or the order was cancelled
-			// Thus, the remaining stock quantity needs to be closed
-			if tr == nil {
-				ob.depth.CloseOrder(isMarket(askTop.OrderType), true, askTop.Price, askTop.StockQuantity-askTop.StockQuantityFulfilled)
-			}
-			ob.asks.Pop()
-		}
-		if bidDone {
-			// If transaction didn't happen, but bidDone is true
-			// Thus the bid was faulty in some way or the order was cancelled
-			// Thus, the remaining stock quantity needs to be closed
-			if tr == nil {
-				ob.depth.CloseOrder(isMarket(bidTop.OrderType), false, bidTop.Price, bidTop.StockQuantity-bidTop.StockQuantityFulfilled)
-			}
-			ob.bids.Pop()
-		}
-
+		// treating both ask and bid as non-incoming orders
+		// which means depth will be updated for both.
+		askDone, bidDone = ob.makeTrade(askTop, bidTop, false, false)
 		addBackOrders()
 
 		// Check if error occurred in acquiring locks or database transactions
 		if askDone == false && bidDone == false {
-			l.Errorf("PerformOrderFillTransaction returned both askDone, bidDone false")
+			l.Errorf("makeTrade returned both askDone, bidDone false")
 			return
 		}
 
-		askTop, bidTop, addBackOrders = ob.getTopMatchingOrders()
+		// if ask is done, remove it. Depth is already updated. No need to worry.
+		if askDone {
+			ob.asks.Pop()
+		}
+		// if current bid is fulfilled, move to next bid
+		if bidDone {
+			bidTop = ob.bids.Pop()
+		}
+		if bidTop != nil {
+			// this will work even when askDone = false, bidDone = true including
+			// the weird case where same user bids-asks get involved
+			askTop, addBackOrders = ob.getTopMatchingAsk(bidTop)
+		}
+		// otherwise the loop will break. Since askTop hasn't been popped from
+		// asks queue, so no need to worry about it
+	}
+
+	// if bid is not fulfilled and asks queue becomes empty. Shouldn't update depth
+	if bidTop != nil {
+		ob.bids.Push(bidTop)
 	}
 }
 
@@ -253,28 +597,10 @@ func (ob *orderBook) waitForOrder() {
 	select {
 	case askOrder := <-ob.askChan:
 		l.Debugf("Got ask %+v. Processing", askOrder)
-		if askOrder.OrderType == models.StopLoss {
-			l.Debugf("Adding stopLoss with ask_id %d to the list", askOrder.Id)
-			ob.askStoploss.Push(askOrder, askOrder.Price, askOrder.StockQuantity)
-			break
-		}
-
-		// If control reaches here, it's not a StopLoss order
-		askUnfulfilledQuantity := askOrder.StockQuantity - askOrder.StockQuantityFulfilled
-		ob.asks.Push(askOrder, askOrder.Price, askUnfulfilledQuantity)
-		ob.depth.AddOrder(isMarket(askOrder.OrderType), true, askOrder.Price, askOrder.StockQuantity)
+		ob.processAsk(askOrder)
 
 	case bidOrder := <-ob.bidChan:
 		l.Debugf("Got bid %+v. Processing", bidOrder)
-		if bidOrder.OrderType == models.StopLoss {
-			l.Debugf("Adding stopLoss with bid_id %d to the list", bidOrder.Id)
-			ob.bidStoploss.Push(bidOrder, bidOrder.Price, bidOrder.StockQuantity)
-			break
-		}
-
-		// If control reaches here, it's not a StopLoss order
-		bidUnfulfilledQuantity := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
-		ob.bids.Push(bidOrder, bidOrder.Price, bidUnfulfilledQuantity)
-		ob.depth.AddOrder(isMarket(bidOrder.OrderType), true, bidOrder.Price, bidOrder.StockQuantity)
+		ob.processBid(bidOrder)
 	}
 }

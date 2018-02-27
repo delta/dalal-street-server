@@ -1,6 +1,12 @@
 package models
 
 import (
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 	"github.com/thakkarparth007/dalal-street-server/utils"
@@ -13,6 +19,7 @@ type MarketEvent struct {
 	Headline     string `gorm:"column:headline;not null" json:"headline"`
 	Text         string `gorm:"column:text" json:"text"`
 	IsGlobal     bool   `gorm:"column:isGlobal" json:"is_global"`
+	ImagePath    string `gorm:"column:imagePath" json:"image_path"`
 	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
 }
 
@@ -28,6 +35,7 @@ func (gMarketEvent *MarketEvent) ToProto() *models_pb.MarketEvent {
 		Text:         gMarketEvent.Text,
 		EmotionScore: gMarketEvent.EmotionScore,
 		IsGlobal:     gMarketEvent.IsGlobal,
+		ImagePath:    gMarketEvent.ImagePath,
 		CreatedAt:    gMarketEvent.CreatedAt,
 	}
 	return pMarketEvent
@@ -42,11 +50,7 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 
 	l.Infof("Attempting to get market events")
 
-	db, err := DbOpen()
-	if err != nil {
-		return true, nil, err
-	}
-	defer db.Close()
+	db := getDB()
 
 	var marketEvents []*MarketEvent
 
@@ -70,31 +74,65 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	return moreExists, marketEvents, nil
 }
 
-func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool) error {
+func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageURL string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "AddMarketEvent",
 		"param_stockId":  stockId,
 		"param_headline": headline,
 		"param_text":     text,
 		"param_isGlobal": isGlobal,
+		"param_imageURL": imageURL,
 	})
 
 	l.Infof("Attempting")
 
-	db, err := DbOpen()
+	// Try downloading image first
+	response, err := http.Get(imageURL)
+	if err != nil || response.StatusCode != http.StatusOK {
+		l.Errorf("Error : %v, StatusCode : %d", err, response.StatusCode)
+		if err != nil {
+			return err
+		}
+		return errors.New("NOT OK status code")
+	}
+	defer response.Body.Close()
+
+	// Extract filename
+	var basename = imageURL[strings.LastIndex(imageURL, "/")+1:]
+	var getParamStartIndex = strings.Index(basename, "?")
+	if getParamStartIndex != -1 {
+		basename = basename[:getParamStartIndex]
+	}
+	l.Debugf("ImageURL : %s Basename : %s", imageURL, basename)
+
+	// open file for saving image
+	file, err := os.Create(utils.GetImageBasePath() + basename)
+
 	if err != nil {
+		l.Error(err)
 		return err
 	}
-	defer db.Close()
+	defer file.Close()
 
-	me := &MarketEvent{
-		StockId:  stockId,
-		Headline: headline,
-		Text:     text,
-		IsGlobal: isGlobal,
+	// copy image to file
+	_, err = io.Copy(file, response.Body)
+	if err != nil {
+		l.Error(err)
+		return err
 	}
 
-	if err := db.Save(me).Error; err != nil {
+	db := getDB()
+
+	me := &MarketEvent{
+		StockId:   stockId,
+		Headline:  headline,
+		Text:      text,
+		IsGlobal:  isGlobal,
+		ImagePath: basename,
+		CreatedAt: utils.GetCurrentTimeISO8601(),
+	}
+
+	if err = db.Save(me).Error; err != nil {
 		l.Error(err)
 		return err
 	}

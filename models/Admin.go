@@ -9,20 +9,17 @@ func IsAdmin(username, password string) (bool, error) {
 		"method": "IsAdmin",
 	})
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return false, err
-	}
-	defer db.Close()
-	db.LogMode(true)
+	db := getDB()
 
-	sql := "Select * from Admins where username = ? and password = MD5(?)"
-	db = db.Exec(sql, username, password)
-	if err := db.Error; err != nil {
+	row := db.Table("Admins").Where("username = ? and password = MD5(?)", username, password).Select("username").Row()
+	tmp := ""
+	err := row.Scan(&tmp)
+	if err != nil {
+		l.Errorf("Error checking if user is admin: %+v", err)
 		return false, err
 	}
-	return true, err
+
+	return true, nil
 }
 
 func AdminLog(username, msg string) {
@@ -32,13 +29,7 @@ func AdminLog(username, msg string) {
 		"param_msg":      msg,
 	})
 
-	db, err := DbOpen()
-	if err != nil {
-		l.Error(err)
-		return
-	}
-	defer db.Close()
-	db.LogMode(true)
+	db := getDB()
 
 	sql := "Insert into AdminLogs (username, msg) Values(?, ?)"
 	if err := db.Exec(sql, username, msg).Error; err != nil {

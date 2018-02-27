@@ -1,6 +1,8 @@
 package matchingengine
 
 import (
+	"sync"
+
 	"github.com/Sirupsen/logrus"
 
 	"github.com/thakkarparth007/dalal-street-server/datastreams"
@@ -14,6 +16,8 @@ var logger *logrus.Entry
 type MatchingEngine interface {
 	AddAskOrder(*models.Ask)
 	AddBidOrder(*models.Bid)
+	CancelAskOrder(*models.Ask)
+	CancelBidOrder(*models.Bid)
 }
 
 // matchingEngine implements the MatchingEngine interface
@@ -35,6 +39,7 @@ func Init(config *utils.Config) {
 
 // NewMatchingEngine returns an instance of MatchingEngine
 // It calls StartStockmatching for all the stocks in concurrent goroutines.
+// WARNING: Do NOT call this again for a given stock, once the server has restarted
 func NewMatchingEngine(dsm datastreams.Manager) MatchingEngine {
 	engine := &matchingEngine{
 		logger: utils.Logger.WithFields(logrus.Fields{
@@ -46,10 +51,17 @@ func NewMatchingEngine(dsm datastreams.Manager) MatchingEngine {
 
 	engine.loadOldOrders()
 
+	var wg sync.WaitGroup
+
 	for _, ob := range engine.orderBooks {
-		go ob.StartStockMatching()
+		wg.Add(1)
+		go func(ob OrderBook) {
+			ob.StartStockMatching() // this will return when it's initialized
+			wg.Done()
+		}(ob)
 	}
 
+	wg.Wait() // Don't return till the orderbooks have been initialized
 	engine.logger.Info("Started matching engine")
 	return engine
 }
@@ -64,52 +76,68 @@ func (m *matchingEngine) AddBidOrder(bidOrder *models.Bid) {
 	m.orderBooks[bidOrder.StockId].AddBidOrder(bidOrder)
 }
 
+// CancelAskOrder removes the ask order from the orderbook.
+func (m *matchingEngine) CancelAskOrder(askOrder *models.Ask) {
+	m.orderBooks[askOrder.StockId].CancelAskOrder(askOrder)
+}
+
+// CancelBidOrder removes the bid order from the orderbook.
+func (m *matchingEngine) CancelBidOrder(bidOrder *models.Bid) {
+	m.orderBooks[bidOrder.StockId].CancelBidOrder(bidOrder)
+}
+
 // loadOldOrders() loads old unfulfilled orders from database
 func (m *matchingEngine) loadOldOrders() {
 	var l = m.logger.WithFields(logrus.Fields{
 		"method": "loadOldOrders",
 	})
 
-	db, err := models.DbOpen()
-	if err != nil {
-		l.Errorf("Errored : %+v", err)
-		panic("Error opening database for matching engine")
-	}
-	defer db.Close()
+	db := utils.GetDB()
 
 	var (
 		openAskOrders []*models.Ask
 		openBidOrders []*models.Bid
-		stockIds      []uint32
+		stockIDs      []uint32
+		err           error
 	)
 
 	//Load stock ids from database
-	if err := db.Model(&models.Stock{}).Pluck("id", &stockIds).Error; err != nil {
+	if err = db.Model(&models.Stock{}).Pluck("id", &stockIDs).Error; err != nil {
 		panic("Failed to load stock ids in matching engine: " + err.Error())
 	}
 
 	//Load open ask orders from database
-	if err := db.Where("isClosed = ?", 0).Find(&openAskOrders).Error; err != nil {
+	openAskOrders, err = models.GetAllOpenAsks()
+	if err != nil {
 		panic("Error loading open ask orders in matching engine: " + err.Error())
 	}
 
 	//Load open bid orders from database
-	if err := db.Where("isClosed = ?", 0).Find(&openBidOrders).Error; err != nil {
+	openBidOrders, err = models.GetAllOpenBids()
+	if err != nil {
 		panic("Error loading open bid orders in matching engine: " + err.Error())
 	}
 
-	for _, stockId := range stockIds {
-		marketDepth := m.datastreamsManager.GetMarketDepthStream(stockId)
-		m.orderBooks[stockId] = NewOrderBook(stockId, marketDepth)
+	for _, stockID := range stockIDs {
+		marketDepth := m.datastreamsManager.GetMarketDepthStream(stockID)
+		m.orderBooks[stockID] = NewOrderBook(stockID, marketDepth)
+		tx, err := models.GetAskTransactionsForStock(stockID, 15)
+		if err != nil {
+			l.Errorf("Unable to load old transactions for stockid %d", stockID)
+		} else {
+			m.orderBooks[stockID].LoadOldTransactions(tx)
+		}
 	}
 
 	//Load open ask orders into priority queue
 	for _, openAskOrder := range openAskOrders {
-		m.orderBooks[openAskOrder.StockId].AddAskOrder(openAskOrder)
+		m.orderBooks[openAskOrder.StockId].LoadOldAsk(openAskOrder)
 	}
 
 	//Load open bid orders into priority queue
 	for _, openBidOrder := range openBidOrders {
-		m.orderBooks[openBidOrder.StockId].AddBidOrder(openBidOrder)
+		m.orderBooks[openBidOrder.StockId].LoadOldBid(openBidOrder)
 	}
+
+	l.Info("Loaded!")
 }
