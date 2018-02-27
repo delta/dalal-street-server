@@ -136,6 +136,9 @@ func createBid(bid *Bid) error {
 	bid.CreatedAt = utils.GetCurrentTimeISO8601()
 	bid.UpdatedAt = bid.CreatedAt
 
+	bid.CreatedAt = utils.GetCurrentTimeISO8601()
+	bid.UpdatedAt = bid.CreatedAt
+
 	if err := db.Create(bid).Error; err != nil {
 		return err
 	}

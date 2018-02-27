@@ -188,6 +188,7 @@ func createAsk(ask *Ask) error {
 	ask.UpdatedAt = ask.CreatedAt
 
 	db := getDB()
+
 	if err := db.Create(ask).Error; err != nil {
 		return err
 	}
