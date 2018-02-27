@@ -270,8 +270,8 @@ func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint32
 	}
 	if isAsk {
 		mds.askDepthLock.Lock()
-                // IMPORTANT: This needs to be inspected and fixed
-                // Without this hack, we get an unsigned integer wraparound in Market Depth
+		// IMPORTANT: This needs to be inspected and fixed
+		// Without this hack, we get an unsigned integer wraparound in Market Depth
 		if stockQuantity > mds.askDepth[price] {
 			l.Errorf("%d stockQuantity, %d price, %b isAsk, %b isMarket", stockQuantity, price, isAsk, isMarket)
 			stockQuantity = mds.askDepth[price]
@@ -288,12 +288,12 @@ func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint32
 		return
 	}
 	mds.bidDepthLock.Lock()
-                // IMPORTANT: This needs to be inspected and fixed
-                // Without this hack, we get an unsigned integer wraparound in Market Depth
-		if stockQuantity > mds.bidDepth[price] {
-			l.Errorf("%d stockQuantity, %d price, %b isAsk, %b isMarket", stockQuantity, price, isAsk, isMarket)
-			stockQuantity = mds.bidDepth[price]
-		}
+	// IMPORTANT: This needs to be inspected and fixed
+	// Without this hack, we get an unsigned integer wraparound in Market Depth
+	if stockQuantity > mds.bidDepth[price] {
+		l.Errorf("%d stockQuantity, %d price, %b isAsk, %b isMarket", stockQuantity, price, isAsk, isMarket)
+		stockQuantity = mds.bidDepth[price]
+	}
 	mds.bidDepth[price] -= stockQuantity
 	mds.bidDepthDiff[price] -= int32(stockQuantity)
 	if mds.bidDepth[price] == 0 {

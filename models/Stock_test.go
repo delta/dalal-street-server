@@ -59,16 +59,18 @@ func Test_UpdateStockPrice(t *testing.T) {
 
 	retrievedStock := &Stock{}
 	db.First(retrievedStock, 1)
+
+	var expectedAvgPrice uint32 = 1000 - (1000 / AVERAGE_COUNT) + (2000 / AVERAGE_COUNT)
 	var stock1 = &Stock{
 		Id:               1,
-		CurrentPrice:     2000,
+		CurrentPrice:     expectedAvgPrice,
 		DayHigh:          2000,
 		AllTimeHigh:      2000,
 		AllTimeLow:       1000,
 		UpOrDown:         true,
-		AvgLastPrice:     1050,
+		AvgLastPrice:     expectedAvgPrice,
 		PreviousDayClose: 1000,
-		UpdatedAt: retrievedStock.UpdatedAt,
+		UpdatedAt:        retrievedStock.UpdatedAt,
 	}
 	if !testutils.AssertEqual(t, stock1, retrievedStock) {
 		t.Fatalf("Expected %v but got %v", stock1, retrievedStock)
