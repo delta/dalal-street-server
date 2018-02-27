@@ -86,7 +86,5 @@ func RealMain() {
 }
 
 func main() {
-	for {
 		RealMain()
-	}
 }

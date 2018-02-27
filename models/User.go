@@ -431,8 +431,9 @@ func (e OrderStockLimitExceeded) Error() string {
 type OrderPriceOutOfWindowError struct{ price uint32 }
 
 func (e OrderPriceOutOfWindowError) Error() string {
-	return fmt.Sprintf("Order price must be within %d%% of the current price - currently between %d and %d",
+	return fmt.Sprintf("Order price must be within %d%% of the average price of last %d trades- currently between %d and %d",
 		ORDER_PRICE_WINDOW,
+		AVERAGE_COUNT,
 		uint32((1-ORDER_PRICE_WINDOW/100.0)*float32(e.price)),
 		uint32((1+ORDER_PRICE_WINDOW/100.0)*float32(e.price)),
 	)
@@ -1445,7 +1446,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		MortgagePutLimitRWMutex.RLock()
 		lim := MortgagePutLimit
 		MortgagePutLimitRWMutex.RUnlock()
-		if user.Total < lim {
+		if user.Total >= lim {
 			return nil, WayTooMuchCashError{}
 		}
 

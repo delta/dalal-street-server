@@ -21,9 +21,10 @@ echo "########## Building proto files ###########"
 bash build_proto.sh
 
 # Get the database password
-dbPass=$(egrep "Docker|DbPassword" config.json \
-        | grep -C1 "Docker" | tail -n1 \
+currentStage="${DALAL_ENV:-Dev}"
+dbPass=$(egrep "$currentStage|DbPassword" config.json \
+        | grep -C1 $currentStage | tail -n1 \
         | awk '{print substr($2,2,length($2)-3)}')
 
 echo "######### Running migrations ##########"
-migrate -url "mysql://root:$dbPass@tcp(db:3306)/dalalstreet_docker" -path ./migrations up
+migrate -url "mysql://root:$dbPass@tcp(db:3306)/dalalstreet" -path ./migrations up

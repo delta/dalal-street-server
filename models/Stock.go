@@ -163,10 +163,11 @@ func UpdateStockPrice(stockId, price uint32) error {
 	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
 
 	avgLastPrice.Lock()
-	avgLastPrice.m[stock.Id] -= uint32((avgLastPrice.m[stock.Id] / 20))
-	avgLastPrice.m[stock.Id] += uint32((stock.CurrentPrice) / 20)
+	avgLastPrice.m[stock.Id] -= uint32((avgLastPrice.m[stock.Id])/ AVERAGE_COUNT)
+	avgLastPrice.m[stock.Id] += uint32((price)/ AVERAGE_COUNT)
 	l.Infof("Average Price +%v", avgLastPrice.m[stock.Id])
 	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
+	stock.CurrentPrice = stock.AvgLastPrice
 	avgLastPrice.Unlock()
 
 	db := getDB()
@@ -177,7 +178,7 @@ func UpdateStockPrice(stockId, price uint32) error {
 	}
 
 	stockPriceStream := datastreamsManager.GetStockPricesStream()
-	stockPriceStream.SendStockPriceUpdate(stockId, price)
+	stockPriceStream.SendStockPriceUpdate(stockId, stock.AvgLastPrice)
 
 	l.Infof("Done")
 

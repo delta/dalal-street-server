@@ -17,20 +17,20 @@ services:
         volumes: 
             - $GOPATH:/go
         ports:
-            - "443:8000"
+            - "9001:8000"
         depends_on:
             - db
         env_file:
             - .env
         environment:
             MYSQL_DATABASE: ${DB_NAME}
-            DALAL_ENV: Docker
+            DALAL_ENV: Prod
 
     db:
         container_name: dalalstreet_db_1
-        image: mysql:latest
+        image: mysql:5.7.16
         volumes:
-            - ./docker/mysql:/var/lib/mysql
+            - ./docker/mysql1:/var/lib/mysql
         env_file:
             - .env
         environment:
@@ -43,6 +43,6 @@ services:
         env_file:
             - .env
         ports:
-            - "9040:80"
+            - "9002:80"
         depends_on:
             - db

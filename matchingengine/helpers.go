@@ -35,7 +35,7 @@ func getTradePriceAndQty(ask *models.Ask, bid *models.Bid) (uint32, uint32) {
 	//set transaction price based on order type
 	if isMarket(ask.OrderType) && isMarket(bid.OrderType) {
 		stock, _ := models.GetStockCopy(ask.StockId)
-		stockTradePrice = stock.CurrentPrice
+		stockTradePrice = stock.AvgLastPrice
 	} else if isMarket(ask.OrderType) {
 		stockTradePrice = bid.Price
 	} else if isMarket(bid.OrderType) {
