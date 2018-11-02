@@ -16,6 +16,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 
+	"github.com/delta/dalal-street-server/proto_build"
+	"github.com/delta/dalal-street-server/proto_build/actions"
 	"github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
 	_ "github.com/delta/dalal-street-server/utils/test"
@@ -80,7 +82,10 @@ func Test_Authentication(t *testing.T) {
 		t.Fatalf("Unexpected: Login request failed with %+v %+v", loginRes, err)
 	}
 
-	buyStocksFromExchangeReq := &actions_pb.BuyStocksFromExchangeRequest{1, 1}
+	buyStocksFromExchangeReq := &actions_pb.BuyStocksFromExchangeRequest{
+		StockId:       1,
+		StockQuantity: 1,
+	}
 	_, err = actionClient.BuyStocksFromExchange(context.Background(), buyStocksFromExchangeReq)
 	statusCode, _ = status.FromError(err)
 	if statusCode.Code() != codes.Unauthenticated {
@@ -88,8 +93,8 @@ func Test_Authentication(t *testing.T) {
 	}
 
 	subId := &datastreams_pb.SubscriptionId{
-		"1",
-		datastreams_pb.DataStreamType_MARKET_DEPTH,
+		Id:             "1",
+		DataStreamType: datastreams_pb.DataStreamType_MARKET_DEPTH,
 	}
 	res, err := streamClient.GetMarketDepthUpdates(context.Background(), subId)
 	statusCode, _ = status.FromError(err)

@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
 )
 

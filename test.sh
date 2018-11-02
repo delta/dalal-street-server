@@ -17,7 +17,7 @@ dbPass=$(egrep "Test|DbPassword" config.json \
 	| grep -C1 "Test" | tail -n1 \
 	| awk '{print substr($2,2,length($2)-3)}')
 
-migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations up 
+migrate -url mysql://root:$dbPass@$MYSQL_HOST/dalalstreet_test -path ./migrations up
 go test -race -v -p=1 -run="^(Test|Benchmark)_(.*)" ./... -args -config="$(pwd)/config.json"
 code=$?
 migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations down 

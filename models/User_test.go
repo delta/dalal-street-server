@@ -126,7 +126,7 @@ func TestUserToProto(t *testing.T) {
 	o_proto := o.ToProto()
 
 	if !testutils.AssertEqual(t, o, o_proto) {
-		t.Fatal("Converted values not equal!+%v,+%v", o, o_proto)
+		t.Fatalf("Converted values not equal!+%v,+%v", o, o_proto)
 	}
 
 }
