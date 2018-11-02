@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/jarcoal/httpmock.v1"
 
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
+	"github.com/delta/dalal-street-server/utils/test"
 )
 
 func Test_Login(t *testing.T) {

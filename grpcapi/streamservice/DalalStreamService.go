@@ -11,12 +11,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/proto_build"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/datastreams"
+	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	"github.com/delta/dalal-street-server/session"
 
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 var logger *logrus.Entry

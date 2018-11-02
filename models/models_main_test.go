@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/datastreams"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 func TestMain(m *testing.M) {

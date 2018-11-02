@@ -8,8 +8,8 @@
 - Set your `$GOPATH` in your `.bashrc`. (Just a place where you want to keep all your Go code)
 - Append `$GOPATH/bin` to your `$PATH`. Add the line `PATH=$PATH:$GOPATH/bin` to your `.bashrc`.
 - Clone this repository.
-    - `go get github.com/thakkarparth007/dalal-street-server` (**recommended**)
-    - `git clone git@github.com:thakkarparth007/dalal-street-server.git` (In this case, make sure you clone the repository in `$GOPATH/src/github.com/thakkarparth007`)
+    - `go get github.com/delta/dalal-street-server` (**recommended**)
+    - `git clone git@github.com:delta/dalal-street-server.git` (In this case, make sure you clone the repository in `$GOPATH/src/github.com/delta`)
 - Install ***protocol buffers*** for Go. [Click here](https://github.com/golang/protobuf). Feel free to look up more about protobufs [here](https://developers.google.com/protocol-buffers/docs/gotutorial).
 - Test your installation by typing `protoc --help` in your terminal.
 ```

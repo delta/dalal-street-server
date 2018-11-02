@@ -11,7 +11,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 const sidLen = 32

@@ -3,7 +3,7 @@ package matchingengine
 import (
 	"sync"
 
-	"github.com/thakkarparth007/dalal-street-server/models"
+	"github.com/delta/dalal-street-server/models"
 )
 
 // PQType represents a priority queue ordering kind (see MAXPQ and MINPQ)

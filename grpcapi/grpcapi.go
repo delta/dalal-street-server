@@ -13,18 +13,13 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
-
+	"github.com/delta/dalal-street-server/datastreams"
+	"github.com/delta/dalal-street-server/grpcapi/actionservice"
+	"github.com/delta/dalal-street-server/grpcapi/streamservice"
+	"github.com/delta/dalal-street-server/matchingengine"
+	"github.com/delta/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/utils"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/grpcapi/actionservice"
-	"github.com/thakkarparth007/dalal-street-server/grpcapi/streamservice"
-	"github.com/thakkarparth007/dalal-street-server/matchingengine"
-	"github.com/thakkarparth007/dalal-street-server/proto_build"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
-	"github.com/thakkarparth007/dalal-street-server/session"
-	"github.com/thakkarparth007/dalal-street-server/utils"
 )
 
 var (
@@ -111,7 +106,7 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		} else {
 			sess, err = session.Load(md["sessionid"][0])
 			if err != nil {
-				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")	
+				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
 			}
 
 			err2 := sess.Touch() // ignore the error here.

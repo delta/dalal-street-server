@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 var logger *logrus.Entry

@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 type OrderType uint8
@@ -209,7 +209,6 @@ type AlreadyClosedError struct{ orderID uint32 }
 func (e AlreadyClosedError) Error() string {
 	return fmt.Sprintf("Order#%d is already closed. Cannot cancel now.", e.orderID)
 }
-
 
 // Marks an ask as closed and removes it from asksMap
 func (ask *Ask) Close() error {

@@ -8,15 +8,15 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/thakkarparth007/dalal-street-server/matchingengine"
-	"github.com/thakkarparth007/dalal-street-server/models"
-	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/matchingengine"
+	"github.com/delta/dalal-street-server/models"
+	"github.com/delta/dalal-street-server/session"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
+	"github.com/delta/dalal-street-server/proto_build"
+	"github.com/delta/dalal-street-server/proto_build/actions"
+	"github.com/delta/dalal-street-server/proto_build/models"
 
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 var logger *logrus.Entry

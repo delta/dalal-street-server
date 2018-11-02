@@ -3,9 +3,9 @@ package matchingengine
 import (
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/models"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/datastreams"
+	"github.com/delta/dalal-street-server/models"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 // FillOrder is a type definition for a function that fills an order with given ask, bid, stockPrice and stockQty

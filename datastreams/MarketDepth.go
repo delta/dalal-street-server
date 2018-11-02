@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 // MarketDepthStream defines the interface for accessing a single stock's market depth
