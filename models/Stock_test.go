@@ -3,8 +3,8 @@ package models
 import (
 	"testing"
 
-	"github.com/thakkarparth007/dalal-street-server/utils"
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
+	"github.com/delta/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestStockToProto(t *testing.T) {
@@ -68,7 +68,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 		UpOrDown:         true,
 		AvgLastPrice:     1050,
 		PreviousDayClose: 1000,
-		UpdatedAt: retrievedStock.UpdatedAt,
+		UpdatedAt:        retrievedStock.UpdatedAt,
 	}
 	if !testutils.AssertEqual(t, stock1, retrievedStock) {
 		t.Fatalf("Expected %v but got %v", stock1, retrievedStock)

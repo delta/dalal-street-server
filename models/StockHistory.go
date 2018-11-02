@@ -5,9 +5,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
-
-	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
 )
 
 type StockHistory struct {

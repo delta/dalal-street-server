@@ -5,9 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 // NotificationsStream represents the interface for handling a notifications data stream

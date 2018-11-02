@@ -7,8 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 // StockExchangeStream interface defines the interface to interact with StockExchange stream

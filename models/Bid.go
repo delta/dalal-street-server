@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build/models"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 type Bid struct {

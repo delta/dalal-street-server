@@ -6,9 +6,9 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
 
-	"github.com/thakkarparth007/dalal-street-server/session"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/repl"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/socketapi/repl"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 var socketApiLogger *logrus.Entry

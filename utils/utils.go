@@ -50,7 +50,7 @@ func GetCurrentTimeISO8601() string {
 }
 
 func GetImageBasePath() string {
-	return os.Getenv("GOPATH") + "/src/github.com/thakkarparth007/dalal-street-server/frontend/public/src/images/news/"
+	return os.Getenv("GOPATH") + "/src/github.com/delta/dalal-street-server/frontend/public/src/images/news/"
 }
 
 func IsProdEnv() bool {

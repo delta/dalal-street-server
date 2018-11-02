@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/delta/dalal-street-server/models"
+	_ "github.com/delta/dalal-street-server/utils/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/thakkarparth007/dalal-street-server/models"
-	_ "github.com/thakkarparth007/dalal-street-server/utils/test"
 )
 
 //helper function to return an Ask object

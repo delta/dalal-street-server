@@ -7,6 +7,6 @@ RUN apt-get update && \
     vim \
     curl
 
-WORKDIR  /go/src/github.com/thakkarparth007/dalal-street-server 
+WORKDIR  /go/src/github.com/delta/dalal-street-server 
 
 CMD ["./docker-entry.sh"]

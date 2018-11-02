@@ -8,10 +8,10 @@ import (
 	"github.com/golang/mock/gomock"
 	"gopkg.in/jarcoal/httpmock.v1"
 
-	//"github.com/thakkarparth007/dalal-street-server/utils/test"
-	"github.com/thakkarparth007/dalal-street-server/models"
-	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/actions"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
+	//"github.com/delta/dalal-street-server/utils/test"
+	"github.com/delta/dalal-street-server/models"
+	actions_proto "github.com/delta/dalal-street-server/socketapi/proto_build/actions"
+	models_proto "github.com/delta/dalal-street-server/socketapi/proto_build/models"
 )
 
 func Test_Login(t *testing.T) {

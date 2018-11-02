@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/grpcapi"
-	"github.com/thakkarparth007/dalal-street-server/matchingengine"
-	"github.com/thakkarparth007/dalal-street-server/models"
-	"github.com/thakkarparth007/dalal-street-server/session"
-	"github.com/thakkarparth007/dalal-street-server/socketapi"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/datastreams"
+	"github.com/delta/dalal-street-server/grpcapi"
+	"github.com/delta/dalal-street-server/matchingengine"
+	"github.com/delta/dalal-street-server/models"
+	"github.com/delta/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/socketapi"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 func RealMain() {

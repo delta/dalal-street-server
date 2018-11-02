@@ -7,14 +7,14 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/thakkarparth007/dalal-street-server/models"
-	"github.com/thakkarparth007/dalal-street-server/session"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/datastreams"
-	actions_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/actions"
-	datastreams_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/datastreams"
-	errors_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/errors"
-	models_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build/models"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/models"
+	"github.com/delta/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/socketapi/datastreams"
+	actions_proto "github.com/delta/dalal-street-server/socketapi/proto_build/actions"
+	datastreams_proto "github.com/delta/dalal-street-server/socketapi/proto_build/datastreams"
+	errors_proto "github.com/delta/dalal-street-server/socketapi/proto_build/errors"
+	models_proto "github.com/delta/dalal-street-server/socketapi/proto_build/models"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 var logger *logrus.Entry

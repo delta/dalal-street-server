@@ -5,11 +5,10 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
-	"github.com/satori/go.uuid"
 
-	"github.com/thakkarparth007/dalal-street-server/session"
-	// socketapi_proto "github.com/thakkarparth007/dalal-street-server/socketapi/proto_build"
-	"github.com/thakkarparth007/dalal-street-server/socketapi/repl"
+	"github.com/delta/dalal-street-server/session"
+	// socketapi_proto "github.com/delta/dalal-street-server/socketapi/proto_build"
+	"github.com/delta/dalal-street-server/socketapi/repl"
 )
 
 const (

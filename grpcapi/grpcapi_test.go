@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thakkarparth007/dalal-street-server/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/models"
-	"github.com/thakkarparth007/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/datastreams"
+	"github.com/delta/dalal-street-server/models"
+	"github.com/delta/dalal-street-server/session"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -16,11 +16,9 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 
-	"github.com/thakkarparth007/dalal-street-server/proto_build"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/actions"
-	"github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-	"github.com/thakkarparth007/dalal-street-server/utils"
-	_ "github.com/thakkarparth007/dalal-street-server/utils/test"
+	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	"github.com/delta/dalal-street-server/utils"
+	_ "github.com/delta/dalal-street-server/utils/test"
 )
 
 func init() {

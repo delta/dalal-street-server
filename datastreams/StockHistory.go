@@ -2,9 +2,9 @@ package datastreams
 
 import (
 	"github.com/Sirupsen/logrus"
-	datastreams_pb "github.com/thakkarparth007/dalal-street-server/proto_build/datastreams"
-	models_pb "github.com/thakkarparth007/dalal-street-server/proto_build/models"
-	"github.com/thakkarparth007/dalal-street-server/utils"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
+	"github.com/delta/dalal-street-server/utils"
 )
 
 // StockHistoryStream interface defines the interface to interact with StockHistory stream

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/thakkarparth007/dalal-street-server/utils"
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
+	"github.com/delta/dalal-street-server/utils"
+	"github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestLeaderboardRowToProto(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thakkarparth007/dalal-street-server/utils/test"
+	"github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestStockHistoryToProto(t *testing.T) {
