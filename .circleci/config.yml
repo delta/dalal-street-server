@@ -4,8 +4,6 @@ jobs:
     working_directory: /go/src/github.com/delta/dalal-street-server
     docker:
       - image: circleci/golang:1.10
-        environment:
-          MYSQL_HOST: 127.0.0.1:3306
       - image: circleci/mysql:5.7
 
     steps:
