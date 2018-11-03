@@ -1,4 +1,5 @@
-![CircleCI build status](https://circleci.com/gh/delta/dalal-street-server.png) 
+![CircleCI build status](https://circleci.com/gh/delta/dalal-street-server.png)
+![Go Report Card](https://goreportcard.com/badge/github.com/delta/dalal-street-server)
 
 # Server for Dalal Street
 
