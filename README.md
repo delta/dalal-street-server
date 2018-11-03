@@ -1,31 +1,57 @@
-[![Build Status](https://travis-ci.com/thakkarparth007/dalal-street-server.svg?token=8v3CJzGiBxKjxGqb6pbU&branch=master)](https://travis-ci.com/thakkarparth007/dalal-street-server)
+![CircleCI build status](https://circleci.com/gh/delta/dalal-street-server.png) 
 
 # Server for Dalal Street
 
-## Setup instructions
+## Prerequisites
+- Go 1.10 [Download link](https://golang.org/dl/#go1.10)
+- Protocol buffers [Download link](https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip)
+- MySQL
 
-- You must have Go 1.7+ [installed](https://golang.org/doc/install) and [configured](https://golang.org/doc/install#testing).
-- Set your `$GOPATH` in your `.bashrc`. (Just a place where you want to keep all your Go code)
-- Append `$GOPATH/bin` to your `$PATH`. Add the line `PATH=$PATH:$GOPATH/bin` to your `.bashrc`.
-- Clone this repository.
-    - `go get github.com/delta/dalal-street-server` (**recommended**)
-    - `git clone git@github.com:delta/dalal-street-server.git` (In this case, make sure you clone the repository in `$GOPATH/src/github.com/delta`)
-- Install ***protocol buffers*** for Go. [Click here](https://github.com/golang/protobuf). Feel free to look up more about protobufs [here](https://developers.google.com/protocol-buffers/docs/gotutorial).
-- Test your installation by typing `protoc --help` in your terminal.
+## Check prerequisites
+- Check the go version installed.
 ```
-cd dalal-street-server
+go version
+```
+- Check protobuf installation.
+```
+protoc --help
+```
+
+## Build instructions
+
+- Download the repository and `cd` into it.
+```
+go get github.com/delta/dalal-street-server
+cd $GOPATH/src/github.com/delta/dalal-street-server
+```
+- Install dependencies
+```
 go get -v ./...
 go get -v github.com/gemnasium/migrate
-mysql -u root -p -e "CREATE DATABASE dalalstreet_dev"
+go get -v gopkg.in/jarcoal/httpmock.v1
+```
+- Setup submodules
+```
+git submodule init
+git submodule update --recursive
+```
+- Create databases and run migrations
+```
+mysql -u root -p -e "CREATE DATABASE dalalstreet_dev; CREATE DATABASE dalalstreet_test;"
 migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./migrations up
-git config --local status.submoduleSummary true
-git submodule update --init --recursive
-cd socketapi
+```
+- Generate proto files
+```
 ./build_proto.sh
-
 ```
 - Fill in the database credentials in the `Dev` section of **config.json**.
 - Run `go run main.go`
+
+## Tests
+- Run the test script locally before pushing commits.
+```
+./test.sh
+```
 
 ## Docker usage instructions
 - Install [docker](https://docs.docker.com/engine/installation) and [docker-compose](https://docs.docker.com/compose/install).
@@ -36,4 +62,3 @@ cd socketapi
 ```
 docker exec -it <CONTAINER_ID> bash
 ```
-
