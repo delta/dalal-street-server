@@ -9,7 +9,7 @@ import (
 )
 
 func TestTransactionToProto(t *testing.T) {
-	lr := &Transaction{
+	tr := &Transaction{
 		Id:            2,
 		UserId:        20,
 		StockId:       12,
@@ -20,9 +20,9 @@ func TestTransactionToProto(t *testing.T) {
 		CreatedAt:     "2017-02-09T00:00:00",
 	}
 
-	lr_proto := lr.ToProto()
+	trProto := tr.ToProto()
 
-	if !testutils.AssertEqual(t, lr, lr_proto) {
+	if !testutils.AssertEqual(t, tr, trProto) {
 		t.Fatal("Converted values not equal!")
 	}
 }

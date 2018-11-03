@@ -11,7 +11,7 @@ import (
 // Logger is to be used for all logging
 var Logger *logrus.Logger
 
-// initLogger initializes the logger with apropriate configuration options
+// initLogger initializes the logger with appropriate configuration options
 func initLogger(config *Config) {
 	var (
 		fileName = config.LogFileName

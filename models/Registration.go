@@ -8,7 +8,7 @@ type Registration struct {
 	UserId     uint32 `gorm:"column:userId;not null" json:"user_id"`
 	IsPragyan  bool   `gorm:"column:isPragyan;not null" json:"is_pragyan"`
 	Password   string `gorm:"column:password;not null" json:"password"`
-	Country    string `gorm:"not null" json:"password"`
+	Country    string `gorm:"not null" json:"country"`
 	IsVerified bool   `gorm:"column:isVerified;not null" json:"is_verified"`
 }
 

@@ -15,9 +15,9 @@ func TestNotificationToProto(t *testing.T) {
 		CreatedAt:   "2017-02-09T00:00:00",
 	}
 
-	o_proto := o.ToProto()
+	oProto := o.ToProto()
 
-	if !testutils.AssertEqual(t, o, o_proto) {
+	if !testutils.AssertEqual(t, o, oProto) {
 		t.Fatal("Converted value not equal")
 	}
 }

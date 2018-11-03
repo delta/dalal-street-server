@@ -1054,7 +1054,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
 
 	if err := tx.Save(stock).Error; err != nil {
-		return errorHelper("Error transfering stocks from exchange to market. Rolling back.")
+		return errorHelper("Error transferring stocks from exchange to market. Rolling back.")
 	}
 
 	l.Debugf("Transferred stocks from Exchange to Market")

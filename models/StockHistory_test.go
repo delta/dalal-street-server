@@ -19,9 +19,9 @@ func TestStockHistoryToProto(t *testing.T) {
 		Volume:    200,
 	}
 
-	o_proto := o.ToProto()
+	oProto := o.ToProto()
 
-	if !testutils.AssertEqual(t, o, o_proto) {
+	if !testutils.AssertEqual(t, o, oProto) {
 		t.Fatal("Converted value not equal")
 	}
 }
@@ -191,7 +191,7 @@ func Test_RecordOneMinuteOHLC(t *testing.T) {
 	UpdateStockPrice(1, 900)
 	UpdateStockVolume(1, 30)
 	UpdateStockVolume(1, 20)
-	err := recordOneMinuteOHLC(db, fakeTime)
+	_ = recordOneMinuteOHLC(db, fakeTime)
 
 	fakeTime1 := fakeTime.Add(time.Minute)
 	UpdateStockPrice(1, 300)
@@ -200,7 +200,7 @@ func Test_RecordOneMinuteOHLC(t *testing.T) {
 	UpdateStockPrice(2, 600)
 	UpdateStockVolume(2, 30)
 	UpdateStockVolume(2, 20)
-	err = recordOneMinuteOHLC(db, fakeTime1)
+	err := recordOneMinuteOHLC(db, fakeTime1)
 
 	if err != nil {
 		t.Fatalf("Recording one minute interval failed with the error +%v", err)

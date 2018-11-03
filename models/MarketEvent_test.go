@@ -18,9 +18,9 @@ func TestMarketEventToProto(t *testing.T) {
 		CreatedAt:    "2017-02-09T00:00:00",
 	}
 
-	o_proto := o.ToProto()
+	oProto := o.ToProto()
 
-	if !testutils.AssertEqual(t, o, o_proto) {
+	if !testutils.AssertEqual(t, o, oProto) {
 		t.Fatal("Converted value not equal")
 	}
 }
@@ -56,7 +56,7 @@ func Test_GetMarketEvents(t *testing.T) {
 		hasMore = dbHasMore
 	}
 	if count != 0 {
-		t.Fatalf("Inserted and Recovered events not equal. Added-Recieved = %v", count)
+		t.Fatalf("Inserted and Recovered events not equal. Added-Received = %v", count)
 	}
 	_, single, err := GetMarketEvents(2, 1)
 	if len(single) != 1 {

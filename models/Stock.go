@@ -310,14 +310,14 @@ func SetPreviousDayClose() (err error) {
 	for _, stockNLock := range allStocks.m {
 		stockNLock.stock.PreviousDayClose = stockNLock.stock.CurrentPrice
 		if err = tx.Save(stockNLock.stock).Error; err != nil {
-			l.Errorf("Error occured : %v", err)
+			l.Errorf("Error occurred : %v", err)
 			tx.Rollback()
 			return err
 		}
 	}
 
 	if err = tx.Commit().Error; err != nil {
-		l.Errorf("Error while commiting transaction : %v", err)
+		l.Errorf("Error while committing transaction : %v", err)
 		return err
 	}
 
@@ -352,14 +352,14 @@ func SetDayHighAndLow() (err error) {
 		stockNLock.stock.DayLow = stockNLock.stock.CurrentPrice
 
 		if err = tx.Save(stockNLock.stock).Error; err != nil {
-			l.Errorf("Error occured : %v", err)
+			l.Errorf("Error occurred : %v", err)
 			tx.Rollback()
 			return err
 		}
 	}
 
 	if err = tx.Commit().Error; err != nil {
-		l.Errorf("Error while commiting transaction : %v", err)
+		l.Errorf("Error while committing transaction : %v", err)
 		return err
 	}
 
