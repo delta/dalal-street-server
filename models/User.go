@@ -1445,7 +1445,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		MortgagePutLimitRWMutex.RLock()
 		lim := MortgagePutLimit
 		MortgagePutLimitRWMutex.RUnlock()
-		if user.Total < lim {
+		if user.Total > lim {
 			return nil, WayTooMuchCashError{}
 		}
 
