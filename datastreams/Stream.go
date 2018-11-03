@@ -15,7 +15,7 @@ type listener struct {
 	done   <-chan struct{}
 }
 
-// Init initalizes and configures the datastreams module
+// Init initializes and configures the datastreams module
 func Init(config *utils.Config) {
 	logger = utils.GetNewFileLogger("datastreams.log", 20, "debug", false).WithFields(logrus.Fields{
 		"module": "datastreams",

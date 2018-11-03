@@ -85,7 +85,7 @@ func (c *client) ReadPump() {
 		msgType, bytes, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				l.Errorf("Error in receving from websocket: '%v'.\nClient: %+v", err, c)
+				l.Errorf("Error in receiving from websocket: '%v'.\nClient: %+v", err, c)
 			}
 			break
 		}

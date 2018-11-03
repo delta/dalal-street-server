@@ -20,9 +20,9 @@ func TestLeaderboardRowToProto(t *testing.T) {
 		TotalWorth: -300,
 	}
 
-	lr_proto := lr.ToProto()
+	lrProto := lr.ToProto()
 
-	if !testutils.AssertEqual(t, lr, lr_proto) {
+	if !testutils.AssertEqual(t, lr, lrProto) {
 		t.Fatal("Converted values not equal!")
 	}
 }

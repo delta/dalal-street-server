@@ -13,9 +13,9 @@ func TestOrderFillToProto(t *testing.T) {
 		AskId:         345,
 	}
 
-	o_proto := o.ToProto()
+	oProto := o.ToProto()
 
-	if !testutils.AssertEqual(t, o, o_proto) {
+	if !testutils.AssertEqual(t, o, oProto) {
 		t.Fatal("Converted value not equal")
 	}
 }

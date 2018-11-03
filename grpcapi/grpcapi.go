@@ -160,7 +160,7 @@ func streamAuthInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc
 	return handler(srv, wrapped)
 }
 
-// Init configures and initalizes the grpcapi package
+// Init configures and initializes the grpcapi package
 func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm datastreams.Manager) {
 	config = conf
 	logger = utils.Logger.WithFields(logrus.Fields{

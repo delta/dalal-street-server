@@ -45,7 +45,7 @@ func Test_Login(t *testing.T) {
 	}
 
 	//The email should be Registrationed with the previous login attempt
-	u, err = Login("test@testmail.com", "password")
+	u, _ = Login("test@testmail.com", "password")
 
 	if reflect.DeepEqual(u, exU) != true {
 		t.Fatalf("Expected Login to return %+v, instead, got %+v", exU, u)
@@ -123,10 +123,10 @@ func TestUserToProto(t *testing.T) {
 		IsHuman:   true,
 	}
 
-	o_proto := o.ToProto()
+	oProto := o.ToProto()
 
-	if !testutils.AssertEqual(t, o, o_proto) {
-		t.Fatalf("Converted values not equal!+%v,+%v", o, o_proto)
+	if !testutils.AssertEqual(t, o, oProto) {
+		t.Fatalf("Converted values not equal!+%v,+%v", o, oProto)
 	}
 
 }
