@@ -47,6 +47,7 @@ migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./mi
 ```
 ./build_proto.sh
 ```
+- Run `cp config.json.example config.json`
 - Fill in the database credentials in the `Dev` section of **config.json**.
 - Run `go run main.go`
 

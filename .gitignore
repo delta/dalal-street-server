@@ -40,3 +40,6 @@ protoc-3.2.0rc2-linux-x86_64.zip*
 protobuf/
 
 tls_keys/prod/*
+
+# config.json contains database credentials
+config.json
