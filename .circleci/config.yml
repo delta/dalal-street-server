@@ -49,4 +49,5 @@ jobs:
           name: Run unit and integration tests
           command: |
             go get ./...
+            cp config.json.example config.json
             ./test.sh
