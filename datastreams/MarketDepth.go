@@ -77,7 +77,7 @@ func newMarketDepthStream(stockId uint32) MarketDepthStream {
 	return mds
 }
 
-// run runs the marketDepthStream by updating the listeners ever 15 seconds
+// run runs the marketDepthStream by updating the listeners ever 2 seconds
 func (mds *marketDepthStream) run() {
 	var l = mds.logger.WithFields(logrus.Fields{
 		"method": "run",
@@ -93,7 +93,7 @@ func (mds *marketDepthStream) run() {
 
 	for {
 		if mds.broadcastStream.GetListenersCount() == 0 {
-			l.Debugf("No listeners. Sleeping for 15 seconds")
+			l.Debugf("No listeners. Sleeping for 2 seconds")
 			time.Sleep(time.Second * 2)
 			continue
 		}
@@ -130,13 +130,13 @@ func (mds *marketDepthStream) run() {
 		mds.latestTradesLock.Unlock()
 
 		if !shouldSend {
-			l.Debugf("No update to send. Sleeping for 15 seconds")
+			l.Debugf("No update to send. Sleeping for 2 seconds")
 			time.Sleep(time.Second * 2)
 			continue
 		}
 
 		mds.broadcastStream.BroadcastUpdate(mdUpdate)
-		l.Debugf("Sent %+v to %d listeners! Sleeping for 15 seconds", mdUpdate, mds.broadcastStream.GetListenersCount())
+		l.Debugf("Sent %+v to %d listeners! Sleeping for 2 seconds", mdUpdate, mds.broadcastStream.GetListenersCount())
 		time.Sleep(time.Second * 2)
 	}
 }
