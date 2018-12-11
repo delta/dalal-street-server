@@ -24,7 +24,12 @@ func isOrderMatching(askTop *models.Ask, bidTop *models.Bid) bool {
 
 /*
  * getTradePriceAndQty returns the trade price and quantity for a particular match of orders
- */
+ To determine quantity : qty = min(bidUnfulfilledStockQuantity, askUnfulfilledStockQuantity)
+ To determine price :
+ 1. If both ask and bid are market orders, trade price is the current market price
+ 2. If one of them is market but other is limit, trade price is the price of the limit order
+ 3. If neither are market, trade price is the price of the order that was placed first
+*/
 func getTradePriceAndQty(ask *models.Ask, bid *models.Bid) (uint32, uint32) {
 	var bidUnfulfilledStockQuantity = bid.StockQuantity - bid.StockQuantityFulfilled
 	var askUnfulfilledStockQuantity = ask.StockQuantity - ask.StockQuantityFulfilled
