@@ -70,7 +70,7 @@ func (ob *orderBook) addAskToDepth(ask *models.Ask) {
 
 // addBidToDepth adds a bid to the depth.
 // NOTE: 1. Only adds unfulfilled qty
-//		 2. It uses ask.StockQuantityFulfilled which gets written to by fillOrderFn, but this
+//		 2. It uses bid.StockQuantityFulfilled which gets written to by fillOrderFn, but this
 //			function doesn't run concurrently with fillOrderFn
 func (ob *orderBook) addBidToDepth(bid *models.Bid) {
 	// use unfulfilled qty here, because depth should have only the unfulfilled qty
@@ -327,6 +327,7 @@ func (ob *orderBook) processAsk(ask *models.Ask) {
 			return
 		}
 
+		// If ask has not been completely fulfilled, find the next top matching bid and repeat
 		matchingBid, addBackOrders = ob.getTopMatchingBid(ask)
 	}
 
@@ -385,6 +386,8 @@ func (ob *orderBook) processBid(bid *models.Bid) {
 			// and if the ask was fulfilled, it has been popped above already.
 			return
 		}
+
+		// If bid has not been completely fulfilled, find the next top matching ask and repeat
 		matchingAsk, addBackOrders = ob.getTopMatchingAsk(bid)
 	}
 
@@ -405,7 +408,7 @@ func (ob *orderBook) processBid(bid *models.Bid) {
 //       3. It returns two booleans: askDone, bidDone. Each is true if the ask/bid order has been
 //     		closed and is safe to remove it from the queue.
 //		 4. The *CALLER* is responsible for dealing with the queue (adding/removing)
-//			[except for triggerStoploss]
+//			[except for triggerStoploss], as makeTrade only deals with the market depth datastream
 //		 5. If transaction happens:
 //			a). A new trade is added to the depth.
 //		 	b). Stoplossess get triggered
@@ -451,7 +454,7 @@ func (ob *orderBook) makeTrade(ask *models.Ask, bid *models.Bid, incomingAsk boo
 	askStatus, bidStatus, tr := fillOrderFn(ask, bid, stockTradePrice, stockTradeQty)
 
 	if tr != nil {
-		l.Infof("Trade made between ask_id %d and bid %d at price %d", ask.Id, bid.Id, tr.Price)
+		l.Infof("Trade made between ask_id %d and bid_id %d at price %d", ask.Id, bid.Id, tr.Price)
 		// tr is always AskTransaction. So its StockQty < 0. Make it positive.
 		ob.depth.AddTrade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
 

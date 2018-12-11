@@ -9,6 +9,7 @@ import (
 // PQType represents a priority queue ordering kind (see MAXPQ and MINPQ)
 type PQType int
 
+// Constants to determine whether to create Max Priority Queue or Min Priority Queue
 const (
 	MAXPQ PQType = iota
 	MINPQ
@@ -26,9 +27,8 @@ type askItem struct {
 	quantity uint32
 }
 
-// PQueue is a heap priority queue data structure implementation.
-// It can be whether max or min ordered and it is synchronized
-// and is safe for concurrent operations.
+// BidPQueue is a heap priority queue data structure implementation for Bids.
+// It can be max or min ordered. It is synchronized and is safe for concurrent operations.
 type BidPQueue struct {
 	sync.RWMutex
 	items      []*bidItem
@@ -36,6 +36,8 @@ type BidPQueue struct {
 	comparator func(factors, factors) bool
 }
 
+// AskPQueue is a heap priority queue data structure implementation for Asks.
+// It can be max or min ordered. It is synchronized and is safe for concurrent operations.
 type AskPQueue struct {
 	sync.RWMutex
 	items      []*askItem
@@ -66,12 +68,8 @@ func newAskItem(value *models.Ask, price uint32, quantity uint32) *askItem {
 	}
 }
 
-//func (i *item) String() string {
-//	return fmt.Sprintf("<item value:%s price:%d quantity:%d>", i.value, i.price, i.quantity)
-//}
-
-// NewPQueue creates a new priority queue with the provided pqtype
-// ordering type
+// NewBidPQueue creates a new priority queue with the ordering type specified by PQType
+// and comprises of Bid items
 func NewBidPQueue(pqType PQType) *BidPQueue {
 	var cmp func(factors, factors) bool
 
@@ -91,6 +89,8 @@ func NewBidPQueue(pqType PQType) *BidPQueue {
 	}
 }
 
+// NewAskPQueue creates a new priority queue with the ordering type specified by PQType
+// and comprises of Ask items
 func NewAskPQueue(pqType PQType) *AskPQueue {
 	var cmp func(factors, factors) bool
 
@@ -116,17 +116,18 @@ func (pq *BidPQueue) Push(value *models.Bid) {
 
 	pq.Lock()
 	pq.items = append(pq.items, item)
-	pq.elemsCount += 1
+	pq.elemsCount++
 	pq.swim(pq.size())
 	pq.Unlock()
 }
 
+// Push the value item into the priority queue with provided priority.
 func (pq *AskPQueue) Push(value *models.Ask) {
 	item := newAskItem(value, value.Price, value.StockQuantity)
 
 	pq.Lock()
 	pq.items = append(pq.items, item)
-	pq.elemsCount += 1
+	pq.elemsCount++
 	pq.swim(pq.size())
 	pq.Unlock()
 }
@@ -141,16 +142,18 @@ func (pq *BidPQueue) Pop() *models.Bid {
 		return nil
 	}
 
-	var max *bidItem = pq.items[1]
+	max := pq.items[1]
 
 	pq.exch(1, pq.size())
 	pq.items = pq.items[0:pq.size()]
-	pq.elemsCount -= 1
+	pq.elemsCount--
 	pq.sink(1)
 
 	return max.value
 }
 
+// Pop and returns the highest/lowest priority item (depending on whether
+// you're using a MINPQ or MAXPQ) from the priority queue
 func (pq *AskPQueue) Pop() *models.Ask {
 	pq.Lock()
 	defer pq.Unlock()
@@ -159,11 +162,11 @@ func (pq *AskPQueue) Pop() *models.Ask {
 		return nil
 	}
 
-	var max *askItem = pq.items[1]
+	max := pq.items[1]
 
 	pq.exch(1, pq.size())
 	pq.items = pq.items[0:pq.size()]
-	pq.elemsCount -= 1
+	pq.elemsCount--
 	pq.sink(1)
 
 	return max.value
@@ -184,6 +187,8 @@ func (pq *BidPQueue) Head() *models.Bid {
 	return headValue
 }
 
+// Head returns the highest/lowest priority item (depending on whether
+// you're using a MINPQ or MAXPQ) from the priority queue
 func (pq *AskPQueue) Head() *models.Ask {
 	pq.RLock()
 	defer pq.RUnlock()
@@ -197,24 +202,28 @@ func (pq *AskPQueue) Head() *models.Ask {
 	return headValue
 }
 
-// Size returns the elements present in the priority queue count
+// Size returns the number of elements present in the priority queue
 func (pq *BidPQueue) Size() int {
 	pq.RLock()
 	defer pq.RUnlock()
 	return pq.size()
 }
+
+// Size returns the number of elements present in the priority queue
 func (pq *AskPQueue) Size() int {
 	pq.RLock()
 	defer pq.RUnlock()
 	return pq.size()
 }
 
-// Check queue is empty
+// Empty checks if queue is empty
 func (pq *BidPQueue) Empty() bool {
 	pq.RLock()
 	defer pq.RUnlock()
 	return pq.size() == 0
 }
+
+// Empty checks if queue is empty
 func (pq *AskPQueue) Empty() bool {
 	pq.RLock()
 	defer pq.RUnlock()
@@ -224,6 +233,7 @@ func (pq *AskPQueue) Empty() bool {
 func (pq *BidPQueue) size() int {
 	return pq.elemsCount
 }
+
 func (pq *AskPQueue) size() int {
 	return pq.elemsCount
 }
@@ -310,13 +320,14 @@ func (pq *AskPQueue) less(i, j int) bool {
 }
 
 func (pq *BidPQueue) exch(i, j int) {
-	var tmpItem *bidItem = pq.items[i]
+	tmpItem := pq.items[i]
 
 	pq.items[i] = pq.items[j]
 	pq.items[j] = tmpItem
 }
+
 func (pq *AskPQueue) exch(i, j int) {
-	var tmpItem *askItem = pq.items[i]
+	tmpItem := pq.items[i]
 
 	pq.items[i] = pq.items[j]
 	pq.items[j] = tmpItem
@@ -339,7 +350,7 @@ func (pq *AskPQueue) swim(k int) {
 
 func (pq *BidPQueue) sink(k int) {
 	for 2*k <= pq.size() {
-		var j int = 2 * k
+		j := 2 * k
 
 		if j < pq.size() && pq.less(j, j+1) {
 			j++
@@ -355,7 +366,7 @@ func (pq *BidPQueue) sink(k int) {
 }
 func (pq *AskPQueue) sink(k int) {
 	for 2*k <= pq.size() {
-		var j int = 2 * k
+		j := 2 * k
 
 		if j < pq.size() && pq.less(j, j+1) {
 			j++
