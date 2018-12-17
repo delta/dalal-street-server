@@ -12,12 +12,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/delta/dalal-street-server/proto_build/models"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 )
 
 var (
@@ -1414,27 +1414,18 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 	l.Infof("Taking current price of stock as %d", mortgagePrice)
 
-	var rate int32
-
-	if stockQuantity >= 0 {
-		rate = MORTGAGE_RETRIEVE_RATE
-		l.Debugf("stockQuantity positive. Retrieving stocks from mortgage @ %d%%", rate)
-
+	if stockQuantity >= 0 /* Retrieve stocks action*/ {
 		db := getDB()
 
-		stockCount := struct{ Sc int64 }{0}
-		sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=? and Type=?"
-		err = db.Raw(sql, user.Id, stockId, MortgageTransaction.String()).Scan(&stockCount).Error
+		stockCount := struct{ Sc int32 }{0}
+		sql := "Select sum(stocksInBank) as sc from MortgageDetails where UserId=? and StockId=?"
+		err = db.Raw(sql, user.Id, stockId).Scan(&stockCount).Error
 		if err != nil {
 			l.Error(err)
 			return nil, err
 		}
 
-		// Sc will be negative if stocks are there in mortgage.
-		// Change sign to mean number of stocks in mortgage
-		stockCount.Sc *= -1
-
-		l.Infof("%d stocks mortgaged currently", stockCount.Sc)
+		l.Debugf("%d stocks mortgaged currently", stockCount.Sc)
 
 		if stockQuantity > stockCount.Sc {
 			l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stockCount.Sc, stockQuantity)
@@ -1446,29 +1437,106 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		lim := int64(MortgagePutLimit)
 		MortgagePutLimitRWMutex.RUnlock()
 		if user.Total > lim {
-			return nil, WayTooMuchCashError{}
+			// TODO (remove this) : return nil, WayTooMuchCashError{}
 		}
 
-		rate = MORTGAGE_DEPOSIT_RATE
-		l.Debugf("stockQuantity negative. Depositing stocks to mortgage @ %d%%", rate)
+		// stockOwned, err := getSingleStockCount(user, stockId)
+		// if err != nil {
+		// 	l.Error(err)
+		// 	return nil, err
+		// }
 
-		stockOwned, err := getSingleStockCount(user, stockId)
+		// if stockOwned < -stockQuantity {
+		// 	l.Errorf("Insufficient stocks in ownership. Have %d, want %d", stockOwned, stockQuantity)
+		// 	return nil, NotEnoughStocksError{}
+		// }
+	}
+
+	var trTotal int32
+
+	/* It is retrive action; This block will set correct trTotal and stockQuantity equal
+	to amount of stocks that could be retrieved; This block also modifies MortgageDetails
+	table, btw this table is not used anywhere except in current function */
+
+	type MortgageStocksData struct {
+		id           int32
+		stocksInBank int32
+		price        int32
+	}
+
+	if stockQuantity >= 0 {
+
+		db := getDB()
+		var results []MortgageStocksData
+
+		sql := "SELECT id, stocksInBank, mortgagePrice from MortgageDetails where userId=? AND stockId=? ORDER BY mortgagePrice"
+		err = db.Exec(sql, user.Id, stockId).Scan(&results).Error
 		if err != nil {
 			l.Error(err)
 			return nil, err
 		}
 
-		if stockOwned < -stockQuantity {
-			l.Errorf("Insufficient stocks in ownership. Have %d, want %d", stockOwned, stockQuantity)
-			return nil, NotEnoughStocksError{}
-		}
-	}
+		l.Debugf("Got data from MortgageDetails table")
 
-	trTotal := -int64(mortgagePrice) * stockQuantity * int64(rate) / 100
-	l.Infof("lalalalalalalala %d %d %d", trTotal, stockQuantity, int64(rate/100))
-	if int64(user.Cash)+trTotal < 0 {
-		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", trTotal, user.Cash)
-		return nil, NotEnoughCashError{}
+		// tempStockQuantity is stock quantity left to retrieve
+		tempStockQuantity := stockQuantity
+		tempUserCash := int32(user.Cash)
+		var maxStocksRetrieval int32
+
+		for _, currentData := range results {
+
+			maxStocksRetrieval = tempUserCash / currentData.price
+
+			if maxStocksRetrieval == 0 || tempStockQuantity == 0 {
+				stockQuantity -= tempStockQuantity // Amount of stocks retrieved till now
+				break
+			}
+
+			if maxStocksRetrieval > currentData.stocksInBank {
+				maxStocksRetrieval = currentData.stocksInBank
+			}
+
+			if maxStocksRetrieval > tempStockQuantity { // We don't want to retrieve more than required
+				maxStocksRetrieval = tempStockQuantity
+			}
+
+			expense := -int32(currentData.price) * int32(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
+			trTotal += expense
+
+			if maxStocksRetrieval < currentData.stocksInBank {
+				sql := "UPDATE MortgageDetails SET stocksInBank=? where id=?"
+				err = db.Exec(sql, currentData.stocksInBank-maxStocksRetrieval, currentData.id).Error
+				if err != nil {
+					l.Error(err)
+					return nil, err
+				}
+			} else /* So we can delete that entire row */ {
+				sql := "DELETE from MortgageDetails WHERE id=?"
+				err = db.Exec(sql, currentData.id).Error
+				if err != nil {
+					l.Error(err)
+					return nil, err
+				}
+			}
+
+			tempStockQuantity -= maxStocksRetrieval
+			tempUserCash -= expense
+		}
+
+	} else /* Inserting into MortgageDetails table to get mortgage price later while retriving */ {
+
+		db := getDB()
+
+		sql := "INSERT into MortgageDetails (userId, stockId, stocksInBank, mortgagePrice) VALUES (?, ?, ?, ?)"
+
+		// Here mortgage price is last average price, refer line 1412 above
+		err = db.Exec(sql, user.Id, stockId, -stockQuantity, mortgagePrice).Error
+		if err != nil {
+			l.Error(err)
+			return nil, err
+		}
+
+		trTotal = -int32(mortgagePrice) * stockQuantity * MORTGAGE_DEPOSIT_RATE / 100
 	}
 
 	transaction := &Transaction{
