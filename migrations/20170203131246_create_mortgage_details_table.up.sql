@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS MortgageDetails (
 	userId int(11) UNSIGNED NOT NULL,
 	stockId int(11) UNSIGNED NOT NULL,
 	stocksInBank int(11) UNSIGNED NOT NULL,
+	mortgagePrice int(11) UNSIGNED NOT NULL,
 	FOREIGN KEY (stockId) REFERENCES Stocks(id),
 	FOREIGN KEY (userId) REFERENCES Users(id),
 	PRIMARY KEY (id)
