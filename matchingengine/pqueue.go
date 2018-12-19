@@ -6,6 +6,9 @@ import (
 	"github.com/delta/dalal-street-server/models"
 )
 
+// DO NOT DELETE THIS COMMENT : It is required to generate mocks when running "go generate ./..."
+//go:generate mockgen -source pqueue.go -destination ../mocks/mock_pqueue.go -package mocks
+
 // BidPQueue provides a heap priority queue data structure for Bids.
 // It can be max or min ordered. It is synchronized and is safe for concurrent operations.
 type BidPQueue interface {
