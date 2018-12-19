@@ -33,10 +33,10 @@ type orderBook struct {
 	stockId     uint32
 	askChan     chan *models.Ask
 	bidChan     chan *models.Bid
-	asks        *AskPQueue
-	bids        *BidPQueue
-	askStoploss *AskPQueue
-	bidStoploss *BidPQueue
+	asks        AskPQueue
+	bids        BidPQueue
+	askStoploss AskPQueue
+	bidStoploss BidPQueue
 	depth       datastreams.MarketDepthStream
 }
 

@@ -34,8 +34,22 @@ func makeBid(userId uint32, stockId uint32, ot models.OrderType, stockQty uint32
 	}
 }
 
+//newBidPQueueImpl returns instances of bidPQueue meant for testing purposes
+func newBidPQueueImpl(pqType PQType) *bidPQueue {
+	pqueueInterface := NewBidPQueue(pqType)
+	pQueueImpl := pqueueInterface.(*bidPQueue)
+	return pQueueImpl
+}
+
+//newAskPQueueImpl returns instances of askPQueue meant for testing purposes
+func newAskPQueueImpl(pqType PQType) *askPQueue {
+	pqueueInterface := NewAskPQueue(pqType)
+	pQueueImpl := pqueueInterface.(*askPQueue)
+	return pQueueImpl
+}
+
 func TestBidPQueue_init(t *testing.T) {
-	pqueue := NewBidPQueue(MAXPQ)
+	pqueue := newBidPQueueImpl(MAXPQ)
 
 	assert.Equal(
 		t,
@@ -57,7 +71,7 @@ func TestBidPQueue_init(t *testing.T) {
 }
 
 func TestAskPQueue_init(t *testing.T) {
-	pqueue := NewAskPQueue(MINPQ)
+	pqueue := newAskPQueueImpl(MINPQ)
 
 	assert.Equal(
 		t,
@@ -118,7 +132,7 @@ func TestBidPQueuePushAndPop_protects_max_order(t *testing.T) {
 func TestBidPQueuePushAndPop_concurrently_protects_max_order(t *testing.T) {
 	var wg sync.WaitGroup
 
-	pqueue := NewBidPQueue(MAXPQ)
+	pqueue := newBidPQueueImpl(MAXPQ)
 
 	testcases := []struct {
 		bid *models.Bid
@@ -163,7 +177,7 @@ func TestBidPQueuePushAndPop_concurrently_protects_max_order(t *testing.T) {
 }
 
 func TestAskPQueuePushAndPop_protects_min_order(t *testing.T) {
-	pqueue := NewAskPQueue(MINPQ)
+	pqueue := newAskPQueueImpl(MINPQ)
 
 	testcases := []struct {
 		ask *models.Ask
@@ -203,7 +217,7 @@ func TestAskPQueuePushAndPop_protects_min_order(t *testing.T) {
 func TestAskPQueuePushAndPop_concurrently_protects_min_order(t *testing.T) {
 	var wg sync.WaitGroup
 
-	pqueue := NewAskPQueue(MINPQ)
+	pqueue := newAskPQueueImpl(MINPQ)
 
 	testcases := []struct {
 		ask *models.Ask
@@ -247,7 +261,7 @@ func TestAskPQueuePushAndPop_concurrently_protects_min_order(t *testing.T) {
 }
 
 func TestBidPQueueHead_returns_max_element(t *testing.T) {
-	pqueue := NewBidPQueue(MAXPQ)
+	pqueue := newBidPQueueImpl(MAXPQ)
 
 	pqueue.Push(makeBid(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"))
 	pqueue.Push(makeBid(2, 1, models.Limit, 11, 400, "2017-12-29T02:00:00Z"))
@@ -263,7 +277,7 @@ func TestBidPQueueHead_returns_max_element(t *testing.T) {
 }
 
 func TestAskPQueueHead_returns_min_element(t *testing.T) {
-	pqueue := NewAskPQueue(MINPQ)
+	pqueue := newAskPQueueImpl(MINPQ)
 
 	pqueue.Push(makeAsk(2, 1, models.Limit, 5, 100, "2017-12-29T01:00:00Z"))
 	pqueue.Push(makeAsk(2, 1, models.Limit, 11, 400, "2017-12-29T02:00:00Z"))
