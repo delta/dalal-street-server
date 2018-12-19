@@ -10,6 +10,9 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
+// DO NOT DELETE THIS COMMENT : It is required to generate mocks when running "go generate ./..."
+//go:generate mockgen -source MarketDepth.go -destination ../mocks/mock_MarketDepth.go -package mocks
+
 // MarketDepthStream defines the interface for accessing a single stock's market depth
 type MarketDepthStream interface {
 	AddListener(done <-chan struct{}, updates chan interface{}, sessionId string)
