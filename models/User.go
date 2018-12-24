@@ -747,7 +747,19 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return 0, NotEnoughStocksError{currentAllowedQty}
 	}
 
-	l.Debugf("Check2: Passed. Creating Ask.")
+	l.Debugf("Check2: Passed.")
+
+	var orderFee = uint32((ORDER_FEE_PERCENT / 100.0) * float32(ask.StockQuantity*ask.Price))
+	var cashLeft = uint32(user.Cash) - orderFee
+
+	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
+
+	if cashLeft < MINIMUM_CASH_LIMIT {
+		l.Debugf("Check3: Failed. Not enough cash.")
+		return 0, NotEnoughCashError{}
+	}
+
+	l.Debugf("Check3: Passed. Creating Ask.")
 
 	if err := createAsk(ask); err != nil {
 		l.Errorf("Error creating the ask %+v", err)
@@ -755,6 +767,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	}
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
+
+	user.Cash = cashLeft
+
+	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(ask *Ask) {
@@ -841,7 +857,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Debugf("Check1: Passed.")
 
 	// Second Check: User should have enough cash
-	var cashLeft = int64(user.Cash) - int64(bid.StockQuantity*bid.Price)
+	var orderFee = uint64((ORDER_FEE_PERCENT / 100.0) * float64(bid.StockQuantity*bid.Price))
+	var cashLeft = int64(user.Cash) - int64(bid.StockQuantity*bid.Price+orderFee)
 
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
@@ -858,6 +875,9 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	}
 
 	l.Infof("Created Bid order. BidId: %d", bid.Id)
+
+	user.Cash = user.Cash - orderFee
+	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(bid *Bid) {

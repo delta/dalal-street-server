@@ -280,6 +280,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 		{makeBid(2, 1, Limit, 3, 200), true},
 		{makeBid(2, 1, Limit, 11, 200), false},
 		{makeBid(2, 1, Limit, 11, 2000), false}, // too high a price won't be allowed
+		{makeBid(2, 1, Limit, 10, 200), false},  // with transaction fee, cash wont be enough
 		{makeBid(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
@@ -341,6 +342,11 @@ func Test_PlaceBidOrder(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	tid, terr := PlaceBidOrder(2, testcases[len(testcases)-2].bid)
+	if terr == nil {
+		t.Fatalf("Did not expect success. Failing %+v %+v", tid, terr)
+	}
 
 	id, err := PlaceBidOrder(2, testcases[len(testcases)-1].bid)
 	if err == nil {
