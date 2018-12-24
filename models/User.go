@@ -673,7 +673,7 @@ func GetUserCopy(id uint32) (User, error) {
 //  3. NotEnoughStocksError is returned
 //  4. Other error is returned (e.g. if Database connection doesn't open)
 func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
-	var l = logger.WithFields(logrus.Fields{
+	l := logger.WithFields(logrus.Fields{
 		"method":       "PlaceAskOrder",
 		"param_userId": userId,
 		"param_ask":    fmt.Sprintf("%+v", ask),
@@ -749,8 +749,8 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Check2: Passed.")
 
-	var orderFee = uint32((ORDER_FEE_PERCENT / 100.0) * float32(ask.StockQuantity*ask.Price))
-	var cashLeft = uint32(user.Cash) - orderFee
+	orderFee := uint32((ORDER_FEE_PERCENT / 100.0) * float32(ask.StockQuantity*ask.Price))
+	cashLeft := uint32(user.Cash) - orderFee
 
 	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
@@ -801,7 +801,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 //  3. NotEnoughCashError is returned
 //  4. Other error is returned (e.g. if Database connection doesn't open)
 func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
-	var l = logger.WithFields(logrus.Fields{
+	l := logger.WithFields(logrus.Fields{
 		"method":    "PlaceBidOrder",
 		"param_id":  userId,
 		"param_bid": fmt.Sprintf("%+v", bid),
