@@ -231,8 +231,27 @@ func TestLoadOldTransactions(t *testing.T) {
 		depth:       mockDepth,
 	}
 
-	t1 := makeTransaction(1, 10, stockID, 1, 20, 50, 1000, "random1")
-	t2 := makeTransaction(2, 10, stockID, 2, 10, 20, 200, "random2")
+	t1 := &models.Transaction{
+		Id:            1,
+		UserId:        10,
+		StockId:       stockID,
+		Type:          1,
+		StockQuantity: 20,
+		Price:         50,
+		Total:         1000,
+		CreatedAt:     "random1",
+	}
+
+	t2 := &models.Transaction{
+		Id:            2,
+		UserId:        10,
+		StockId:       stockID,
+		Type:          2,
+		StockQuantity: 10,
+		Price:         20,
+		Total:         200,
+		CreatedAt:     "random2",
+	}
 
 	transactions := []*models.Transaction{t1, t2}
 
