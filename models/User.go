@@ -750,7 +750,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	l.Debugf("Check2: Passed.")
 
 	orderFee := uint32((ORDER_FEE_PERCENT / 100.0) * float32(ask.StockQuantity*ask.Price))
-	cashLeft := uint32(user.Cash) - orderFee
+	cashLeft := int32(user.Cash) - int32(orderFee)
 
 	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
@@ -768,7 +768,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
 
-	user.Cash = cashLeft
+	user.Cash = user.Cash - orderFee
 
 	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
 
@@ -877,7 +877,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Infof("Created Bid order. BidId: %d", bid.Id)
 
 	user.Cash = user.Cash - orderFee
-	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
+	l.Debugf("Deducted order fee from user's account. New balance: %d", user.Cash)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(bid *Bid) {
