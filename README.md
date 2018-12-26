@@ -66,3 +66,20 @@ migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./mi
 ```
 docker exec -it <CONTAINER_ID> bash
 ```
+## GoMock usage instructions
+- To generate mock for a file using mockgen, place this comment after import statement
+```
+ //go:generate mockgen -source {YOUR_FILE_NAME}.go -destination ../mocks/{YOUR_FILE_NAME}.go -package mocks
+```
+- To generate mocks for all packages that has above comment
+
+```
+go generate ./...
+
+```
+
+- To manually generate a mock package
+```
+mockgen -destination=mocks/{YOUR_FILE_NAME}.go -package=mocks {PATH_TO_YOUR_FILE}
+
+```
