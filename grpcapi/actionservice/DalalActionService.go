@@ -391,7 +391,7 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 
 	userId := getUserId(ctx)
 	stockId := req.StockId
-	stockQty := -int32(req.StockQuantity)
+	stockQty := -int64(req.StockQuantity)
 
 	transaction, err := models.PerformMortgageTransaction(userId, stockId, stockQty)
 
@@ -508,7 +508,7 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 
 	userId := getUserId(ctx)
 	stockId := req.StockId
-	stockQty := int32(req.StockQuantity)
+	stockQty := int64(req.StockQuantity)
 
 	transaction, err := models.PerformMortgageTransaction(userId, stockId, stockQty)
 
@@ -824,9 +824,9 @@ func (d *dalalActionService) GetMortgageDetails(ctx context.Context, req *action
 		return resp, nil
 	}
 
-	resp.MortgageMap = make(map[uint32]uint32)
+	resp.MortgageMap = make(map[uint32]uint64)
 	for _, mortgageDetails := range mortgages {
-		resp.MortgageMap[mortgageDetails.StockId] = uint32(-mortgageDetails.StocksInBank)
+		resp.MortgageMap[mortgageDetails.StockId] = uint64(-mortgageDetails.StocksInBank)
 	}
 
 	l.Infof("Request completed successfully")

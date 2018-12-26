@@ -18,15 +18,15 @@ type MarketDepthStream interface {
 	AddListener(done <-chan struct{}, updates chan interface{}, sessionId string)
 	RemoveListener(sessionId string)
 
-	AddOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32)
-	AddTrade(price, qty uint32, createdAt string)
-	CloseOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) // To be called after trades as well
+	AddOrder(isMarket bool, isAsk bool, price uint64, stockQuantity uint64)
+	AddTrade(price uint64, qty uint64, createdAt string)
+	CloseOrder(isMarket bool, isAsk bool, price uint64, stockQuantity uint64) // To be called after trades as well
 }
 
 // trade represents a single trade for a given stock
 type trade struct {
-	tradeQuantity uint32
-	tradePrice    uint32
+	tradeQuantity uint64
+	tradePrice    uint64
 	tradeTime     string
 }
 
@@ -46,12 +46,12 @@ type marketDepthStream struct {
 	stockId uint32
 
 	askDepthLock sync.Mutex
-	askDepth     map[uint32]uint32
-	askDepthDiff map[uint32]int32
+	askDepth     map[uint64]uint64
+	askDepthDiff map[uint64]int64
 
 	bidDepthLock sync.Mutex
-	bidDepth     map[uint32]uint32
-	bidDepthDiff map[uint32]int32
+	bidDepth     map[uint64]uint64
+	bidDepthDiff map[uint64]int64
 
 	latestTradesLock sync.Mutex
 	latestTrades     []*trade
@@ -68,10 +68,10 @@ func newMarketDepthStream(stockId uint32) MarketDepthStream {
 			"param_stockId": stockId,
 		}),
 		stockId:      stockId,
-		askDepth:     make(map[uint32]uint32),
-		askDepthDiff: make(map[uint32]int32),
-		bidDepth:     make(map[uint32]uint32),
-		bidDepthDiff: make(map[uint32]int32),
+		askDepth:     make(map[uint64]uint64),
+		askDepthDiff: make(map[uint64]int64),
+		bidDepth:     make(map[uint64]uint64),
+		bidDepthDiff: make(map[uint64]int64),
 
 		broadcastStream: NewBroadcastStream(),
 	}
@@ -109,7 +109,7 @@ func (mds *marketDepthStream) run() {
 		mds.askDepthLock.Lock()
 		if len(mds.askDepthDiff) != 0 {
 			mdUpdate.AskDepthDiff = mds.askDepthDiff
-			mds.askDepthDiff = make(map[uint32]int32)
+			mds.askDepthDiff = make(map[uint64]int64)
 			shouldSend = true
 		}
 		mds.askDepthLock.Unlock()
@@ -117,7 +117,7 @@ func (mds *marketDepthStream) run() {
 		mds.bidDepthLock.Lock()
 		if len(mds.bidDepthDiff) != 0 {
 			mdUpdate.BidDepthDiff = mds.bidDepthDiff
-			mds.bidDepthDiff = make(map[uint32]int32)
+			mds.bidDepthDiff = make(map[uint64]int64)
 			shouldSend = true
 		}
 		mds.bidDepthLock.Unlock()
@@ -199,7 +199,7 @@ func (mds *marketDepthStream) RemoveListener(sessionId string) {
 }
 
 // AddOrder adds an order to a marketdepth stream
-func (mds *marketDepthStream) AddOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
+func (mds *marketDepthStream) AddOrder(isMarket bool, isAsk bool, price uint64, stockQuantity uint64) {
 	// Do not add Market orders to depth
 	if isMarket {
 		price = 0 // special value for market orders
@@ -218,7 +218,7 @@ func (mds *marketDepthStream) AddOrder(isMarket bool, isAsk bool, price uint32, 
 	if isAsk {
 		mds.askDepthLock.Lock()
 		mds.askDepth[price] += stockQuantity
-		mds.askDepthDiff[price] += int32(stockQuantity)
+		mds.askDepthDiff[price] += int64(stockQuantity)
 		mds.askDepthLock.Unlock()
 
 		l.Debugf("Added")
@@ -226,14 +226,14 @@ func (mds *marketDepthStream) AddOrder(isMarket bool, isAsk bool, price uint32, 
 	}
 	mds.bidDepthLock.Lock()
 	mds.bidDepth[price] += stockQuantity
-	mds.bidDepthDiff[price] += int32(stockQuantity)
+	mds.bidDepthDiff[price] += int64(stockQuantity)
 	mds.bidDepthLock.Unlock()
 
 	l.Debugf("Added")
 }
 
 // AddTrade adds a trade to the marketdepthstream
-func (mds *marketDepthStream) AddTrade(price, qty uint32, createdAt string) {
+func (mds *marketDepthStream) AddTrade(price, qty uint64, createdAt string) {
 	var l = mds.logger.WithFields(logrus.Fields{
 		"method":      "MarketDepth.Trade",
 		"param_price": price,
@@ -261,7 +261,7 @@ func (mds *marketDepthStream) AddTrade(price, qty uint32, createdAt string) {
 
 // CloseOrder will close an order from the order book. It should be called every time an order closes
 // either due to cancellation or due to fulfillment
-func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint32, stockQuantity uint32) {
+func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint64, stockQuantity uint64) {
 	// Market orders have not even been added to depth
 	if isMarket {
 		price = 0 // special value for market orders.
@@ -269,7 +269,7 @@ func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint32
 	if isAsk {
 		mds.askDepthLock.Lock()
 		mds.askDepth[price] -= stockQuantity
-		mds.askDepthDiff[price] -= int32(stockQuantity)
+		mds.askDepthDiff[price] -= int64(stockQuantity)
 		if mds.askDepth[price] == 0 {
 			delete(mds.askDepth, price)
 		}
@@ -281,7 +281,7 @@ func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint32
 	}
 	mds.bidDepthLock.Lock()
 	mds.bidDepth[price] -= stockQuantity
-	mds.bidDepthDiff[price] -= int32(stockQuantity)
+	mds.bidDepthDiff[price] -= int64(stockQuantity)
 	if mds.bidDepth[price] == 0 {
 		delete(mds.bidDepth, price)
 	}

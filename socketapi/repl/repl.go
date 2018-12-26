@@ -199,7 +199,7 @@ var replCmds = map[string]replCmdFn{
 	},
 	"add_stocks_to_exchange": func(userSess session.Session, s cmdSession) {
 		var stockId uint32
-		var newStocks uint32
+		var newStocks uint64
 
 		aun, _ := userSess.Get("repl_Username")
 
@@ -228,7 +228,7 @@ var replCmds = map[string]replCmdFn{
 	},
 	"update_stock_price": func(userSess session.Session, s cmdSession) {
 		var stockId uint32
-		var newPrice uint32
+		var newPrice uint64
 
 		aun, _ := userSess.Get("repl_Username")
 
@@ -305,7 +305,7 @@ var replCmds = map[string]replCmdFn{
 		oldLim := models.MortgagePutLimit
 		models.MortgagePutLimitRWMutex.RUnlock()
 
-		var newLim int32
+		var newLim int64
 		s.read("%d", &newLim)
 
 		s.print("Are you sure you want to change the limit from %d to %d?", oldLim, newLim)

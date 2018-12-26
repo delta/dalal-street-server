@@ -13,10 +13,10 @@ type LeaderboardRow struct {
 	UserId     uint32 `gorm:"column:userId;not null" json:"user_id"`
 	UserName   string `gorm:"column:userName;not null" json:"user_name"`
 	Rank       uint32 `gorm:"column:rank;not null" json:"rank"`
-	Cash       uint32 `gorm:"column:cash;not null" json:"cash"`
-	Debt       uint32 `gorm:"column:debt;not null" json:"debt"`
-	StockWorth int32  `gorm:"column:stockWorth;not null" json:"stock_worth"`
-	TotalWorth int32  `gorm:"column:totalWorth;not null" json:"total_worth"`
+	Cash       uint64 `gorm:"column:cash;not null" json:"cash"`
+	Debt       uint64 `gorm:"column:debt;not null" json:"debt"`
+	StockWorth int64  `gorm:"column:stockWorth;not null" json:"stock_worth"`
+	TotalWorth int64  `gorm:"column:totalWorth;not null" json:"total_worth"`
 }
 
 func (LeaderboardRow) TableName() string {
@@ -80,9 +80,9 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 type leaderboardQueryData struct {
 	UserId     uint32
 	UserName   string
-	Cash       uint32
-	StockWorth int32
-	Total      int32
+	Cash       uint64
+	StockWorth int64
+	Total      int64
 }
 
 //function to update leaderboard. Must be called periodically

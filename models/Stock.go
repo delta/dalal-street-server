@@ -17,24 +17,24 @@ type Stock struct {
 	ShortName        string `gorm:"column:shortName;not null" json:"short_name"`
 	FullName         string `gorm:"column:fullName;not null" json:"full_name"`
 	Description      string `gorm:"not null" json:"description"`
-	CurrentPrice     uint32 `gorm:"column:currentPrice;not null"  json:"current_price"`
-	DayHigh          uint32 `gorm:"column:dayHigh;not null" json:"day_high"`
-	DayLow           uint32 `gorm:"column:dayLow;not null" json:"day_low"`
-	AllTimeHigh      uint32 `gorm:"column:allTimeHigh;not null" json:"all_time_high"`
-	AllTimeLow       uint32 `gorm:"column:allTimeLow;not null" json:"all_time_low"`
-	StocksInExchange uint32 `gorm:"column:stocksInExchange;not null" json:"stocks_in_exchange"`
-	StocksInMarket   uint32 `gorm:"column:stocksInMarket;not null" json:"stocks_in_market"`
-	PreviousDayClose uint32 `gorm:"column:previousDayClose;not null" json:"previous_day_close"`
+	CurrentPrice     uint64 `gorm:"column:currentPrice;not null"  json:"current_price"`
+	DayHigh          uint64 `gorm:"column:dayHigh;not null" json:"day_high"`
+	DayLow           uint64 `gorm:"column:dayLow;not null" json:"day_low"`
+	AllTimeHigh      uint64 `gorm:"column:allTimeHigh;not null" json:"all_time_high"`
+	AllTimeLow       uint64 `gorm:"column:allTimeLow;not null" json:"all_time_low"`
+	StocksInExchange uint64 `gorm:"column:stocksInExchange;not null" json:"stocks_in_exchange"`
+	StocksInMarket   uint64 `gorm:"column:stocksInMarket;not null" json:"stocks_in_market"`
+	PreviousDayClose uint64 `gorm:"column:previousDayClose;not null" json:"previous_day_close"`
 	UpOrDown         bool   `gorm:"column:upOrDown;not null" json:"up_or_down"`
-	AvgLastPrice     uint32 `gorm:"column:avgLastPrice;not null" json:"avg_last_price"`
+	AvgLastPrice     uint64 `gorm:"column:avgLastPrice;not null" json:"avg_last_price"`
 	CreatedAt        string `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt        string `gorm:"column:updatedAt;not null" json:"updated_at"`
 
 	// HACK: Getting last minute's hl from transactions used by stock history
-	open   uint32 // Used to store Open for the last minute
-	high   uint32 // Used to store High for the last minute
-	low    uint32 // Used to store Low for the last minute
-	volume uint32 //Used to store trade volume for the last minute
+	open   uint64 // Used to store Open for the last minute
+	high   uint64 // Used to store High for the last minute
+	low    uint64 // Used to store Low for the last minute
+	volume uint64 //Used to store trade volume for the last minute
 }
 
 func (Stock) TableName() string {
@@ -77,10 +77,10 @@ var allStocks = struct {
 
 var avgLastPrice = struct {
 	sync.RWMutex
-	m map[uint32]uint32
+	m map[uint32]uint64
 }{
 	sync.RWMutex{},
-	make(map[uint32]uint32),
+	make(map[uint32]uint64),
 }
 
 func GetStockCopy(stockId uint32) (Stock, error) {
@@ -115,7 +115,7 @@ func GetAllStocks() map[uint32]*Stock {
 	return allStocksCopy
 }
 
-func UpdateStockPrice(stockId, price uint32) error {
+func UpdateStockPrice(stockId uint32, price uint64) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "UpdateStockPrice",
 	})
@@ -163,8 +163,8 @@ func UpdateStockPrice(stockId, price uint32) error {
 	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
 
 	avgLastPrice.Lock()
-	avgLastPrice.m[stock.Id] -= uint32((avgLastPrice.m[stock.Id] / 20))
-	avgLastPrice.m[stock.Id] += uint32((stock.CurrentPrice) / 20)
+	avgLastPrice.m[stock.Id] -= uint64((avgLastPrice.m[stock.Id] / 20))
+	avgLastPrice.m[stock.Id] += uint64((stock.CurrentPrice) / 20)
 	l.Infof("Average Price +%v", avgLastPrice.m[stock.Id])
 	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
 	avgLastPrice.Unlock()
@@ -183,7 +183,7 @@ func UpdateStockPrice(stockId, price uint32) error {
 
 	return nil
 }
-func UpdateStockVolume(stockId uint32, volume uint32) {
+func UpdateStockVolume(stockId uint32, volume uint64) {
 	allStocks.Lock()
 	allStocks.m[stockId].stock.volume += volume
 	allStocks.Unlock()
@@ -206,7 +206,7 @@ func LoadStocks() error {
 	allStocks.Lock()
 	avgLastPrice.Lock()
 	allStocks.m = make(map[uint32]*stockAndLock)
-	avgLastPrice.m = make(map[uint32]uint32)
+	avgLastPrice.m = make(map[uint32]uint64)
 
 	for _, stock := range stocks {
 		allStocks.m[stock.Id] = &stockAndLock{stock: stock}
@@ -242,7 +242,7 @@ func GetCompanyDetails(stockId uint32) (*Stock, error) {
 	return &stock, nil
 }
 
-func AddStocksToExchange(stockId, count uint32) error {
+func AddStocksToExchange(stockId uint32, count uint64) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "AddStocksToExchange",
 		"param_stockId": stockId,

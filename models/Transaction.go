@@ -52,9 +52,9 @@ type Transaction struct {
 	UserId        uint32          `gorm:"column:userId;not null" json:"user_id"`
 	StockId       uint32          `gorm:"column:stockId;not null" json:"stock_id"`
 	Type          TransactionType `gorm:"column:type;not null" json:"type"`
-	StockQuantity int32           `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
-	Price         uint32          `gorm:"not null" json:"price"`
-	Total         int32           `gorm:"not null" json:"total"`
+	StockQuantity int64           `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
+	Price         uint64          `gorm:"not null" json:"price"`
+	Total         int64           `gorm:"not null" json:"total"`
 	CreatedAt     string          `gorm:"column:createdAt;not null" json:"created_at"`
 }
 

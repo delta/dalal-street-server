@@ -67,9 +67,9 @@ type Ask struct {
 	UserId                 uint32    `gorm:"column:userId;not null" json:"user_id"`
 	StockId                uint32    `gorm:"column:stockId;not null" json:"stock_id"`
 	OrderType              OrderType `gorm:"column:orderType;not null" json:"order_type"`
-	Price                  uint32    `gorm:"not null" json:"price"`
-	StockQuantity          uint32    `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
-	StockQuantityFulfilled uint32    `gorm:"column:stockQuantityFulFilled;not null" json:"stock_quantity_fulfilled"`
+	Price                  uint64    `gorm:"not null" json:"price"`
+	StockQuantity          uint64    `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
+	StockQuantityFulfilled uint64    `gorm:"column:stockQuantityFulFilled;not null" json:"stock_quantity_fulfilled"`
 	IsClosed               bool      `gorm:"column:isClosed;not null" json:"is_closed"`
 	CreatedAt              string    `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt              string    `gorm:"column:updatedAt;not null" json:"updated_at"`

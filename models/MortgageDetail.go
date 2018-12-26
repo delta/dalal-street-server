@@ -7,7 +7,7 @@ import (
 // MortgageQueryData stores stocks in bank of a given stockid
 type MortgageQueryData struct {
 	StockId      uint32
-	StocksInBank int32
+	StocksInBank int64
 }
 
 // GetMortgageDetails returns mortgage data about a user

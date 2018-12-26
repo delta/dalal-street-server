@@ -41,6 +41,13 @@ func MinInt(a, b uint32) uint32 {
 	return b
 }
 
+func MinInt64(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func IsGrpcRequest(req *http.Request) bool {
 	return strings.Contains(req.Header.Get("Content-Type"), "application/grpc")
 }

@@ -54,7 +54,7 @@ func Test_RecordNMinuteOHLCs(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		//Update StockPrice with multiples of i
-		UpdateStockPrice(1, uint32(250*i))
+		UpdateStockPrice(1, uint64(250*i))
 		UpdateStockVolume(1, 1)
 		recordOneMinuteOHLC(db, fakeTime.Add(time.Duration(i)*time.Minute))
 		//Check if minute is a multiple of 5
@@ -100,7 +100,7 @@ func Test_RecordNMinuteOHLCs(t *testing.T) {
 }
 
 func Test_VolumeRecording(t *testing.T) {
-	var fakeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var fakeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -241,7 +241,7 @@ func Test_GetStockHistory(t *testing.T) {
 	LoadStocks()
 
 	for i := 0; i <= 75; i++ {
-		UpdateStockPrice(1, uint32(i*20))
+		UpdateStockPrice(1, uint64(i*20))
 		recordOneMinuteOHLC(db, now.Add(time.Minute*time.Duration(i)))
 	}
 	retrievedHistories, err := GetStockHistory(1, 1)

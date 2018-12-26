@@ -13,7 +13,7 @@ import (
 // StockPricesStream interface defines the interface to interact with StockPrices stream
 type StockPricesStream interface {
 	Run()
-	SendStockPriceUpdate(stockId uint32, price uint32)
+	SendStockPriceUpdate(stockId uint32, price uint64)
 	AddListener(done <-chan struct{}, updates chan interface{}, sessionId string)
 	RemoveListener(sessionId string)
 }
@@ -24,7 +24,7 @@ type stockPricesStream struct {
 	broadcastStream BroadcastStream
 
 	stockPricesMutex sync.RWMutex
-	dirtyStocks      map[uint32]uint32 // list of stocks whose updates we haven't sent yet
+	dirtyStocks      map[uint32]uint64 // list of stocks whose updates we haven't sent yet
 }
 
 // newStockPricesStream creates a new StockPricesStream
@@ -34,7 +34,7 @@ func newStockPricesStream() StockPricesStream {
 			"module": "datastreams.StockPricesStream",
 		}),
 		broadcastStream: NewBroadcastStream(),
-		dirtyStocks:     make(map[uint32]uint32),
+		dirtyStocks:     make(map[uint32]uint64),
 	}
 }
 
@@ -65,7 +65,7 @@ func (sps *stockPricesStream) Run() {
 		updateProto := &datastreams_pb.StockPricesUpdate{
 			Prices: sps.dirtyStocks,
 		}
-		sps.dirtyStocks = make(map[uint32]uint32)
+		sps.dirtyStocks = make(map[uint32]uint64)
 		sps.stockPricesMutex.Unlock()
 
 		sps.broadcastStream.BroadcastUpdate(updateProto)
@@ -77,7 +77,7 @@ func (sps *stockPricesStream) Run() {
 }
 
 // SendStockPriceUpdate updates price of a given stock. It doesn't send it immediately. That's done by Run.
-func (sps *stockPricesStream) SendStockPriceUpdate(stockId, price uint32) {
+func (sps *stockPricesStream) SendStockPriceUpdate(stockId uint32, price uint64) {
 	var l = sps.logger.WithFields(logrus.Fields{
 		"method":        "SendStockPriceUpdate",
 		"param_stockId": stockId,
