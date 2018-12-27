@@ -52,7 +52,7 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 	if count == 0 {
 		count = LEADERBOARD_COUNT
 	} else {
-		count = utils.MinInt(count, LEADERBOARD_COUNT)
+		count = utils.MinInt32(count, LEADERBOARD_COUNT)
 	}
 
 	db := getDB()

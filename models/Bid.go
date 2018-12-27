@@ -248,7 +248,7 @@ func GetMyClosedBids(userId, lastId, count uint32) (bool, []*Bid, error) {
 	if count == 0 {
 		count = MY_BID_COUNT
 	} else {
-		count = utils.MinInt(count, MY_BID_COUNT)
+		count = utils.MinInt32(count, MY_BID_COUNT)
 	}
 
 	//get latest events if lastId is zero

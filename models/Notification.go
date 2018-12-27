@@ -45,7 +45,7 @@ func GetNotifications(userId, lastId, count uint32) (bool, []*Notification, erro
 	if count == 0 {
 		count = GET_NOTIFICATION_COUNT
 	} else {
-		count = utils.MinInt(count, GET_NOTIFICATION_COUNT)
+		count = utils.MinInt32(count, GET_NOTIFICATION_COUNT)
 	}
 
 	//get latest events if lastId is zero

@@ -310,7 +310,7 @@ func GetMyClosedAsks(userId, lastId, count uint32) (bool, []*Ask, error) {
 	if count == 0 {
 		count = MY_ASK_COUNT
 	} else {
-		count = utils.MinInt(count, MY_ASK_COUNT)
+		count = utils.MinInt32(count, MY_ASK_COUNT)
 	}
 
 	//get latest events if lastId is zero
