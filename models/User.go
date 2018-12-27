@@ -232,6 +232,21 @@ func checkPasswordHash(password, hash string) bool {
 	return hash == sha1Hash
 }
 
+func getOrderFeePrice(price, stockId uint32, o OrderType) uint32 {
+	var orderFee uint32
+	switch o {
+	case Limit:
+		orderFee = price
+	case Market:
+		allStocks.m[stockId].RLock()
+		orderFee = allStocks.m[stockId].stock.CurrentPrice
+		allStocks.m[stockId].RUnlock()
+	case StopLoss:
+		orderFee = price
+	}
+	return orderFee
+}
+
 // createUser() creates a user given his email and name.
 func createUser(name string, email string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
@@ -748,8 +763,8 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	}
 
 	l.Debugf("Check2: Passed.")
-
-	orderFee := uint32((ORDER_FEE_PERCENT / 100.0) * float32(ask.StockQuantity*ask.Price))
+	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
+	orderFee := uint32((ORDER_FEE_PERCENT / 100.0) * float32(ask.StockQuantity*orderPrice))
 	cashLeft := int32(user.Cash) - int32(orderFee)
 
 	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
@@ -857,8 +872,9 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Debugf("Check1: Passed.")
 
 	// Second Check: User should have enough cash
-	var orderFee = uint64((ORDER_FEE_PERCENT / 100.0) * float64(bid.StockQuantity*bid.Price))
-	var cashLeft = int64(user.Cash) - int64(bid.StockQuantity*bid.Price+orderFee)
+	orderPrice := getOrderFeePrice(bid.Price, bid.StockId, bid.OrderType)
+	orderFee := uint64((ORDER_FEE_PERCENT / 100.0) * float64(bid.StockQuantity*orderPrice))
+	cashLeft := int64(user.Cash) - int64(bid.StockQuantity*bid.Price+orderFee)
 
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
