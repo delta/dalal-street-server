@@ -1458,61 +1458,58 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	to amount of stocks that could be retrieved; This block also modifies MortgageDetails
 	table, btw this table is not used anywhere except in current function */
 
-	type MortgageStocksData struct {
-		id           int32
-		stocksInBank int32
-		price        int32
-	}
-
 	if stockQuantity >= 0 {
 
 		db := getDB()
-		var results []MortgageStocksData
-
 		sql := "SELECT id, stocksInBank, mortgagePrice from MortgageDetails where userId=? AND stockId=? ORDER BY mortgagePrice"
-		err = db.Exec(sql, user.Id, stockId).Scan(&results).Error
+		rows, err := db.Raw(sql, user.Id, stockId).Rows()
 		if err != nil {
 			l.Error(err)
 			return nil, err
 		}
+		defer rows.Close()
 
-		l.Debugf("Got data from MortgageDetails table")
+		// price represents cost of stock at time of mortgage
+		// stocksInBank represents number of stocks mortgaged at that time
+		var id int32
+		var price int32
+		var stocksInBank int32
 
 		// tempStockQuantity is stock quantity left to retrieve
 		tempStockQuantity := stockQuantity
 		tempUserCash := int32(user.Cash)
+		l.Infof("Cash %d", tempUserCash)
 		var maxStocksRetrieval int32
 
-		for _, currentData := range results {
-
-			maxStocksRetrieval = tempUserCash / currentData.price
+		for rows.Next() {
+			rows.Scan(&id, &stocksInBank, &price)
+			maxStocksRetrieval = tempUserCash / price
 
 			if maxStocksRetrieval == 0 || tempStockQuantity == 0 {
 				stockQuantity -= tempStockQuantity // Amount of stocks retrieved till now
 				break
 			}
 
-			if maxStocksRetrieval > currentData.stocksInBank {
-				maxStocksRetrieval = currentData.stocksInBank
+			if maxStocksRetrieval > stocksInBank {
+				maxStocksRetrieval = stocksInBank
 			}
 
 			if maxStocksRetrieval > tempStockQuantity { // We don't want to retrieve more than required
 				maxStocksRetrieval = tempStockQuantity
 			}
 
-			expense := -int32(currentData.price) * int32(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
+			expense := -int32(price) * int32(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
 			trTotal += expense
-
-			if maxStocksRetrieval < currentData.stocksInBank {
+			if maxStocksRetrieval < stocksInBank {
 				sql := "UPDATE MortgageDetails SET stocksInBank=? where id=?"
-				err = db.Exec(sql, currentData.stocksInBank-maxStocksRetrieval, currentData.id).Error
+				err = db.Exec(sql, stocksInBank-maxStocksRetrieval, id).Error
 				if err != nil {
 					l.Error(err)
 					return nil, err
 				}
 			} else /* So we can delete that entire row */ {
 				sql := "DELETE from MortgageDetails WHERE id=?"
-				err = db.Exec(sql, currentData.id).Error
+				err = db.Exec(sql, id).Error
 				if err != nil {
 					l.Error(err)
 					return nil, err
