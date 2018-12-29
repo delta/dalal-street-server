@@ -1394,11 +1394,12 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		"param_stockQuantity": stockQuantity,
 	})
 
-	l.Infof("PerformMortgageTransaction requested")
+	l.Infof("PerformMortgageTransaction requested for userId = %d, stockId = %d amount = %d", userId, stockId, stockQuantity)
 
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUserExclusively(userId)
 	if err != nil {
+		l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while retrieving user", userId, stockId, stockQuantity)
 		l.Errorf("Errored: %+v", err)
 		return nil, err
 	}
@@ -1417,10 +1418,13 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 	if stockQuantity >= 0 /* Retrieve stocks action*/ {
 		db := getDB()
 
+		l.Debugf("Retrieving stocks in action")
+
 		stockCount := struct{ Sc int32 }{0}
 		sql := "Select sum(stocksInBank) as sc from MortgageDetails where UserId=? and StockId=?"
 		err = db.Raw(sql, user.Id, stockId).Scan(&stockCount).Error
 		if err != nil {
+			l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while retrieving total stocks", userId, stockId, stockQuantity)
 			l.Error(err)
 			return nil, err
 		}
@@ -1433,23 +1437,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		}
 
 	} else {
-		MortgagePutLimitRWMutex.RLock()
-		lim := int64(MortgagePutLimit)
-		MortgagePutLimitRWMutex.RUnlock()
-		if user.Total > lim {
-			// TODO (remove this) : return nil, WayTooMuchCashError{}
-		}
-
-		// stockOwned, err := getSingleStockCount(user, stockId)
-		// if err != nil {
-		// 	l.Error(err)
-		// 	return nil, err
-		// }
-
-		// if stockOwned < -stockQuantity {
-		// 	l.Errorf("Insufficient stocks in ownership. Have %d, want %d", stockOwned, stockQuantity)
-		// 	return nil, NotEnoughStocksError{}
-		// }
+		l.Debugf("Mortgaging stocks in action")
 	}
 
 	var trTotal int32
@@ -1504,6 +1492,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 				sql := "UPDATE MortgageDetails SET stocksInBank=? where id=?"
 				err = db.Exec(sql, stocksInBank-maxStocksRetrieval, id).Error
 				if err != nil {
+					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating retrieved stocks", userId, stockId, stockQuantity)
 					l.Error(err)
 					return nil, err
 				}
@@ -1511,6 +1500,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 				sql := "DELETE from MortgageDetails WHERE id=?"
 				err = db.Exec(sql, id).Error
 				if err != nil {
+					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d deleting retrieved user", userId, stockId, stockQuantity)
 					l.Error(err)
 					return nil, err
 				}
@@ -1529,6 +1519,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		// Here mortgage price is last average price, refer line 1412 above
 		err = db.Exec(sql, user.Id, stockId, -stockQuantity, mortgagePrice).Error
 		if err != nil {
+			l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while mortgaging stocks", userId, stockId, stockQuantity)
 			l.Error(err)
 			return nil, err
 		}
