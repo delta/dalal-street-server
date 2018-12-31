@@ -32,7 +32,7 @@ func Test_UpdateLeaderboard(t *testing.T) {
 		"method": "Test_UpdateLeaderboard",
 	})
 
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -43,7 +43,7 @@ func Test_UpdateLeaderboard(t *testing.T) {
 		}
 	}
 
-	var makeUser = func(id uint32, email string, name string, cash uint32, total int32) *User {
+	var makeUser = func(id uint32, email string, name string, cash uint64, total int64) *User {
 		return &User{
 			Id:        id,
 			Email:     email,
@@ -54,7 +54,7 @@ func Test_UpdateLeaderboard(t *testing.T) {
 		}
 	}
 
-	var makeStock = func(id uint32, sName string, fName string, desc string, curPrice uint32, dayHigh uint32, dayLow uint32, allHigh uint32, allLow uint32, stocks uint32, upOrDown bool) *Stock {
+	var makeStock = func(id uint32, sName string, fName string, desc string, curPrice uint64, dayHigh uint64, dayLow uint64, allHigh uint64, allLow uint64, stocks uint64, upOrDown bool) *Stock {
 		return &Stock{
 			Id:               id,
 			ShortName:        sName,

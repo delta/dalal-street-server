@@ -58,7 +58,7 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	if count == 0 {
 		count = MARKET_EVENT_COUNT
 	} else {
-		count = utils.MinInt(count, MARKET_EVENT_COUNT)
+		count = utils.MinInt32(count, MARKET_EVENT_COUNT)
 	}
 
 	//get latest events if lastId is zero

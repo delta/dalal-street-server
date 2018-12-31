@@ -33,8 +33,8 @@ type User struct {
 	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	Email     string `gorm:"unique;not null" json:"email"`
 	Name      string `gorm:"not null" json:"name"`
-	Cash      uint32 `gorm:"not null" json:"cash"`
-	Total     int32  `gorm:"not null" json:"total"`
+	Cash      uint64 `gorm:"not null" json:"cash"`
+	Total     int64  `gorm:"not null" json:"total"`
 	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
 	IsHuman   bool   `gorm:"column:isHuman;not null" json:"is_human"`
 }
@@ -389,7 +389,7 @@ var userLocks = struct {
 // getSingleStockCount() returns the stocks a user owns for a given stockId
 // This method is *not* thread-safe.
 // The caller is responsible for thread-safety.
-func getSingleStockCount(u *User, stockId uint32) (int32, error) {
+func getSingleStockCount(u *User, stockId uint32) (int64, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "getSingleStockCount",
 		"param_u":       fmt.Sprintf("%+v", u),
@@ -400,7 +400,7 @@ func getSingleStockCount(u *User, stockId uint32) (int32, error) {
 
 	db := getDB()
 
-	var stockCount = struct{ Sc int32 }{0}
+	var stockCount = struct{ Sc int64 }{0}
 	sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=?"
 	if err := db.Raw(sql, u.Id, stockId).Scan(&stockCount).Error; err != nil {
 		l.Error(err)
@@ -428,13 +428,13 @@ func (e OrderStockLimitExceeded) Error() string {
 }
 
 // OrderPriceOutOfWindowError is sent when the order's price is outside the allowed price window
-type OrderPriceOutOfWindowError struct{ price uint32 }
+type OrderPriceOutOfWindowError struct{ price uint64 }
 
 func (e OrderPriceOutOfWindowError) Error() string {
 	return fmt.Sprintf("Order price must be within %d%% of the current price - currently between %d and %d",
 		ORDER_PRICE_WINDOW,
-		uint32((1-ORDER_PRICE_WINDOW/100.0)*float32(e.price)),
-		uint32((1+ORDER_PRICE_WINDOW/100.0)*float32(e.price)),
+		uint64((1-ORDER_PRICE_WINDOW/100.0)*float64(e.price)),
+		uint64((1+ORDER_PRICE_WINDOW/100.0)*float64(e.price)),
 	)
 }
 
@@ -457,7 +457,7 @@ func (e BuyLimitExceededError) Error() string {
 // deducting those many stocks will leave the user with less than
 // SHORT_SELL_BORROW_LIMIT
 type NotEnoughStocksError struct {
-	currentAllowedQty int32
+	currentAllowedQty int64
 }
 
 func (e NotEnoughStocksError) Error() string {
@@ -689,8 +689,8 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 		l.Debugf("Releasing lock for ask order threshold check with stock id : %v ", ask.StockId)
 
-		var upperLimit = uint32((1 + ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
-		var lowerLimit = uint32((1 - ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
+		var upperLimit = uint64((1 + ORDER_PRICE_WINDOW/100.0) * float64(currentPrice))
+		var lowerLimit = uint64((1 - ORDER_PRICE_WINDOW/100.0) * float64(currentPrice))
 
 		if ask.Price > upperLimit || ask.Price < lowerLimit {
 			l.Debugf("Threshold price check failed for ask order")
@@ -727,7 +727,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	var numStocksLeft = numStocks - int32(ask.StockQuantity)
+	var numStocksLeft = numStocks - int64(ask.StockQuantity)
 
 	l.Debugf("Check2: Current stocks: %d. Stocks after trade: %d.", numStocks, numStocksLeft)
 
@@ -801,8 +801,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 		l.Debugf("Releasing lock for bid order threshold check with stock id : %v ", bid.StockId)
 
-		var upperLimit = uint32((1 + ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
-		var lowerLimit = uint32((1 - ORDER_PRICE_WINDOW/100.0) * float32(currentPrice))
+		var upperLimit = uint64((1 + ORDER_PRICE_WINDOW/100.0) * float64(currentPrice))
+		var lowerLimit = uint64((1 - ORDER_PRICE_WINDOW/100.0) * float64(currentPrice))
 
 		if bid.Price > upperLimit || bid.Price < lowerLimit {
 			l.Debugf("Threshold price check failed for bid order")
@@ -834,7 +834,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Debugf("Check1: Passed.")
 
 	// Second Check: User should have enough cash
-	var cashLeft = int32(user.Cash) - int32(bid.StockQuantity*bid.Price)
+	var cashLeft = int64(user.Cash) - int64(bid.StockQuantity*bid.Price)
 
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
@@ -949,7 +949,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 	}
 }
 
-func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*Transaction, error) {
+func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuantity uint64) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "PerformBuyFromExchangeTransaction",
 		"param_userId":        userId,
@@ -1010,14 +1010,14 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 		UserId:        userId,
 		StockId:       stockId,
 		Type:          FromExchangeTransaction,
-		StockQuantity: int32(stockQuantityRemoved),
+		StockQuantity: int64(stockQuantityRemoved),
 		Price:         price,
-		Total:         -int32(price * stockQuantityRemoved),
+		Total:         -int64(price * stockQuantityRemoved),
 		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
 
 	oldCash := user.Cash
-	user.Cash = uint32(int32(user.Cash) + transaction.Total)
+	user.Cash = uint64(int64(user.Cash) + transaction.Total)
 
 	oldStocksInExchange := stock.StocksInExchange
 	oldStocksInMarket := stock.StocksInMarket
@@ -1065,7 +1065,7 @@ func PerformBuyFromExchangeTransaction(userId, stockId, stockQuantity uint32) (*
 
 	l.Infof("Committed transaction. Removed %d stocks @ %d per stock. Total cost = %d. New balance: %d", stockQuantityRemoved, price, price*stockQuantityRemoved, user.Cash)
 
-	go func(inExchange, inMarket uint32) {
+	go func(inExchange, inMarket uint64) {
 		stockExchangeStream := datastreamsManager.GetStockExchangeStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -1113,7 +1113,7 @@ const (
 	BidUndone                                  // Order yet to complete
 )
 
-func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, stockTradeQty uint32) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
+func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, stockTradeQty uint64) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "PerformOrderFillTransaction",
 		"askingUserId":  ask.UserId,
@@ -1212,7 +1212,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	}
 
 	//Check if bidder has enough cash
-	var cashLeft = int32(biddingUser.Cash) - int32(stockTradePrice*stockTradeQty)
+	var cashLeft = int64(biddingUser.Cash) - int64(stockTradePrice*stockTradeQty)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
 		l.Errorf("Check1: Failed. Not enough cash.")
@@ -1229,7 +1229,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 		return AskUndone, BidUndone, nil
 	}
 
-	var numStocksLeft = numStocks - int32(stockTradeQty)
+	var numStocksLeft = numStocks - int64(stockTradeQty)
 
 	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
 		l.Debugf("Check2: Failed. Not enough stocks.")
@@ -1244,7 +1244,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	}
 
 	//helper function to return a transaction object
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -1256,18 +1256,18 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 		}
 	}
 
-	total := int32(stockTradePrice * stockTradeQty)
+	total := int64(stockTradePrice * stockTradeQty)
 
-	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -int32(stockTradeQty), stockTradePrice, total)
-	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, int32(stockTradeQty), stockTradePrice, -total)
+	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -int64(stockTradeQty), stockTradePrice, total)
+	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, int64(stockTradeQty), stockTradePrice, -total)
 
 	// save old cash for rolling back
 	askingUserOldCash := askingUser.Cash
 	biddingUserOldCash := biddingUser.Cash
 
 	//calculate user's updated cash
-	askingUser.Cash += uint32(stockTradeQty) * stockTradePrice
-	biddingUser.Cash -= uint32(stockTradeQty) * stockTradePrice
+	askingUser.Cash += uint64(stockTradeQty) * stockTradePrice
+	biddingUser.Cash -= uint64(stockTradeQty) * stockTradePrice
 
 	// in case things go wrong and we've to roll back
 	oldAskStockQuantityFulfilled := ask.StockQuantityFulfilled
@@ -1276,8 +1276,8 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 	oldBidIsClosed := bid.IsClosed
 
 	//calculate StockQuantityFulfilled and IsClosed for ask and bid order
-	ask.StockQuantityFulfilled += uint32(stockTradeQty)
-	bid.StockQuantityFulfilled += uint32(stockTradeQty)
+	ask.StockQuantityFulfilled += uint64(stockTradeQty)
+	bid.StockQuantityFulfilled += uint64(stockTradeQty)
 	ask.IsClosed = ask.StockQuantity == ask.StockQuantityFulfilled
 	bid.IsClosed = bid.StockQuantity == bid.StockQuantityFulfilled
 
@@ -1377,7 +1377,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint32, sto
 }
 
 var MortgagePutLimitRWMutex sync.RWMutex
-var MortgagePutLimit int32 = 4000000
+var MortgagePutLimit int64 = 4000000
 
 type WayTooMuchCashError struct {
 }
@@ -1386,7 +1386,7 @@ func (e WayTooMuchCashError) Error() string {
 	return "You already have more than enough cash. You cannot mortgage stocks right now."
 }
 
-func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*Transaction, error) {
+func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "PerformMortgageTransaction",
 		"param_userId":        userId,
@@ -1412,7 +1412,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	mortgagePrice := allStocks.m[stockId].stock.AvgLastPrice
 	allStocks.m[stockId].RUnlock()
 
-	l.Debugf("Taking current price of stock as %d", mortgagePrice)
+	l.Infof("Taking current price of stock as %d", mortgagePrice)
 
 	var rate int32
 
@@ -1422,7 +1422,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 
 		db := getDB()
 
-		stockCount := struct{ Sc int32 }{0}
+		stockCount := struct{ Sc int64 }{0}
 		sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=? and Type=?"
 		err = db.Raw(sql, user.Id, stockId, MortgageTransaction.String()).Scan(&stockCount).Error
 		if err != nil {
@@ -1434,7 +1434,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		// Change sign to mean number of stocks in mortgage
 		stockCount.Sc *= -1
 
-		l.Debugf("%d stocks mortgaged currently", stockCount.Sc)
+		l.Infof("%d stocks mortgaged currently", stockCount.Sc)
 
 		if stockQuantity > stockCount.Sc {
 			l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stockCount.Sc, stockQuantity)
@@ -1443,7 +1443,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 
 	} else {
 		MortgagePutLimitRWMutex.RLock()
-		lim := MortgagePutLimit
+		lim := int64(MortgagePutLimit)
 		MortgagePutLimitRWMutex.RUnlock()
 		if user.Total > lim {
 			return nil, WayTooMuchCashError{}
@@ -1464,8 +1464,9 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		}
 	}
 
-	trTotal := -int32(mortgagePrice) * stockQuantity * rate / 100
-	if int32(user.Cash)+trTotal < 0 {
+	trTotal := -int64(mortgagePrice) * stockQuantity * int64(rate) / 100
+	l.Infof("lalalalalalalala %d %d %d", trTotal, stockQuantity, int64(rate/100))
+	if int64(user.Cash)+trTotal < 0 {
 		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", trTotal, user.Cash)
 		return nil, NotEnoughCashError{}
 	}
@@ -1484,7 +1485,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	// Safe to make changes to this user and this stock
 
 	oldCash := user.Cash
-	user.Cash = uint32(int32(user.Cash) + trTotal)
+	user.Cash = uint64(int64(user.Cash) + trTotal)
 
 	/* Committing to database */
 	db := getDB()
@@ -1508,7 +1509,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 		return errorHelper("Error updating user's cash. Rolling back. Error: %+v", err)
 	}
 
-	l.Debugf("Updated user's cash. New balance: %d", user.Cash)
+	l.Infof("Updated user's cash. New balance: %d", user.Cash)
 
 	if err := tx.Commit().Error; err != nil {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
@@ -1525,7 +1526,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int32) (*T
 	return transaction, nil
 }
 
-func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
+func GetStocksOwned(userId uint32) (map[uint32]int64, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetStocksOwned",
 		"userId": userId,
@@ -1556,10 +1557,10 @@ func GetStocksOwned(userId uint32) (map[uint32]int32, error) {
 	}
 	defer rows.Close()
 
-	stocksOwned := make(map[uint32]int32)
+	stocksOwned := make(map[uint32]int64)
 	for rows.Next() {
 		var stockId uint32
-		var stockQty int32
+		var stockQty int64
 		rows.Scan(&stockId, &stockQty)
 
 		stocksOwned[stockId] = stockQty

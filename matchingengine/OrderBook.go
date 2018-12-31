@@ -9,7 +9,7 @@ import (
 )
 
 // FillOrder is a type definition for a function that fills an order with given ask, bid, stockPrice and stockQty
-type FillOrder func(ask *models.Ask, bid *models.Bid, stockTradePrice uint32, stockTradeQty uint32) (models.AskOrderFillStatus, models.BidOrderFillStatus, *models.Transaction)
+type FillOrder func(ask *models.Ask, bid *models.Bid, stockTradePrice uint64, stockTradeQty uint64) (models.AskOrderFillStatus, models.BidOrderFillStatus, *models.Transaction)
 
 // fillOrderFn is the actual function that filles an order.
 // It has been separated from implementation to ease testing.
@@ -80,7 +80,7 @@ func (ob *orderBook) addBidToDepth(bid *models.Bid) {
 
 func (ob *orderBook) LoadOldTransactions(txs []*models.Transaction) {
 	for _, tx := range txs {
-		ob.depth.AddTrade(tx.Price, uint32(-tx.StockQuantity), tx.CreatedAt)
+		ob.depth.AddTrade(tx.Price, uint64(-tx.StockQuantity), tx.CreatedAt)
 	}
 }
 
@@ -456,14 +456,14 @@ func (ob *orderBook) makeTrade(ask *models.Ask, bid *models.Bid, incomingAsk boo
 	if tr != nil {
 		l.Infof("Trade made between ask_id %d and bid_id %d at price %d", ask.Id, bid.Id, tr.Price)
 		// tr is always AskTransaction. So its StockQty < 0. Make it positive.
-		ob.depth.AddTrade(tr.Price, uint32(-tr.StockQuantity), tr.CreatedAt)
+		ob.depth.AddTrade(tr.Price, uint64(-tr.StockQuantity), tr.CreatedAt)
 
 		// if ask is incoming, close just bid depth as ask hasn't even been added to depth
 		if !incomingBid {
-			ob.depth.CloseOrder(isMarket(bid.OrderType), false, bid.Price, uint32(-tr.StockQuantity))
+			ob.depth.CloseOrder(isMarket(bid.OrderType), false, bid.Price, uint64(-tr.StockQuantity))
 		}
 		if !incomingAsk {
-			ob.depth.CloseOrder(isMarket(ask.OrderType), true, ask.Price, uint32(-tr.StockQuantity))
+			ob.depth.CloseOrder(isMarket(ask.OrderType), true, ask.Price, uint64(-tr.StockQuantity))
 		}
 
 		// Trigger stop losses here

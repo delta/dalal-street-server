@@ -53,7 +53,7 @@ func (mr *MockMarketDepthStreamMockRecorder) RemoveListener(sessionId interface{
 }
 
 // AddOrder mocks base method
-func (m *MockMarketDepthStream) AddOrder(isMarket, isAsk bool, price, stockQuantity uint32) {
+func (m *MockMarketDepthStream) AddOrder(isMarket, isAsk bool, price, stockQuantity uint64) {
 	m.ctrl.Call(m, "AddOrder", isMarket, isAsk, price, stockQuantity)
 }
 
@@ -63,7 +63,7 @@ func (mr *MockMarketDepthStreamMockRecorder) AddOrder(isMarket, isAsk, price, st
 }
 
 // AddTrade mocks base method
-func (m *MockMarketDepthStream) AddTrade(price, qty uint32, createdAt string) {
+func (m *MockMarketDepthStream) AddTrade(price, qty uint64, createdAt string) {
 	m.ctrl.Call(m, "AddTrade", price, qty, createdAt)
 }
 
@@ -73,7 +73,7 @@ func (mr *MockMarketDepthStreamMockRecorder) AddTrade(price, qty, createdAt inte
 }
 
 // CloseOrder mocks base method
-func (m *MockMarketDepthStream) CloseOrder(isMarket, isAsk bool, price, stockQuantity uint32) {
+func (m *MockMarketDepthStream) CloseOrder(isMarket, isAsk bool, price, stockQuantity uint64) {
 	m.ctrl.Call(m, "CloseOrder", isMarket, isAsk, price, stockQuantity)
 }
 

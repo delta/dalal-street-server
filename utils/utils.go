@@ -34,7 +34,14 @@ func RandString(n int) string {
 	return string(b)
 }
 
-func MinInt(a, b uint32) uint32 {
+func MinInt32(a, b uint32) uint32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func MinInt64(a, b uint64) uint64 {
 	if a < b {
 		return a
 	}

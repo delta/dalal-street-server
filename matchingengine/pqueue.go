@@ -40,14 +40,14 @@ const (
 
 type bidItem struct {
 	value    *models.Bid
-	price    uint32
-	quantity uint32
+	price    uint64
+	quantity uint64
 }
 
 type askItem struct {
 	value    *models.Ask
-	price    uint32
-	quantity uint32
+	price    uint64
+	quantity uint64
 }
 
 // bidPQueue implements the BidPQueue interface
@@ -68,12 +68,12 @@ type askPQueue struct {
 
 type factors struct {
 	oType    models.OrderType
-	price    uint32
+	price    uint64
 	placedAt string
-	quantity uint32
+	quantity uint64
 }
 
-func newBidItem(value *models.Bid, price uint32, quantity uint32) *bidItem {
+func newBidItem(value *models.Bid, price uint64, quantity uint64) *bidItem {
 	return &bidItem{
 		value:    value,
 		price:    price,
@@ -81,7 +81,7 @@ func newBidItem(value *models.Bid, price uint32, quantity uint32) *bidItem {
 	}
 }
 
-func newAskItem(value *models.Ask, price uint32, quantity uint32) *askItem {
+func newAskItem(value *models.Ask, price uint64, quantity uint64) *askItem {
 	return &askItem{
 		value:    value,
 		price:    price,

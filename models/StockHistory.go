@@ -12,13 +12,13 @@ import (
 
 type StockHistory struct {
 	StockId   uint32 `gorm:"column:stockId;not null" json:"stock_id"`
-	Close     uint32 `gorm:"column:close;not null" json:"close"`
+	Close     uint64 `gorm:"column:close;not null" json:"close"`
 	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
 	Interval  uint32 `gorm:"column:intervalRecord;not null" json:"interval"`
-	Open      uint32 `gorm:"column:open;not null" json:"open"`
-	High      uint32 `gorm:"column:high;not null" json:"high"`
-	Low       uint32 `gorm:"column:low;not null" json:"low"`
-	Volume    uint32 `gorm:"column:volume;not null" json:"volume"`
+	Open      uint64 `gorm:"column:open;not null" json:"open"`
+	High      uint64 `gorm:"column:high;not null" json:"high"`
+	Low       uint64 `gorm:"column:low;not null" json:"low"`
+	Volume    uint64 `gorm:"column:volume;not null" json:"volume"`
 }
 
 func (StockHistory) TableName() string {
@@ -71,11 +71,11 @@ func ResolutionFromProto(s actions_pb.StockHistoryResolution) Resolution {
 
 // ohlc represents ohlc for a given stock
 type ohlcv struct {
-	open   uint32
-	high   uint32
-	low    uint32
-	close  uint32
-	volume uint32
+	open   uint64
+	high   uint64
+	low    uint64
+	close  uint64
+	volume uint64
 }
 
 var stopStockHistoryRecorderChan chan struct{}

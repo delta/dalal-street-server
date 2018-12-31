@@ -11,7 +11,7 @@ import (
 )
 
 // helper function to create a new transaction object
-func makeTransaction(id uint32, userID uint32, stockID uint32, transactionType models.TransactionType, stockQty int32, price uint32, total int32, createdAt string) *models.Transaction {
+func makeTransaction(id uint32, userID uint32, stockID uint32, transactionType models.TransactionType, stockQty int64, price uint64, total int64, createdAt string) *models.Transaction {
 	return &models.Transaction{
 		Id:            id,
 		UserId:        userID,
@@ -35,8 +35,8 @@ func TestLoadOldAsk(t *testing.T) {
 	defer mockControl.Finish()
 
 	var stockID uint32 = 1
-	var stockQuantity uint32 = 10
-	var stockPrice uint32 = 20
+	var stockQuantity uint64 = 10
+	var stockPrice uint64 = 20
 
 	mockAskQueue := mocks.NewMockAskPQueue(mockControl)
 	mockBidQueue := mocks.NewMockBidPQueue(mockControl)
@@ -79,8 +79,8 @@ func TestLoadOldAskStopLoss(t *testing.T) {
 	defer mockControl.Finish()
 
 	var stockID uint32 = 1
-	var stockQuantity uint32 = 10
-	var stockPrice uint32 = 20
+	var stockQuantity uint64 = 10
+	var stockPrice uint64 = 20
 
 	mockAskQueue := mocks.NewMockAskPQueue(mockControl)
 	mockBidQueue := mocks.NewMockBidPQueue(mockControl)
@@ -122,8 +122,8 @@ func TestLoadOldBid(t *testing.T) {
 	defer mockControl.Finish()
 
 	var stockID uint32 = 1
-	var stockQuantity uint32 = 10
-	var stockPrice uint32 = 20
+	var stockQuantity uint64 = 10
+	var stockPrice uint64 = 20
 
 	mockAskQueue := mocks.NewMockAskPQueue(mockControl)
 	mockBidQueue := mocks.NewMockBidPQueue(mockControl)
@@ -166,8 +166,8 @@ func TestLoadOldBidStopLoss(t *testing.T) {
 	defer mockControl.Finish()
 
 	var stockID uint32 = 1
-	var stockQuantity uint32 = 10
-	var stockPrice uint32 = 20
+	var stockQuantity uint64 = 10
+	var stockPrice uint64 = 20
 
 	mockAskQueue := mocks.NewMockAskPQueue(mockControl)
 	mockBidQueue := mocks.NewMockBidPQueue(mockControl)
@@ -237,7 +237,7 @@ func TestLoadOldTransactions(t *testing.T) {
 	transactions := []*models.Transaction{t1, t2}
 
 	for _, transaction := range transactions {
-		mockDepth.EXPECT().AddTrade(transaction.Price, uint32(-transaction.StockQuantity), transaction.CreatedAt).Times(1)
+		mockDepth.EXPECT().AddTrade(transaction.Price, uint64(-transaction.StockQuantity), transaction.CreatedAt).Times(1)
 	}
 
 	ob.LoadOldTransactions(transactions)

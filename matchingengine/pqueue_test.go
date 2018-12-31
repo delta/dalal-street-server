@@ -11,7 +11,7 @@ import (
 )
 
 //helper function to return an Ask object
-func makeAsk(userId uint32, stockId uint32, ot models.OrderType, stockQty uint32, price uint32, placedAt string) *models.Ask {
+func makeAsk(userId uint32, stockId uint32, ot models.OrderType, stockQty uint64, price uint64, placedAt string) *models.Ask {
 	return &models.Ask{
 		UserId:        userId,
 		StockId:       stockId,
@@ -23,7 +23,7 @@ func makeAsk(userId uint32, stockId uint32, ot models.OrderType, stockQty uint32
 }
 
 //helper function to return a Bid object
-func makeBid(userId uint32, stockId uint32, ot models.OrderType, stockQty uint32, price uint32, placedAt string) *models.Bid {
+func makeBid(userId uint32, stockId uint32, ot models.OrderType, stockQty uint64, price uint64, placedAt string) *models.Bid {
 	return &models.Bid{
 		UserId:        userId,
 		StockId:       stockId,
@@ -110,8 +110,8 @@ func TestBidPQueuePushAndPop_protects_max_order(t *testing.T) {
 		pqueue.Push(testcases[i].bid)
 	}
 
-	var expectedPrice = []uint32{500, 400, 800, 100, 100}
-	var expectedQty = []uint32{3, 11, 2, 10, 5}
+	var expectedPrice = []uint64{500, 400, 800, 100, 100}
+	var expectedQty = []uint64{3, 11, 2, 10, 5}
 
 	for i := 0; i <= 4; i++ {
 
@@ -157,8 +157,8 @@ func TestBidPQueuePushAndPop_concurrently_protects_max_order(t *testing.T) {
 
 	wg.Wait()
 
-	var expectedPrice = []uint32{500, 400, 800, 100, 100}
-	var expectedQty = []uint32{3, 11, 2, 10, 5}
+	var expectedPrice = []uint64{500, 400, 800, 100, 100}
+	var expectedQty = []uint64{3, 11, 2, 10, 5}
 
 	for i := 0; i <= 4; i++ {
 
@@ -194,8 +194,8 @@ func TestAskPQueuePushAndPop_protects_min_order(t *testing.T) {
 		pqueue.Push(testcases[i].ask)
 	}
 
-	var expectedPrice = []uint32{500, 400, 100, 100, 800}
-	var expectedQty = []uint32{3, 11, 10, 5, 2}
+	var expectedPrice = []uint64{500, 400, 100, 100, 800}
+	var expectedQty = []uint64{3, 11, 10, 5, 2}
 
 	for i := 0; i <= 4; i++ {
 
@@ -242,8 +242,8 @@ func TestAskPQueuePushAndPop_concurrently_protects_min_order(t *testing.T) {
 
 	wg.Wait()
 
-	var expectedPrice = []uint32{500, 400, 100, 100, 800}
-	var expectedQty = []uint32{3, 11, 10, 5, 2}
+	var expectedPrice = []uint64{500, 400, 100, 100, 800}
+	var expectedQty = []uint64{3, 11, 10, 5, 2}
 
 	for i := 0; i <= 4; i++ {
 		topAsk := pqueue.Pop()
@@ -272,8 +272,8 @@ func TestBidPQueueHead_returns_max_element(t *testing.T) {
 	// size is the number of elements actually stored + 1
 	assert.Equal(t, len(pqueue.items), 3, "len(pqueue.items) = %d; want %d", len(pqueue.items), 3)
 
-	assert.Equal(t, topBid.Price, uint32(400), "pqueue.Head().price = %v; want %v", topBid.Price, uint32(400))
-	assert.Equal(t, topBid.StockQuantity, uint32(11), "pqueue.Head().StockQuantity = %v; want %v", topBid.StockQuantity, uint32(11))
+	assert.Equal(t, topBid.Price, uint64(400), "pqueue.Head().price = %v; want %v", topBid.Price, uint64(400))
+	assert.Equal(t, topBid.StockQuantity, uint64(11), "pqueue.Head().StockQuantity = %v; want %v", topBid.StockQuantity, uint64(11))
 }
 
 func TestAskPQueueHead_returns_min_element(t *testing.T) {
@@ -288,6 +288,6 @@ func TestAskPQueueHead_returns_min_element(t *testing.T) {
 	// size is the number of elements actually stored + 1
 	assert.Equal(t, len(pqueue.items), 3, "len(pqueue.items) = %d; want %d", len(pqueue.items), 3)
 
-	assert.Equal(t, topAsk.Price, uint32(100), "pqueue.Head().price = %v; want %v", topAsk.Price, uint32(100))
-	assert.Equal(t, topAsk.StockQuantity, uint32(5), "pqueue.Head().StockQuantity = %v; want %v", topAsk.StockQuantity, uint32(5))
+	assert.Equal(t, topAsk.Price, uint64(100), "pqueue.Head().price = %v; want %v", topAsk.Price, uint64(100))
+	assert.Equal(t, topAsk.StockQuantity, uint64(5), "pqueue.Head().StockQuantity = %v; want %v", topAsk.StockQuantity, uint64(5))
 }

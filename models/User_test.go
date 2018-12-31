@@ -132,7 +132,7 @@ func TestUserToProto(t *testing.T) {
 }
 
 func Test_PlaceAskOrder(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -143,7 +143,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		}
 	}
 
-	var makeAsk = func(userId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Ask {
+	var makeAsk = func(userId uint32, stockId uint32, ot OrderType, stockQty uint64, price uint64) *Ask {
 		return &Ask{
 			UserId:        userId,
 			StockId:       stockId,
@@ -241,7 +241,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 }
 
 func Test_PlaceBidOrder(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -252,7 +252,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 		}
 	}
 
-	var makeBid = func(userId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Bid {
+	var makeBid = func(userId uint32, stockId uint32, ot OrderType, stockQty uint64, price uint64) *Bid {
 		return &Bid{
 			UserId:        userId,
 			StockId:       stockId,
@@ -349,7 +349,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 }
 
 func Test_CancelOrder(t *testing.T) {
-	var makeAsk = func(userId uint32, askId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Ask {
+	var makeAsk = func(userId uint32, askId uint32, stockId uint32, ot OrderType, stockQty uint64, price uint64) *Ask {
 		return &Ask{
 			Id:            askId,
 			UserId:        userId,
@@ -360,7 +360,7 @@ func Test_CancelOrder(t *testing.T) {
 		}
 	}
 
-	var makeBid = func(userId uint32, bidId uint32, stockId uint32, ot OrderType, stockQty uint32, price uint32) *Bid {
+	var makeBid = func(userId uint32, bidId uint32, stockId uint32, ot OrderType, stockQty uint64, price uint64) *Bid {
 		return &Bid{
 			Id:            bidId,
 			UserId:        userId,
@@ -469,7 +469,7 @@ func Test_CancelOrder(t *testing.T) {
 }
 
 func Test_GetStocksOwned(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -577,7 +577,7 @@ func Test_GetStocksOwned(t *testing.T) {
 }
 
 func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
-	origCash := map[uint32]uint32{2: 2000, 3: 1000, 4: 5000}
+	origCash := map[uint32]uint64{2: 2000, 3: 1000, 4: 5000}
 
 	users := []*User{
 		{Id: 2, Email: "a@b.com", Cash: origCash[2]},
@@ -593,7 +593,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 
 	stockPrices := []struct {
 		stockId uint32
-		price   uint32
+		price   uint64
 	}{
 		{1, 101},
 		{2, 498},
@@ -607,8 +607,8 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 	testcases := []struct {
 		userId           uint32
 		stockId          uint32
-		stockQuantity    uint32
-		maxStkQtyGot     uint32
+		stockQuantity    uint64
+		maxStkQtyGot     uint64
 		buyLimitExceeded bool
 	}{
 		{2, 1, 10, 10, false},
@@ -722,7 +722,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 			if tr.StockQuantity < 0 {
 				t.Fatalf("Got negative! Wut. Got %+v", tr.StockQuantity)
 			}
-			if tc.maxStkQtyGot < uint32(tr.StockQuantity) {
+			if tc.maxStkQtyGot < uint64(tr.StockQuantity) {
 				t.Fatalf("Got more than possible. Allowed %+v; Got %+v", tc.maxStkQtyGot, tr.StockQuantity)
 			}
 		}()
@@ -745,7 +745,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 
 	// verify the cash for each user
 	for uid, oc := range origCash {
-		newCash := int32(oc)
+		newCash := int64(oc)
 		for _, tr := range transactions.m[uid].trlist {
 			newCash += tr.Total
 		}
@@ -753,14 +753,14 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error getting latest user data %+v", err)
 		}
-		if uint32(newCash) != u.Cash {
+		if uint64(newCash) != u.Cash {
 			t.Fatalf("User %d's cash not consistent. Got %d; want %d", uid, u.Cash, newCash)
 		}
 	}
 }
 
 func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -795,9 +795,9 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 	testcases := []struct {
 		userId        uint32
 		stockId       uint32
-		stockQuantity int32
-		cashLost      uint32
-		stockLeft     int32
+		stockQuantity int64
+		cashLost      uint64
+		stockLeft     int64
 		enoughStock   bool
 	}{
 		{2, 1, 7, 7 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 3, true},
@@ -861,11 +861,11 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error loading user data %+v", err)
 		}
-		originalCash := int32(u.Cash)
+		originalCash := int64(u.Cash)
 
 		tr, err := PerformMortgageTransaction(tc.userId, tc.stockId, tc.stockQuantity)
 
-		wasCashEnough := originalCash-int32(stocks[tc.stockId-1].CurrentPrice)*tc.stockQuantity*MORTGAGE_RETRIEVE_RATE/100 > 0
+		wasCashEnough := originalCash-int64(stocks[tc.stockId-1].CurrentPrice)*tc.stockQuantity*MORTGAGE_RETRIEVE_RATE/100 > 0
 		if _, ok := err.(NotEnoughStocksError); ok && !tc.enoughStock {
 			continue
 		} else if _, ok = err.(NotEnoughCashError); ok && !wasCashEnough {
@@ -885,16 +885,16 @@ func Test_PerformMortgageRetrieveTransaction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error loading user data %+v", err)
 		}
-		cashLost := uint32(originalCash) - u.Cash
+		cashLost := uint64(originalCash) - u.Cash
 		if cashLost != tc.cashLost {
-			t.Fatalf("Cash didn't change as expected. Want new cash %d; Got %+v; tc: %+v", uint32(originalCash)-tc.cashLost, u.Cash, tc)
+			t.Fatalf("Cash didn't change as expected. Want new cash %d; Got %+v; tc: %+v", uint64(originalCash)-tc.cashLost, u.Cash, tc)
 		}
 	}
 
 }
 
 func Test_PerformMortgageDepositTransaction(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int32, price uint32, total int32) *Transaction {
+	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
 		return &Transaction{
 			UserId:        userId,
 			StockId:       stockId,
@@ -929,9 +929,9 @@ func Test_PerformMortgageDepositTransaction(t *testing.T) {
 	testcases := []struct {
 		userId        uint32
 		stockId       uint32
-		stockQuantity int32
-		cashGained    uint32
-		stockLeft     int32
+		stockQuantity int64
+		cashGained    uint64
+		stockLeft     int64
 		enoughStock   bool
 	}{
 		{2, 1, -7, 7 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 3, true},
