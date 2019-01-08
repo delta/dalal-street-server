@@ -1258,6 +1258,19 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	total := int64(stockTradePrice * stockTradeQty)
 
+	// calculate tax
+	// // here tax is amount to be paid per stock
+
+	var tax uint64
+	if askingUser.Total < 500000 {
+		tax = 0
+	} else if 500000 < askingUser.Total && askingUser.Total < 2000000 {
+		tax = stockTradePrice / 10
+	} else {
+		tax = stockTradePrice * 3 / 10
+	}
+	l.Debugf("TAX per stock  %d", tax)
+
 	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -int64(stockTradeQty), stockTradePrice, total)
 	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, int64(stockTradeQty), stockTradePrice, -total)
 
@@ -1266,7 +1279,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	biddingUserOldCash := biddingUser.Cash
 
 	//calculate user's updated cash
-	askingUser.Cash += uint64(stockTradeQty) * stockTradePrice
+	askingUser.Cash += uint64(stockTradeQty) * (stockTradePrice - tax)
 	biddingUser.Cash -= uint64(stockTradeQty) * stockTradePrice
 
 	// in case things go wrong and we've to roll back
