@@ -232,8 +232,8 @@ func checkPasswordHash(password, hash string) bool {
 	return hash == sha1Hash
 }
 
-func getOrderFeePrice(price, stockId uint32, o OrderType) uint32 {
-	var orderFee uint32
+func getOrderFeePrice(price uint64, stockId uint32, o OrderType) uint64 {
+	var orderFee uint64
 	switch o {
 	case Limit:
 		orderFee = price
@@ -764,8 +764,8 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Check2: Passed.")
 	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
-	orderFee := uint32((ORDER_FEE_PERCENT / 100.0) * float32(ask.StockQuantity*orderPrice))
-	cashLeft := int32(user.Cash) - int32(orderFee)
+	orderFee := uint64((ORDER_FEE_PERCENT / 100.0) * float64(ask.StockQuantity*orderPrice))
+	cashLeft := int64(user.Cash) - int64(orderFee)
 
 	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
