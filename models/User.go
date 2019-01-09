@@ -1420,7 +1420,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 		l.Debugf("Retrieving stocks in action")
 
-		stockCount := struct{ Sc int32 }{0}
+		stockCount := struct{ Sc int64 }{0}
 		sql := "Select sum(stocksInBank) as sc from MortgageDetails where UserId=? and StockId=?"
 		err = db.Raw(sql, user.Id, stockId).Scan(&stockCount).Error
 		if err != nil {
@@ -1440,7 +1440,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		l.Debugf("Mortgaging stocks in action")
 	}
 
-	var trTotal int32
+	var trTotal int64
 
 	/* It is retrive action; This block will set correct trTotal and stockQuantity equal
 	to amount of stocks that could be retrieved; This block also modifies MortgageDetails
@@ -1460,14 +1460,14 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		// price represents cost of stock at time of mortgage
 		// stocksInBank represents number of stocks mortgaged at that time
 		var id int32
-		var price int32
-		var stocksInBank int32
+		var price int64
+		var stocksInBank int64
 
 		// tempStockQuantity is stock quantity left to retrieve
 		tempStockQuantity := stockQuantity
-		tempUserCash := int32(user.Cash)
+		tempUserCash := int64(user.Cash)
 		l.Infof("Cash %d", tempUserCash)
-		var maxStocksRetrieval int32
+		var maxStocksRetrieval int64
 
 		for rows.Next() {
 			rows.Scan(&id, &stocksInBank, &price)
@@ -1485,8 +1485,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 			if maxStocksRetrieval > tempStockQuantity { // We don't want to retrieve more than required
 				maxStocksRetrieval = tempStockQuantity
 			}
-
-			expense := -int32(price) * int32(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
+			expense := -int64(price) * int64(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
 			trTotal += expense
 			if maxStocksRetrieval < stocksInBank {
 				sql := "UPDATE MortgageDetails SET stocksInBank=? where id=?"
@@ -1524,7 +1523,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 			return nil, err
 		}
 
-		trTotal = -int32(mortgagePrice) * stockQuantity * MORTGAGE_DEPOSIT_RATE / 100
+		trTotal = -int64(mortgagePrice) * stockQuantity * MORTGAGE_DEPOSIT_RATE / 100
 	}
 
 	transaction := &Transaction{
