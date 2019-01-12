@@ -12,9 +12,9 @@ import (
 	"github.com/delta/dalal-street-server/models"
 	"github.com/delta/dalal-street-server/session"
 
-	"github.com/delta/dalal-street-server/proto_build"
-	"github.com/delta/dalal-street-server/proto_build/actions"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	pb "github.com/delta/dalal-street-server/proto_build"
+	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -828,6 +828,33 @@ func (d *dalalActionService) GetMortgageDetails(ctx context.Context, req *action
 	for _, mortgageDetails := range mortgages {
 		resp.MortgageMap[mortgageDetails.StockId] = uint64(-mortgageDetails.StocksInBank)
 	}
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}
+
+func (d *dalalActionService) GetRetrievePrice(ctx context.Context, req *actions_pb.GetRetrievePriceRequest) (*actions_pb.GetRetrievePriceResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetRetrievePrice",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("GetRetrievePrice requested")
+
+	resp := &actions_pb.GetRetrievePriceResponse{}
+
+	userId := getUserId(ctx)
+	retrievalPrice, err := models.GetRetrievePriceDetails(userId, req.StockId, int64(req.StockQuantity))
+
+	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
+		resp.StatusCode = actions_pb.GetRetrievePriceResponse_InternalServerError
+		return resp, nil
+	}
+
+	resp.StatusCode = actions_pb.GetRetrievePriceResponse_OK
+	resp.RetrievalCost = uint64(retrievalPrice)
 
 	l.Infof("Request completed successfully")
 

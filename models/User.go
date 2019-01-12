@@ -1610,6 +1610,84 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 	return transaction, nil
 }
 
+// Gets estimated cost of retriving number of stocks
+func GetRetrievePriceDetails(userId, stockId uint32, stockQuantity int64) (int64, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":              "GetRetrievePriceDetails",
+		"param_userId":        userId,
+		"param_stockId":       stockId,
+		"param_stockQuantity": stockQuantity,
+	})
+
+	l.Infof("PerformRetrievePriceDetails requested for userId = %d, stockId = %d amount = %d", userId, stockId, stockQuantity)
+
+	l.Debugf("Acquiring exclusive write on user")
+	ch, user, err := getUserExclusively(userId)
+
+	if err != nil {
+		l.Infof("GetRetrieveDetails failed for userId = %d, stockId = %d amount = %d while retrieving user", userId, stockId, stockQuantity)
+		l.Errorf("Errored: %+v", err)
+		return 0, err
+	}
+
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	// Estimated retrieval cost
+	var trTotal int64
+
+	// Perform estimation
+	db := getDB()
+
+	sql := "SELECT id, stocksInBank, mortgagePrice from MortgageDetails where userId=? AND stockId=? ORDER BY mortgagePrice"
+	rows, err := db.Raw(sql, user.Id, stockId).Rows()
+	if err != nil {
+		l.Error(err)
+		return 0, err
+	}
+	defer rows.Close()
+
+	// price represents cost of stock at time of mortgage
+	// stocksInBank represents number of stocks mortgaged at that time
+	var id int32
+	var price int64
+	var stocksInBank int64
+
+	// tempStockQuantity is stock quantity left to retrieve
+	tempStockQuantity := stockQuantity
+	tempUserCash := int64(user.Cash)
+	l.Infof("Cash %d", tempUserCash)
+	var maxStocksRetrieval int64
+
+	for rows.Next() {
+		rows.Scan(&id, &stocksInBank, &price)
+		maxStocksRetrieval = tempUserCash / price
+
+		if maxStocksRetrieval == 0 || tempStockQuantity == 0 {
+			stockQuantity -= tempStockQuantity // Amount of stocks retrieved till now
+			break
+		}
+
+		if maxStocksRetrieval > stocksInBank {
+			maxStocksRetrieval = stocksInBank
+		}
+
+		if maxStocksRetrieval > tempStockQuantity { // We don't want to retrieve more than required
+			maxStocksRetrieval = tempStockQuantity
+		}
+		expense := -int64(price) * int64(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
+		trTotal += expense
+
+		tempStockQuantity -= maxStocksRetrieval
+		tempUserCash -= expense
+	}
+
+	return trTotal, nil
+}
+
 func GetStocksOwned(userId uint32) (map[uint32]int64, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetStocksOwned",
