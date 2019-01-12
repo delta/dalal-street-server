@@ -1438,6 +1438,34 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 	} else {
 		l.Debugf("Mortgaging stocks in action")
+
+		db := getDB()
+
+		/* We don't want to include Mortgage type transaction because mortgage transactions are stored in Transactions
+		   table just for displaying/frontend purpose.*/
+
+		// stockCount = Total no. of stocks (mortgaged + unmortgaged)
+		stockCount := struct{ Sc int64 }{0}
+		sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=? and NOT Type=?"
+		err = db.Raw(sql, user.Id, stockId, MortgageTransaction.String()).Scan(&stockCount).Error
+		if err != nil {
+			l.Error(err)
+			return nil, err
+		}
+
+		// mortgageCount = stocksMortgaged
+		mortgageCount := struct{ Sc int64 }{0}
+		sql = "Select sum(stocksInBank) as sc from MortgageDetails where UserId=? and StockId=?"
+		err = db.Raw(sql, user.Id, stockId).Scan(&mortgageCount).Error
+		if err != nil {
+			l.Error(err)
+			return nil, err
+		}
+
+		if AbsBranch(stockQuantity) > stockCount.Sc-mortgageCount.Sc {
+			l.Errorf("Insufficient stocks to mortgage. Have %d, want %d", stockCount.Sc, stockQuantity)
+			return nil, NotEnoughStocksError{}
+		}
 	}
 
 	var trTotal int64
