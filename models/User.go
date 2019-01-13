@@ -1409,6 +1409,11 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		l.Debugf("Released exclusive write on user")
 	}()
 
+	/* Committing to database */
+	db := getDB()
+
+	tx := db.Begin()
+
 	allStocks.m[stockId].RLock()
 	mortgagePrice := allStocks.m[stockId].stock.AvgLastPrice
 	allStocks.m[stockId].RUnlock()
@@ -1517,18 +1522,20 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 			trTotal += expense
 			if maxStocksRetrieval < stocksInBank {
 				sql := "UPDATE MortgageDetails SET stocksInBank=? where id=?"
-				err = db.Exec(sql, stocksInBank-maxStocksRetrieval, id).Error
+				err = tx.Exec(sql, stocksInBank-maxStocksRetrieval, id).Error
 				if err != nil {
 					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating retrieved stocks", userId, stockId, stockQuantity)
 					l.Error(err)
+					tx.Rollback()
 					return nil, err
 				}
 			} else /* So we can delete that entire row */ {
 				sql := "DELETE from MortgageDetails WHERE id=?"
-				err = db.Exec(sql, id).Error
+				err = tx.Exec(sql, id).Error
 				if err != nil {
 					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d deleting retrieved user", userId, stockId, stockQuantity)
 					l.Error(err)
+					tx.Rollback()
 					return nil, err
 				}
 			}
@@ -1539,15 +1546,14 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 	} else /* Inserting into MortgageDetails table to get mortgage price later while retriving */ {
 
-		db := getDB()
-
 		sql := "INSERT into MortgageDetails (userId, stockId, stocksInBank, mortgagePrice) VALUES (?, ?, ?, ?)"
 
 		// Here mortgage price is last average price, refer line 1412 above
-		err = db.Exec(sql, user.Id, stockId, -stockQuantity, mortgagePrice).Error
+		err = tx.Exec(sql, user.Id, stockId, -stockQuantity, mortgagePrice).Error
 		if err != nil {
 			l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while mortgaging stocks", userId, stockId, stockQuantity)
 			l.Error(err)
+			tx.Rollback()
 			return nil, err
 		}
 
@@ -1569,11 +1575,6 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 	oldCash := user.Cash
 	user.Cash = uint64(int64(user.Cash) + trTotal)
-
-	/* Committing to database */
-	db := getDB()
-
-	tx := db.Begin()
 
 	errorHelper := func(format string, args ...interface{}) (*Transaction, error) {
 		l.Errorf(format, args...)
