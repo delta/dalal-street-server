@@ -1399,8 +1399,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUserExclusively(userId)
 	if err != nil {
-		l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while retrieving user", userId, stockId, stockQuantity)
-		l.Errorf("Errored: %+v", err)
+		l.Errorf("Errored PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while retrieving user : %+v ", userId, stockId, stockQuantity, err)
 		return nil, err
 	}
 	l.Debugf("Acquired")
