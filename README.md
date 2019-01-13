@@ -17,6 +17,7 @@ go version
 ```
 protoc --help
 ```
+- Setup ```SECRET_KEY``` environment variable to some string
 
 ## Build instructions
 
@@ -32,6 +33,7 @@ go get -v github.com/gemnasium/migrate
 go get -v gopkg.in/jarcoal/httpmock.v1
 go get -v github.com/golang/protobuf/proto
 go get -v github.com/golang/protobuf/protoc-gen-go
+go get -v github.com/sendgrid/sendgrid-go
 ```
 - Setup submodules
 ```

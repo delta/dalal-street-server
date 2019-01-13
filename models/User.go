@@ -10,11 +10,13 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
 
 	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
+	"github.com/delta/dalal-street-server/templates"
 	"github.com/delta/dalal-street-server/utils"
 	"github.com/jinzhu/gorm"
 
@@ -27,6 +29,7 @@ var (
 	UnauthorizedError      = errors.New("Invalid credentials")
 	NotRegisteredError     = errors.New("Not registered")
 	AlreadyRegisteredError = errors.New("Already registered")
+	UnverifiedUserError    = errors.New("User has not verified account")
 
 	/*
 		Net worth <= 0 => tax percentage = 0%
@@ -156,6 +159,12 @@ func Login(email, password string) (User, error) {
 		return u, nil
 	}
 
+	// Check if user has been verified or not only on prod
+	if config.Stage == "Prod" && registeredUser.IsVerified == false {
+		l.Errorf("User (%s) attempted login before verification", email)
+		return User{}, UnverifiedUserError
+	}
+
 	// Found in our local database
 	// If he's not registered with Pragyan, match password
 	if registeredUser.IsPragyan == false {
@@ -224,17 +233,32 @@ func RegisterUser(email, password, fullName string) error {
 		return err
 	}
 	password, _ = hashPassword(password)
+	verificationKey, _ := getVerificationKey(email)
 	register := &Registration{
-		Email:      email,
-		Password:   password,
-		IsPragyan:  false,
-		IsVerified: false,
-		Name:       fullName,
-		UserId:     u.Id,
+		Email:           email,
+		Password:        password,
+		IsPragyan:       false,
+		IsVerified:      false,
+		Name:            fullName,
+		UserId:          u.Id,
+		VerificationKey: verificationKey,
 	}
 	err = db.Save(register).Error
 	if err != nil {
 		return err
+	}
+
+	// Send verification email only if running on prod
+	if config.Stage == "Prod" {
+		l.Debugf("Sending verification email to %s", email)
+		verificationURL := fmt.Sprintf("https://0.0.0.0%s/verify?key=%s", config.ServerPort, verificationKey)
+		htmlContent := fmt.Sprintf(templates.HtmlEmailVerificationTemplate, verificationURL)
+		plainContent := fmt.Sprintf(templates.PlainEmailVerificationTemplate, verificationURL)
+		err = utils.SendEmail("noreply@dalalstreet.com", "Account Verification", email, plainContent, htmlContent)
+		if err != nil {
+			l.Errorf("Error while sending verification email to player %s", err)
+			return err
+		}
 	}
 
 	return nil
@@ -243,6 +267,14 @@ func RegisterUser(email, password, fullName string) error {
 func hashPassword(password string) (string, error) {
 	h := sha1.New()
 	h.Write([]byte(password))
+	sha1Hash := hex.EncodeToString(h.Sum(nil))
+	return sha1Hash, nil
+}
+
+func getVerificationKey(email string) (string, error) {
+	key := fmt.Sprintf("%s %s", email, os.Getenv("SECRET_KEY"))
+	h := sha1.New()
+	h.Write([]byte(key))
 	sha1Hash := hex.EncodeToString(h.Sum(nil))
 	return sha1Hash, nil
 }
