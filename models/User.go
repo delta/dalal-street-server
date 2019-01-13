@@ -1450,7 +1450,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 			return nil, err
 		}
 
-		if AbsBranch(stockQuantity) > stockOwned {
+		if utils.AbsInt64(stockQuantity) > stockOwned {
 			l.Errorf("Insufficient stocks to mortgage. Have %d, want %d", stockOwned, stockQuantity)
 			return nil, NotEnoughStocksError{}
 		}
@@ -1548,7 +1548,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		StockId:       stockId,
 		Type:          MortgageTransaction,
 		StockQuantity: stockQuantity,
-		Price:         uint64(AbsBranch(trTotal)),
+		Price:         uint64(utils.AbsInt64(trTotal)),
 		Total:         trTotal,
 		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
@@ -1641,11 +1641,4 @@ func Logout(userID uint32) {
 	userLocks.Lock()
 	delete(userLocks.m, userID)
 	userLocks.Unlock()
-}
-
-func AbsBranch(n int64) int64 {
-	if n < 0 {
-		return -n
-	}
-	return n
 }
