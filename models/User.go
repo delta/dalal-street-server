@@ -1386,6 +1386,7 @@ func (e WayTooMuchCashError) Error() string {
 	return "You already have more than enough cash. You cannot mortgage stocks right now."
 }
 
+// PerformMortgageTransaction returns mortgage transaction and/or error
 func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "PerformMortgageTransaction",
@@ -1410,7 +1411,6 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 	/* Committing to database */
 	db := getDB()
-
 	tx := db.Begin()
 
 	allStocks.m[stockId].RLock()
@@ -1419,8 +1419,11 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 	l.Infof("Taking current price of stock as %d", mortgagePrice)
 
-	if stockQuantity >= 0 /* Retrieve stocks action*/ {
-		db := getDB()
+	var trTotal int64
+
+	/* It is retrieve action; This block will set correct trTotal and stockQuantity equal
+	to amount of stocks that could be retrieved */
+	if stockQuantity >= 0 {
 
 		l.Debugf("Retrieving stocks in action")
 
@@ -1440,32 +1443,9 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 			return nil, NotEnoughStocksError{}
 		}
 
-	} else {
-		l.Debugf("Mortgaging stocks in action")
+		// Attempt to retrieve as user has stocks in mortgage
 
-		// stockOwned = Total no. of stocks user owns
-		stockOwned, err := getSingleStockCount(user, stockId)
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-
-		if utils.AbsInt64(stockQuantity) > stockOwned {
-			l.Errorf("Insufficient stocks to mortgage. Have %d, want %d", stockOwned, stockQuantity)
-			return nil, NotEnoughStocksError{}
-		}
-	}
-
-	var trTotal int64
-
-	/* It is retrive action; This block will set correct trTotal and stockQuantity equal
-	to amount of stocks that could be retrieved; This block also modifies MortgageDetails
-	table, btw this table is not used anywhere except in current function */
-
-	if stockQuantity >= 0 {
-
-		db := getDB()
-		sql := "SELECT id, stocksInBank, mortgagePrice from MortgageDetails where userId=? AND stockId=? ORDER BY mortgagePrice"
+		sql = "SELECT id, stocksInBank, mortgagePrice from MortgageDetails where userId=? AND stockId=? ORDER BY mortgagePrice"
 		rows, err := db.Raw(sql, user.Id, stockId).Rows()
 		if err != nil {
 			l.Error(err)
@@ -1479,35 +1459,25 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		var price int64
 		var stocksInBank int64
 
-		// tempStockQuantity is stock quantity left to retrieve
+		/* tempStockQuantity is stock quantity left to retrieve
+		 * tempUserCash is user cash left every row retrieval */
 		tempStockQuantity := stockQuantity
 		tempUserCash := int64(user.Cash)
 		l.Infof("Cash %d", tempUserCash)
-		var maxStocksRetrieval int64
+		var maxStocksRetrieval int64 = 9999
 
-		for rows.Next() {
+		for tempStockQuantity > 0 && maxStocksRetrieval > 0 && rows.Next() {
+
 			rows.Scan(&id, &stocksInBank, &price)
-			maxStocksRetrieval = tempUserCash / price
+			maxStocksRetrieval = utils.MinTripleInt64(tempUserCash/price, tempStockQuantity, stocksInBank)
 
-			if maxStocksRetrieval == 0 || tempStockQuantity == 0 {
-				stockQuantity -= tempStockQuantity // Amount of stocks retrieved till now
-				break
-			}
-
-			if maxStocksRetrieval > stocksInBank {
-				maxStocksRetrieval = stocksInBank
-			}
-
-			if maxStocksRetrieval > tempStockQuantity { // We don't want to retrieve more than required
-				maxStocksRetrieval = tempStockQuantity
-			}
 			expense := -int64(price) * int64(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
 			trTotal += expense
 			if maxStocksRetrieval < stocksInBank {
 				sql := "UPDATE MortgageDetails SET stocksInBank=? where id=?"
 				err = tx.Exec(sql, stocksInBank-maxStocksRetrieval, id).Error
 				if err != nil {
-					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating retrieved stocks", userId, stockId, stockQuantity)
+					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating retrieved stocks", userId, stockId, tempStockQuantity)
 					l.Error(err)
 					tx.Rollback()
 					return nil, err
@@ -1516,7 +1486,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 				sql := "DELETE from MortgageDetails WHERE id=?"
 				err = tx.Exec(sql, id).Error
 				if err != nil {
-					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d deleting retrieved user", userId, stockId, stockQuantity)
+					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d deleting retrieved user", userId, stockId, tempStockQuantity)
 					l.Error(err)
 					tx.Rollback()
 					return nil, err
@@ -1526,8 +1496,24 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 			tempStockQuantity -= maxStocksRetrieval
 			tempUserCash -= expense
 		}
+		// Setting stockQuantity to how much you could actually retreive
+		stockQuantity -= tempStockQuantity
 
 	} else /* Inserting into MortgageDetails table to get mortgage price later while retriving */ {
+
+		l.Debugf("Mortgaging stocks in action")
+
+		// stockOwned = Total no. of stocks user owns
+		stockOwned, err := getSingleStockCount(user, stockId)
+		if err != nil {
+			l.Error(err)
+			return nil, err
+		}
+
+		if utils.AbsInt64(stockQuantity) > stockOwned {
+			l.Errorf("Insufficient stocks to mortgage. Have %d, want %d", stockOwned, stockQuantity)
+			return nil, NotEnoughStocksError{}
+		}
 
 		sql := "INSERT into MortgageDetails (userId, stockId, stocksInBank, mortgagePrice) VALUES (?, ?, ?, ?)"
 
