@@ -12,9 +12,9 @@ import (
 	"github.com/delta/dalal-street-server/models"
 	"github.com/delta/dalal-street-server/session"
 
-	"github.com/delta/dalal-street-server/proto_build"
-	"github.com/delta/dalal-street-server/proto_build/actions"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	pb "github.com/delta/dalal-street-server/proto_build"
+	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -393,7 +393,7 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 	stockId := req.StockId
 	stockQty := -int64(req.StockQuantity)
 
-	transaction, err := models.PerformMortgageTransaction(userId, stockId, stockQty)
+	transaction, err := models.PerformMortgageTransaction(userId, stockId, stockQty, 0)
 
 	switch e := err.(type) {
 	case models.NotEnoughStocksError:
@@ -506,17 +506,20 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 		return makeError(actions_pb.RetrieveMortgageStocksResponse_MarketClosedError, "Market is closed. You cannot retrieve your mortgaged stocks right now.")
 	}
 
-	userId := getUserId(ctx)
-	stockId := req.StockId
+	userID := getUserId(ctx)
+	stockID := req.StockId
 	stockQty := int64(req.StockQuantity)
+	retrievePrice := req.RetrievePrice
 
-	transaction, err := models.PerformMortgageTransaction(userId, stockId, stockQty)
+	transaction, err := models.PerformMortgageTransaction(userID, stockID, stockQty, retrievePrice)
 
 	switch e := err.(type) {
 	case models.NotEnoughStocksError:
 		return makeError(actions_pb.RetrieveMortgageStocksResponse_NotEnoughStocksError, e.Error())
 	case models.NotEnoughCashError:
 		return makeError(actions_pb.RetrieveMortgageStocksResponse_NotEnoughCashError, e.Error())
+	case models.InvalidRetrievePriceError:
+		return makeError(actions_pb.RetrieveMortgageStocksResponse_InvalidRetrievePriceError, e.Error())
 	}
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
@@ -824,9 +827,8 @@ func (d *dalalActionService) GetMortgageDetails(ctx context.Context, req *action
 		return resp, nil
 	}
 
-	resp.MortgageMap = make(map[uint32]uint64)
-	for _, mortgageDetails := range mortgages {
-		resp.MortgageMap[mortgageDetails.StockId] = uint64(-mortgageDetails.StocksInBank)
+	for _, mortgageEntry := range mortgages {
+		resp.MortgageDetails = append(resp.MortgageDetails, mortgageEntry.ToProto())
 	}
 
 	l.Infof("Request completed successfully")

@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"gopkg.in/jarcoal/httpmock.v1"
+	httpmock "gopkg.in/jarcoal/httpmock.v1"
 
-	"github.com/delta/dalal-street-server/utils/test"
+	testutils "github.com/delta/dalal-street-server/utils/test"
 )
 
 func Test_Login(t *testing.T) {
@@ -798,12 +798,13 @@ func Test_PerformMortgageTransaction(t *testing.T) {
 		stockQuantity int64
 		cashGained    uint64
 		stockLeft     int64
+		retrievePrice uint64
 	}{
-		{2, 1, -7, 7 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 3},
-		{2, 1, -2, 2 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 1},
-		{2, 3, -15, 15 * 200 * MORTGAGE_DEPOSIT_RATE / 100, 5},
-		{2, 3, 5, 5 * 200 * MORTGAGE_RETRIEVE_RATE / 100, 10},
-		{2, 1, 5, 5 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 6},
+		{2, 1, -7, 7 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 3, 100},
+		{2, 1, -2, 2 * 100 * MORTGAGE_DEPOSIT_RATE / 100, 1, 100},
+		{2, 3, -15, 15 * 200 * MORTGAGE_DEPOSIT_RATE / 100, 5, 200},
+		{2, 3, 5, 5 * 200 * MORTGAGE_RETRIEVE_RATE / 100, 10, 200},
+		{2, 1, 5, 5 * 100 * MORTGAGE_RETRIEVE_RATE / 100, 6, 100},
 	}
 
 	db := getDB()
@@ -855,7 +856,7 @@ func Test_PerformMortgageTransaction(t *testing.T) {
 		}
 		originalCash := u.Cash
 
-		tr, err := PerformMortgageTransaction(tc.userId, tc.stockId, tc.stockQuantity)
+		tr, err := PerformMortgageTransaction(tc.userId, tc.stockId, tc.stockQuantity, tc.retrievePrice)
 
 		if err != nil {
 			if _, ok := err.(NotEnoughStocksError); !ok {

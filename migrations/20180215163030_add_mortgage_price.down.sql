@@ -1,1 +1,3 @@
-ALTER TABLE MortgageDetails DROP COLUMN mortgagePrice;
+ALTER TABLE MortgageDetails 
+DROP COLUMN mortgagePrice,
+DROP PRIMARY KEY, ADD PRIMARY KEY(id);

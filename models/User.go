@@ -480,6 +480,13 @@ func (e InvalidOrderIDError) Error() string {
 	return fmt.Sprintf("Invalid order id")
 }
 
+// InvalidRetrievePriceError is given out when a user tries to cancel an order he didn't make or that didn't exist
+type InvalidRetrievePriceError struct{}
+
+func (e InvalidRetrievePriceError) Error() string {
+	return fmt.Sprintf("Invalid retrieve price")
+}
+
 //
 // Methods
 //
@@ -1387,15 +1394,16 @@ func (e WayTooMuchCashError) Error() string {
 }
 
 // PerformMortgageTransaction returns mortgage transaction and/or error
-func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*Transaction, error) {
+func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, retrievePrice uint64) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "PerformMortgageTransaction",
 		"param_userId":        userId,
 		"param_stockId":       stockId,
 		"param_stockQuantity": stockQuantity,
+		"param_retrievePrice": retrievePrice,
 	})
 
-	l.Infof("PerformMortgageTransaction requested for userId = %d, stockId = %d amount = %d", userId, stockId, stockQuantity)
+	l.Infof("PerformMortgageTransaction requested for userId = %d, stockId = %d amount = %d retrievePrice = %d", userId, stockId, stockQuantity, retrievePrice)
 
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUserExclusively(userId)
@@ -1427,79 +1435,60 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 		l.Debugf("Retrieving stocks in action")
 
-		stockCount := struct{ Sc int64 }{0}
-		sql := "Select sum(stocksInBank) as sc from MortgageDetails where UserId=? and StockId=?"
-		err = db.Raw(sql, user.Id, stockId).Scan(&stockCount).Error
+		sql := "SELECT id, stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
+		rows, err := db.Raw(sql, user.Id, stockId, retrievePrice).Rows()
 		if err != nil {
-			l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while retrieving total stocks", userId, stockId, stockQuantity)
 			l.Error(err)
 			return nil, err
 		}
 
-		l.Debugf("%d stocks mortgaged currently", stockCount.Sc)
+		var id int32
+		var stocksInBank int64
 
-		if stockQuantity > stockCount.Sc {
-			l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stockCount.Sc, stockQuantity)
+		if !rows.Next() {
+			l.Errorf("Invalid retrieve price. Incoming retrieve price %d", retrievePrice)
+			rows.Close()
+			return nil, InvalidRetrievePriceError{}
+		} else {
+			rows.Scan(&id, &stocksInBank)
+			rows.Close()
+		}
+
+		mortgagePrice = retrievePrice
+
+		if int64(user.Cash/mortgagePrice) >= stockQuantity {
+
+			if stockQuantity < stocksInBank {
+				sql := "UPDATE MortgageDetails SET stocksInBank=? WHERE userId=? AND stockId=? AND mortgagePrice=?"
+				err = tx.Exec(sql, stocksInBank-stockQuantity, user.Id, stockId, retrievePrice).Error
+				if err != nil {
+					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating retrieved stocks", userId, stockId, stockQuantity)
+					l.Error(err)
+					tx.Rollback()
+					return nil, err
+				}
+			} else if stockQuantity == stocksInBank /* So we can delete that entire row */ {
+				sql := "DELETE from MortgageDetails WHERE userId=? AND stockId=? AND mortgagePrice=?"
+				err = tx.Exec(sql, user.Id, stockId, retrievePrice).Error
+				if err != nil {
+					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d deleting retrieved user", userId, stockId, stockQuantity)
+					l.Error(err)
+					tx.Rollback()
+					return nil, err
+				}
+			} else /* stockQuantity to retrieve > stocksInBank */ {
+				l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stocksInBank, stockQuantity)
+				return nil, NotEnoughStocksError{}
+			}
+
+		} else {
+			l.Errorf("Insufficient cash with user. Have %d, want %d", user.Cash, stockQuantity*int64(mortgagePrice))
 			return nil, NotEnoughStocksError{}
 		}
 
-		// Attempt to retrieve as user has stocks in mortgage
+		trTotal = -int64(mortgagePrice) * int64(stockQuantity) * MORTGAGE_RETRIEVE_RATE / 100
 
-		sql = "SELECT id, stocksInBank, mortgagePrice from MortgageDetails where userId=? AND stockId=? ORDER BY mortgagePrice"
-		rows, err := db.Raw(sql, user.Id, stockId).Rows()
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-		defer rows.Close()
-
-		// price represents cost of stock at time of mortgage
-		// stocksInBank represents number of stocks mortgaged at that time
-		var id int32
-		var price int64
-		var stocksInBank int64
-
-		/* tempStockQuantity is stock quantity left to retrieve
-		 * tempUserCash is user cash left every row retrieval */
-		tempStockQuantity := stockQuantity
-		tempUserCash := int64(user.Cash)
-		l.Infof("Cash %d", tempUserCash)
-		var maxStocksRetrieval int64 = 9999
-
-		for tempStockQuantity > 0 && maxStocksRetrieval > 0 && rows.Next() {
-
-			rows.Scan(&id, &stocksInBank, &price)
-			maxStocksRetrieval = utils.MinTripleInt64(tempUserCash/price, tempStockQuantity, stocksInBank)
-
-			expense := -int64(price) * int64(maxStocksRetrieval) * MORTGAGE_RETRIEVE_RATE / 100
-			trTotal += expense
-			if maxStocksRetrieval < stocksInBank {
-				sql := "UPDATE MortgageDetails SET stocksInBank=? where id=?"
-				err = tx.Exec(sql, stocksInBank-maxStocksRetrieval, id).Error
-				if err != nil {
-					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating retrieved stocks", userId, stockId, tempStockQuantity)
-					l.Error(err)
-					tx.Rollback()
-					return nil, err
-				}
-			} else /* So we can delete that entire row */ {
-				sql := "DELETE from MortgageDetails WHERE id=?"
-				err = tx.Exec(sql, id).Error
-				if err != nil {
-					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d deleting retrieved user", userId, stockId, tempStockQuantity)
-					l.Error(err)
-					tx.Rollback()
-					return nil, err
-				}
-			}
-
-			tempStockQuantity -= maxStocksRetrieval
-			tempUserCash -= expense
-		}
-		// Setting stockQuantity to how much you could actually retreive
-		stockQuantity -= tempStockQuantity
-
-	} else /* Inserting into MortgageDetails table to get mortgage price later while retriving */ {
+	} else /* MortgageAction : Inserting into MortgageDetails table to get mortgage price later while retriving */ {
 
 		l.Debugf("Mortgaging stocks in action")
 
@@ -1515,15 +1504,39 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 			return nil, NotEnoughStocksError{}
 		}
 
-		sql := "INSERT into MortgageDetails (userId, stockId, stocksInBank, mortgagePrice) VALUES (?, ?, ?, ?)"
-
-		// Here mortgage price is last average price, refer line 1412 above
-		err = tx.Exec(sql, user.Id, stockId, -stockQuantity, mortgagePrice).Error
+		sql := "SELECT id, stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
+		rows, err := db.Raw(sql, user.Id, stockId, mortgagePrice).Rows()
 		if err != nil {
-			l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while mortgaging stocks", userId, stockId, stockQuantity)
 			l.Error(err)
-			tx.Rollback()
 			return nil, err
+		}
+
+		var id int32
+		var stocksInBank int64
+
+		if !rows.Next() {
+			sql := "INSERT into MortgageDetails (userId, stockId, stocksInBank, mortgagePrice) VALUES (?, ?, ?, ?)"
+
+			// Here mortgage price is last average price
+			err = tx.Exec(sql, user.Id, stockId, -stockQuantity, mortgagePrice).Error
+			if err != nil {
+				l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while mortgaging stocks", userId, stockId, stockQuantity)
+				l.Error(err)
+				tx.Rollback()
+				return nil, err
+			}
+		} else {
+			rows.Scan(&id, &stocksInBank)
+			rows.Close()
+
+			sql := "UPDATE MortgageDetails SET stocksInBank=? WHERE userId=? AND stockId=? AND mortgagePrice=?"
+			err = tx.Exec(sql, stocksInBank-stockQuantity, user.Id, stockId, mortgagePrice).Error
+			if err != nil {
+				l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating mortgaged stocks", userId, stockId, stockQuantity)
+				l.Error(err)
+				tx.Rollback()
+				return nil, err
+			}
 		}
 
 		trTotal = -int64(mortgagePrice) * stockQuantity * MORTGAGE_DEPOSIT_RATE / 100
@@ -1534,7 +1547,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		StockId:       stockId,
 		Type:          MortgageTransaction,
 		StockQuantity: stockQuantity,
-		Price:         uint64(utils.AbsInt64(trTotal)),
+		Price:         mortgagePrice,
 		Total:         trTotal,
 		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
