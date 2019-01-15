@@ -1403,12 +1403,12 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 		"param_retrievePrice": retrievePrice,
 	})
 
-	l.Infof("PerformMortgageTransaction requested for userId = %d, stockId = %d amount = %d retrievePrice = %d", userId, stockId, stockQuantity, retrievePrice)
+	l.Infof("PerformMortgageTransaction requested")
 
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUserExclusively(userId)
 	if err != nil {
-		l.Errorf("Errored PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while retrieving user : %+v ", userId, stockId, stockQuantity, err)
+		l.Errorf("Errored : %+v ", err)
 		return nil, err
 	}
 	l.Debugf("Acquired")
@@ -1429,115 +1429,18 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 
 	var trTotal int64
 
-	/* It is retrieve action; This block will set correct trTotal and stockQuantity equal
-	to amount of stocks that could be retrieved */
 	if stockQuantity >= 0 {
-
-		l.Debugf("Retrieving stocks in action")
-
-		sql := "SELECT stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
-		rows, err := db.Raw(sql, user.Id, stockId, retrievePrice).Rows()
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-
-		var stocksInBank int64
-
-		if !rows.Next() {
-			l.Errorf("Invalid retrieve price. Incoming retrieve price %d", retrievePrice)
-			rows.Close()
-			return nil, InvalidRetrievePriceError{}
-		} else {
-			rows.Scan(&stocksInBank)
-			rows.Close()
-		}
-
 		mortgagePrice = retrievePrice
+		trTotal, err = retrieveStocksAction(user.Id, stockId, stockQuantity, user.Cash, retrievePrice, tx)
+	} else {
+		// Sending stockQuantity negative as stockQuantity itself is negative makeing -stockQuantity
+		trTotal, err = mortgageStocksAction(user, stockId, -stockQuantity, mortgagePrice, tx)
+	}
 
-		if int64(user.Cash/mortgagePrice) >= stockQuantity {
-
-			if stockQuantity < stocksInBank {
-				sql := "UPDATE MortgageDetails SET stocksInBank=? WHERE userId=? AND stockId=? AND mortgagePrice=?"
-				err = tx.Exec(sql, stocksInBank-stockQuantity, user.Id, stockId, retrievePrice).Error
-				if err != nil {
-					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating retrieved stocks", userId, stockId, stockQuantity)
-					l.Error(err)
-					tx.Rollback()
-					return nil, err
-				}
-			} else if stockQuantity == stocksInBank /* So we can delete that entire row */ {
-				sql := "DELETE from MortgageDetails WHERE userId=? AND stockId=? AND mortgagePrice=?"
-				err = tx.Exec(sql, user.Id, stockId, retrievePrice).Error
-				if err != nil {
-					l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d deleting retrieved user", userId, stockId, stockQuantity)
-					l.Error(err)
-					tx.Rollback()
-					return nil, err
-				}
-			} else /* stockQuantity to retrieve > stocksInBank */ {
-				l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stocksInBank, stockQuantity)
-				return nil, NotEnoughStocksError{}
-			}
-
-		} else {
-			l.Errorf("Insufficient cash with user. Have %d, want %d", user.Cash, stockQuantity*int64(mortgagePrice))
-			return nil, NotEnoughCashError{}
-		}
-
-		trTotal = -int64(mortgagePrice) * int64(stockQuantity) * MORTGAGE_RETRIEVE_RATE / 100
-
-	} else /* MortgageAction : Inserting into MortgageDetails table to get mortgage price later while retriving */ {
-
-		l.Debugf("Mortgaging stocks in action")
-
-		// stockOwned = Total no. of stocks user owns
-		stockOwned, err := getSingleStockCount(user, stockId)
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-
-		if utils.AbsInt64(stockQuantity) > stockOwned {
-			l.Errorf("Insufficient stocks to mortgage. Have %d, want %d", stockOwned, stockQuantity)
-			return nil, NotEnoughStocksError{}
-		}
-
-		sql := "SELECT stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
-		rows, err := db.Raw(sql, user.Id, stockId, mortgagePrice).Rows()
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-
-		var stocksInBank int64
-
-		if !rows.Next() {
-			sql := "INSERT into MortgageDetails (userId, stockId, stocksInBank, mortgagePrice) VALUES (?, ?, ?, ?)"
-
-			// Here mortgage price is last average price
-			err = tx.Exec(sql, user.Id, stockId, -stockQuantity, mortgagePrice).Error
-			if err != nil {
-				l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while mortgaging stocks", userId, stockId, stockQuantity)
-				l.Error(err)
-				tx.Rollback()
-				return nil, err
-			}
-		} else {
-			rows.Scan(&stocksInBank)
-			rows.Close()
-
-			sql := "UPDATE MortgageDetails SET stocksInBank=? WHERE userId=? AND stockId=? AND mortgagePrice=?"
-			err = tx.Exec(sql, stocksInBank-stockQuantity, user.Id, stockId, mortgagePrice).Error
-			if err != nil {
-				l.Infof("PerformMortgageTransaction failed for userId = %d, stockId = %d amount = %d while updating mortgaged stocks", userId, stockId, stockQuantity)
-				l.Error(err)
-				tx.Rollback()
-				return nil, err
-			}
-		}
-
-		trTotal = -int64(mortgagePrice) * stockQuantity * MORTGAGE_DEPOSIT_RATE / 100
+	if err != nil {
+		tx.Rollback()
+		l.Error(err)
+		return nil, err
 	}
 
 	transaction := &Transaction{
