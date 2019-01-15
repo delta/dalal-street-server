@@ -1435,14 +1435,13 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 
 		l.Debugf("Retrieving stocks in action")
 
-		sql := "SELECT id, stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
+		sql := "SELECT stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
 		rows, err := db.Raw(sql, user.Id, stockId, retrievePrice).Rows()
 		if err != nil {
 			l.Error(err)
 			return nil, err
 		}
 
-		var id int32
 		var stocksInBank int64
 
 		if !rows.Next() {
@@ -1450,7 +1449,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 			rows.Close()
 			return nil, InvalidRetrievePriceError{}
 		} else {
-			rows.Scan(&id, &stocksInBank)
+			rows.Scan(&stocksInBank)
 			rows.Close()
 		}
 
@@ -1483,7 +1482,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 
 		} else {
 			l.Errorf("Insufficient cash with user. Have %d, want %d", user.Cash, stockQuantity*int64(mortgagePrice))
-			return nil, NotEnoughStocksError{}
+			return nil, NotEnoughCashError{}
 		}
 
 		trTotal = -int64(mortgagePrice) * int64(stockQuantity) * MORTGAGE_RETRIEVE_RATE / 100
@@ -1504,14 +1503,13 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 			return nil, NotEnoughStocksError{}
 		}
 
-		sql := "SELECT id, stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
+		sql := "SELECT stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
 		rows, err := db.Raw(sql, user.Id, stockId, mortgagePrice).Rows()
 		if err != nil {
 			l.Error(err)
 			return nil, err
 		}
 
-		var id int32
 		var stocksInBank int64
 
 		if !rows.Next() {
@@ -1526,7 +1524,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 				return nil, err
 			}
 		} else {
-			rows.Scan(&id, &stocksInBank)
+			rows.Scan(&stocksInBank)
 			rows.Close()
 
 			sql := "UPDATE MortgageDetails SET stocksInBank=? WHERE userId=? AND stockId=? AND mortgagePrice=?"
