@@ -62,7 +62,7 @@ func mortgageStocksAction(user *User, stockID uint32, stockQuantity int64, mortg
 	}
 
 	stocksInBank, err := getStocksInBank(user.Id, stockID, mortgagePrice, tx)
-	if (err != nil && err != InvalidRetrievePriceError{}) /* This type of error not applicable here */ {
+	if (err != nil && err != InvalidRetrievePriceError{}) { /* This type of error not applicable here */
 		l.Error(err)
 		return 0, err
 	}
@@ -110,11 +110,11 @@ func retrieveStocksAction(userID, stockID uint32, stockQuantity int64, userCash,
 		sql := "UPDATE MortgageDetails SET stocksInBank=? WHERE userId=? AND stockId=? AND mortgagePrice=?"
 		err = tx.Exec(sql, stocksInBank-stockQuantity, userID, stockID, retrievePrice).Error
 
-	} else if stockQuantity == stocksInBank /* So we can delete that entire row */ {
+	} else if stockQuantity == stocksInBank { /* So we can delete that entire row */
 		sql := "DELETE from MortgageDetails WHERE userId=? AND stockId=? AND mortgagePrice=?"
 		err = tx.Exec(sql, userID, stockID, retrievePrice).Error
 
-	} else /* stockQuantity to retrieve > stocksInBank */ {
+	} else { /* stockQuantity to retrieve > stocksInBank */
 		l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stocksInBank, stockQuantity)
 		return 0, NotEnoughStocksError{}
 	}
@@ -128,7 +128,6 @@ func retrieveStocksAction(userID, stockID uint32, stockQuantity int64, userCash,
 }
 
 func getStocksInBank(userID, stockID uint32, retrievePrice uint64, tx *gorm.DB) (int64, error) {
-
 	sql := "SELECT stocksInBank from MortgageDetails where userId=? AND stockId=? AND mortgagePrice=?"
 	rows, err := tx.Raw(sql, userID, stockID, retrievePrice).Rows()
 	if err != nil {
