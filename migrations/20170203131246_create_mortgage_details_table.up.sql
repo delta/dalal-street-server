@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS MortgageDetails (
 	id int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
 	userId int(11) UNSIGNED NOT NULL,
 	stockId int(11) UNSIGNED NOT NULL,
-	stocksInBank int(11) UNSIGNED NOT NULL,
+	stocksInBank bigint(11) UNSIGNED NOT NULL,
 	FOREIGN KEY (stockId) REFERENCES Stocks(id),
 	FOREIGN KEY (userId) REFERENCES Users(id),
 	PRIMARY KEY (id)
