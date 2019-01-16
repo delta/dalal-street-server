@@ -14,6 +14,7 @@ import (
 
 	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/jinzhu/gorm"
 
 	"github.com/Sirupsen/logrus"
 
@@ -678,6 +679,25 @@ func GetUserCopy(id uint32) (User, error) {
 	return *u.user, nil
 }
 
+// SubtractOrderFee subtracts cash for users account
+func SubtractOrderFee(user *User, orderFee uint64, tx *gorm.DB) error {
+	l := logger.WithFields(logrus.Fields{
+		"method":         "SubtractOrderFee",
+		"param_user":     fmt.Sprintf("%+v", user),
+		"param_orderFee": fmt.Sprintf("%d", orderFee),
+	})
+
+	user.Cash = user.Cash - orderFee
+
+	if err := tx.Save(user).Error; err != nil {
+		return err
+	}
+
+	l.Infof("Updated user cash. User now has %d", user.Cash)
+
+	return nil
+}
+
 // PlaceAskOrder places an Ask order for the user.
 //
 // The method is thread-safe like other exported methods of this package.
@@ -794,13 +814,9 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return 0, err
 	}
 
-	user.Cash = user.Cash - orderFee
-
-	if err := tx.Save(user).Error; err != nil {
-		return errorHelper("Error updating user cash. Rolling back. Error: %+v", err)
+	if err := SubtractOrderFee(user, orderFee, tx); err != nil {
+		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
 	}
-
-	l.Infof("Updated user cash. User now has %d", user.Cash)
 
 	orderFeeTransaction := GetTransactionRef(
 		userId,
@@ -942,13 +958,9 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		return 0, err
 	}
 
-	user.Cash = user.Cash - orderFee
-
-	if err := tx.Save(user).Error; err != nil {
-		return errorHelper("Error updating user cash. Rolling back. Error: %+v", err)
+	if err := SubtractOrderFee(user, orderFee, tx); err != nil {
+		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
 	}
-
-	l.Infof("Updated user cash. User now has %d", user.Cash)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	orderFeeTransaction := GetTransactionRef(
