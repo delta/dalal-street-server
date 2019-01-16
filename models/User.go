@@ -783,13 +783,51 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
 
+	db := getDB()
+	tx := db.Begin()
+
+	oldCash := user.Cash
+
+	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
+		return 0, err
+	}
+
 	user.Cash = user.Cash - orderFee
 
-	l.Debugf("Deducted cash from user's account. New balance: %d", user.Cash)
+	if err := tx.Save(user).Error; err != nil {
+		return errorHelper("Error updating user cash. Rolling back. Error: %+v", err)
+	}
+
+	l.Infof("Updated user cash. User now has %d", user.Cash)
+
+	orderFeeTransaction := GetTransactionRef(
+		userId,
+		ask.StockId,
+		OrderFeeTransaction,
+		0,
+		0,
+		int64(-orderFee),
+		utils.GetCurrentTimeISO8601(),
+	)
+
+	if err := tx.Save(orderFeeTransaction).Error; err != nil {
+		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
+	}
+
+	l.Info("Saved OrderFeeTransaction for bid %d", ask.Id)
+
+	if err := tx.Commit().Error; err != nil {
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
+	}
+
+	l.Info("Commited successfully for bid %d", ask.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(ask *Ask) {
+	go func(ask *Ask, orderFeeTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+		transactionsStream := datastreamsManager.GetTransactionsStream()
 
 		myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
 			Id:            ask.Id,
@@ -800,9 +838,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 			OrderType:     ask.ToProto().OrderType,
 			StockQuantity: ask.StockQuantity,
 		})
+		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
 
 		l.Infof("Sent through the datastreams")
-	}(ask)
+	}(ask, orderFeeTransaction)
 
 	return ask.Id, nil
 }
@@ -892,12 +931,52 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Infof("Created Bid order. BidId: %d", bid.Id)
 
+	db := getDB()
+	tx := db.Begin()
+
+	oldCash := user.Cash
+
+	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
+		return 0, err
+	}
+
 	user.Cash = user.Cash - orderFee
-	l.Debugf("Deducted order fee from user's account. New balance: %d", user.Cash)
+
+	if err := tx.Save(user).Error; err != nil {
+		return errorHelper("Error updating user cash. Rolling back. Error: %+v", err)
+	}
+
+	l.Infof("Updated user cash. User now has %d", user.Cash)
 
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(bid *Bid) {
+	orderFeeTransaction := GetTransactionRef(
+		userId,
+		bid.StockId,
+		OrderFeeTransaction,
+		0,
+		0,
+		int64(-orderFee),
+		utils.GetCurrentTimeISO8601(),
+	)
+
+	if err := tx.Save(orderFeeTransaction).Error; err != nil {
+		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
+	}
+
+	l.Info("Saved OrderFeeTransaction for bid %d", bid.Id)
+
+	if err := tx.Commit().Error; err != nil {
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
+	}
+
+	l.Info("Commited successfully for bid %d", bid.Id)
+
+	// Update datastreams to add newly placed order in OpenOrders
+	go func(bid *Bid, orderFeeTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+		transactionsStream := datastreamsManager.GetTransactionsStream()
 
 		myOrdersStream.SendOrder(bid.UserId, &datastreams_pb.MyOrderUpdate{
 			Id:            bid.Id,
@@ -908,12 +987,12 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 			OrderType:     bid.ToProto().OrderType,
 			StockQuantity: bid.StockQuantity,
 		})
+		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
 
 		l.Infof("Sent through the datastreams")
-	}(bid)
+	}(bid, orderFeeTransaction)
 
 	return bid.Id, nil
-
 }
 
 // CancelOrder cancels a user's order. It'll check if the user was the one who placed it.
