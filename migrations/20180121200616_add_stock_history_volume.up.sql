@@ -1,1 +1,1 @@
-ALTER TABLE StockHistory ADD COLUMN volume int(11);
+ALTER TABLE StockHistory ADD COLUMN volume bigint(11);

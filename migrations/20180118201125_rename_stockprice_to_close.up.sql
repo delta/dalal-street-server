@@ -1,2 +1,2 @@
 ALTER TABLE StockHistory
-CHANGE stockPrice close int(11);
+CHANGE stockPrice close bigint(11);
