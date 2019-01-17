@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -25,6 +27,23 @@ var (
 	UnauthorizedError      = errors.New("Invalid credentials")
 	NotRegisteredError     = errors.New("Not registered")
 	AlreadyRegisteredError = errors.New("Already registered")
+
+	/*
+		Net worth <= 0 => tax percentage = 0%
+		0 < Net worth <= 100000 => tax percentage = 2%
+		100000 < Net worth <= 500000 => tax percentage = 5%
+		500000 < Net worth <= 1000000 => tax percentage = 9%
+		1000000 < Net worth <= 2000000 => tax percentage = 15%
+		Net worth > 2000000 => tax percentage = 25%
+	*/
+	TaxBrackets = map[int64]uint64{
+		0:       0,
+		100000:  2,
+		500000:  5,
+		1000000: 9,
+		2000000: 15,
+	}
+	MaxTaxPercent uint64 = 25
 )
 
 var TotalUserCount uint32
@@ -1087,6 +1106,165 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 	}
 }
 
+// Helper function to determine what percentage the user should be taxed
+func getTaxPercent(netCash int64) uint64 {
+
+	keys := make([]int64, 0)
+	for taxBracket := range TaxBrackets {
+		keys = append(keys, taxBracket)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+
+	for _, taxBracket := range keys {
+		if netCash <= taxBracket {
+			return TaxBrackets[taxBracket]
+		}
+	}
+	return MaxTaxPercent
+}
+
+// Helper to calculate tax for bidding user.
+// It is assumed that an Exclusive Read and Write lock is already obtained for the user.
+// DO NOT call this function without obtaining the lock.
+func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stockPrice uint64, biddingUser *User) *TransactionSummary {
+	var l = logger.WithFields(logrus.Fields{
+		"method":              "getTaxForBiddingUser",
+		"param_stockId":       stockId,
+		"param_stockQuantity": stockQuantity,
+		"param_stockPrice":    stockPrice,
+		"param_biddingUser":   fmt.Sprintf("%+v", biddingUser),
+	})
+
+	userId := biddingUser.Id
+	stockPriceFloat64 := float64(stockPrice)
+	stockQuantityFloat64 := float64(stockQuantity)
+
+	transactionSummary := &TransactionSummary{UserId: userId, StockId: stockId}
+	tx.First(&transactionSummary)
+
+	l.Debugf("TransactionSummary object retrieved : %+v", transactionSummary)
+
+	if transactionSummary.StockQuantity != 0 {
+		// This user has already placed orders for this stock before
+		currentStocksHeld := float64(transactionSummary.StockQuantity)
+		if currentStocksHeld < 0 {
+			// User is buying back his short sold stocks and so should be taxed
+
+			taxableStockQty := math.Min(stockQuantityFloat64, -currentStocksHeld)
+			/*
+				if taxableStockQty = stockQuantity, then the user is buying back some of his short sold
+				stocks, but not all of them
+
+				if taxableStockQty = -currentStocksHeld, then the user is buying back all of his short sold stocks
+				selling and then buying some more stocks on top of that
+			*/
+
+			profit := taxableStockQty * (transactionSummary.Price - stockPriceFloat64)
+			if profit > 0 {
+				netCash := biddingUser.Total
+				tax := uint64(profit) * getTaxPercent(netCash) / 100
+				biddingUser.Cash -= tax
+				l.Debugf("Profit = %v. Tax = %v * %v / 100 = %v", profit, profit, getTaxPercent(netCash), tax)
+			} else {
+				l.Debugf("Profit = %v <= 0. Therefore, no tax.", profit)
+			}
+			transactionSummary.StockQuantity += int64(stockQuantity)
+			if taxableStockQty == -currentStocksHeld {
+				// User has bough back all of his short sold stocks and is now buying more, therefore the
+				// price in the database should update to reflect this
+				transactionSummary.Price = stockPriceFloat64
+			}
+			l.Debugf("User is buying back his short sold stocks. Database is going to be updated - %+v", transactionSummary)
+		} else {
+			// User already has some of these stocks and is buying more, therefore he shouldn't be taxed.
+			// But update the record in the database
+			transactionSummary.Price = ((currentStocksHeld * transactionSummary.Price) + (stockQuantityFloat64 * stockPriceFloat64)) / (currentStocksHeld + stockQuantityFloat64)
+			transactionSummary.StockQuantity += int64(stockQuantity)
+			l.Debugf("User is buying more stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
+		}
+
+	} else {
+		// Effectively the first time this user is buying this stock.
+		// Therefore, don't tax him. Just add the transaction into the database
+		transactionSummary.StockQuantity = int64(stockQuantity)
+		transactionSummary.Price = stockPriceFloat64
+		l.Debugf("Effectively the first time user is buying these stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
+	}
+
+	return transactionSummary
+}
+
+// Helper to calculate tax for asking user
+// It is assumed that an Exclusive Read and Write lock is already obtained for the user.
+// DO NOT call this function without obtaining the lock.
+func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stockPrice uint64, askingUser *User) *TransactionSummary {
+	var l = logger.WithFields(logrus.Fields{
+		"method":              "getTaxForAskingUser",
+		"param_stockId":       stockId,
+		"param_stockQuantity": stockQuantity,
+		"param_stockPrice":    stockPrice,
+		"param_biddingUser":   fmt.Sprintf("%+v", askingUser),
+	})
+
+	userId := askingUser.Id
+	stockPriceFloat64 := float64(stockPrice)
+	stockQuantityFloat64 := float64(stockQuantity)
+
+	transactionSummary := &TransactionSummary{UserId: userId, StockId: stockId}
+	tx.First(&transactionSummary)
+
+	l.Debugf("TransactionSummary object retrieved : %+v", transactionSummary)
+
+	if transactionSummary.StockQuantity != 0 {
+		// This user has already placed orders for this stock before
+
+		currentStocksHeld := float64(transactionSummary.StockQuantity)
+		if currentStocksHeld > 0 {
+			// User is selling some stocks that he possesses, he must be taxed.
+
+			taxableStockQty := math.Min(stockQuantityFloat64, currentStocksHeld)
+			/*
+				if taxableStockQty = stockQuantity, then the user is selling some of his existing stocks
+
+				if taxableStockQty = currentStocksHeld, then the user is selling all of his existing
+				stocks and then short selling (stockQuantity - currentStocksHeld) number of stocks
+			*/
+
+			profit := taxableStockQty * (stockPriceFloat64 - transactionSummary.Price)
+			if profit > 0 {
+				netCash := askingUser.Total
+				tax := uint64(profit) * getTaxPercent(netCash) / 100
+				askingUser.Cash -= tax
+				l.Debugf("Profit = %v. Tax = %v * %v / 100 = %v", profit, profit, getTaxPercent(netCash), tax)
+			} else {
+				l.Debugf("Profit = %v <= 0. Therefore, no tax.", profit)
+			}
+			transactionSummary.StockQuantity -= int64(stockQuantity)
+			if taxableStockQty == currentStocksHeld {
+				// User has sold all of his stocks and is now short selling, therefore the price in the
+				// database should update to reflect this
+				transactionSummary.Price = stockPriceFloat64
+			}
+			l.Debugf("User is selling his stocks. Database is going to be updated - %+v", transactionSummary)
+		} else {
+			// User has already short sold this stock, and is now short selling more of it. Therefore,
+			// no need to tax him. But update the record in the database.
+			transactionSummary.Price = ((currentStocksHeld * transactionSummary.Price) - (stockQuantityFloat64 * stockPriceFloat64)) / (currentStocksHeld - stockQuantityFloat64)
+			transactionSummary.StockQuantity -= int64(stockQuantity)
+			l.Debugf("User is short selling more stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
+		}
+
+	} else {
+		// Effectively the first time this user has placed an order for this stock and it is a short sell
+		// Therefore, don't tax him. Just add the transaction into the database
+		transactionSummary.StockQuantity = -int64(stockQuantity)
+		transactionSummary.Price = stockPriceFloat64
+		l.Debugf("Effectively the first time user is short selling these stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
+	}
+
+	return transactionSummary
+}
+
 func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuantity uint64) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "PerformBuyFromExchangeTransaction",
@@ -1178,6 +1356,15 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 		tx.Rollback()
 		return nil, fmt.Errorf(format, args...)
 	}
+
+	// Tax Calculation
+	transactionSummary := getTaxForBiddingUser(tx, stockId, stockQuantityRemoved, price, user)
+
+	if err := tx.Save(transactionSummary).Error; err != nil {
+		return errorHelper("Error updating the transaction summary. Rolling back. Error : +%v", err)
+	}
+
+	l.Debugf("TransactionSummary table updated successfully.")
 
 	if err := tx.Save(transaction).Error; err != nil {
 		return errorHelper("Error creating the transaction. Rolling back. Error: %+v", err)
@@ -1439,6 +1626,26 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		tx.Rollback()
 		return AskUndone, BidUndone, nil
 	}
+
+	// Tax Calculation for asking user
+	transactionSummary := getTaxForAskingUser(tx, ask.StockId, stockTradeQty, stockTradePrice, askingUser)
+
+	// Update transaction summary table for asking user
+	if err := tx.Save(transactionSummary).Error; err != nil {
+		return errorHelper("Error updating the transaction summary for asking user. Rolling back. Error : +%v", err)
+	}
+
+	l.Debugf("TransactionSummary table for asking user updated successfully.")
+
+	// Calculate tax for bidding user
+	transactionSummary = getTaxForBiddingUser(tx, bid.StockId, stockTradeQty, stockTradePrice, biddingUser)
+
+	// Update transaction summary table for bidding user
+	if err := tx.Save(transactionSummary).Error; err != nil {
+		return errorHelper("Error updating the transaction summary for bidding user. Rolling back. Error : +%v", err)
+	}
+
+	l.Debugf("TransactionSummary table updated successfully for bidding user.")
 
 	//save askTransaction
 	if err := tx.Save(askTransaction).Error; err != nil {
