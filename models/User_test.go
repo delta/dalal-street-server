@@ -658,6 +658,7 @@ func Test_PerformBuyFromExchangeTransaction(t *testing.T) {
 				}
 			}
 		}
+		db.Exec("DELETE FROM TransactionSummary")
 		db.Exec("DELETE FROM StockHistory")
 		for _, stock := range stocks {
 			if err := db.Delete(stock).Error; err != nil {
@@ -904,4 +905,14 @@ func Test_PerformMortgageTransaction(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestGetTaxPercent(t *testing.T) {
+	testutils.AssertEqual(t, 0, getTaxPercent(-50))
+	testutils.AssertEqual(t, 0, getTaxPercent(0))
+	testutils.AssertEqual(t, 2, getTaxPercent(50000))
+	testutils.AssertEqual(t, 5, getTaxPercent(200000))
+	testutils.AssertEqual(t, 9, getTaxPercent(750000))
+	testutils.AssertEqual(t, 15, getTaxPercent(1500000))
+	testutils.AssertEqual(t, 25, getTaxPercent(2500000))
 }
