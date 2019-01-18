@@ -101,7 +101,7 @@ func retrieveStocksAction(userID, stockID uint32, stockQuantity int64, userCash,
 		return 0, err
 	}
 
-	if int64(userCash/retrievePrice) < stockQuantity {
+	if int64(userCash) < stockQuantity*int64(retrievePrice) {
 		l.Errorf("Insufficient cash with user. Have %d, want %d", userCash, stockQuantity*int64(retrievePrice))
 		return 0, NotEnoughCashError{}
 	}
