@@ -171,6 +171,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		{makeAsk(2, 1, Limit, 3, 200), true},
 		{makeAsk(2, 1, Limit, 11, 200), false},
 		{makeAsk(2, 1, Limit, 11, 2000), false}, // too high a price won't be allowed
+		{makeAsk(2, 1, Limit, 10, 2000), false}, // with transaction fee, not enough cash
 		{makeAsk(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
 	}
 
@@ -182,6 +183,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		for _, tc := range testcases {
 			db.Delete(tc.ask)
 		}
+		db.Exec("DELETE FROM Transactions") // Because we create additional OrderFee Transactions
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
@@ -205,7 +207,6 @@ func Test_PlaceAskOrder(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	fm := sync.Mutex{}
-
 	for _, tc := range testcases {
 		if tc.pass != true {
 			continue
@@ -233,6 +234,11 @@ func Test_PlaceAskOrder(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	tid, terr := PlaceAskOrder(2, testcases[len(testcases)-2].ask)
+	if terr == nil {
+		t.Fatalf("Did not expect success. Failing %+v %+v", tid, terr)
+	}
 
 	id, err := PlaceAskOrder(2, testcases[len(testcases)-1].ask)
 	if err == nil {
@@ -292,6 +298,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 		for _, tc := range testcases {
 			db.Delete(tc.bid)
 		}
+		db.Exec("DELETE FROM Transactions") // Cuz we add new OrderFillTransaction
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
