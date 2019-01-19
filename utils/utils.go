@@ -48,6 +48,29 @@ func MinInt64(a, b uint64) uint64 {
 	return b
 }
 
+func MinTripleInt64(a, b, c int64) int64 {
+	if a < b {
+		if c < a {
+			return c
+		} else {
+			return a
+		}
+	} else {
+		if c < b {
+			return c
+		} else {
+			return b
+		}
+	}
+}
+
+func AbsInt64(n int64) int64 {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
 func IsGrpcRequest(req *http.Request) bool {
 	return strings.Contains(req.Header.Get("Content-Type"), "application/grpc")
 }

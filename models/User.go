@@ -12,12 +12,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/delta/dalal-street-server/proto_build/models"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 )
 
 var (
@@ -478,6 +478,13 @@ type InvalidOrderIDError struct{}
 
 func (e InvalidOrderIDError) Error() string {
 	return fmt.Sprintf("Invalid order id")
+}
+
+// InvalidRetrievePriceError is given out when a user tries to cancel an order he didn't make or that didn't exist
+type InvalidRetrievePriceError struct{}
+
+func (e InvalidRetrievePriceError) Error() string {
+	return fmt.Sprintf("Invalid retrieve price")
 }
 
 //
@@ -1386,12 +1393,14 @@ func (e WayTooMuchCashError) Error() string {
 	return "You already have more than enough cash. You cannot mortgage stocks right now."
 }
 
-func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*Transaction, error) {
+// PerformMortgageTransaction returns mortgage transaction and/or error
+func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, retrievePrice uint64) (*Transaction, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "PerformMortgageTransaction",
 		"param_userId":        userId,
 		"param_stockId":       stockId,
 		"param_stockQuantity": stockQuantity,
+		"param_retrievePrice": retrievePrice,
 	})
 
 	l.Infof("PerformMortgageTransaction requested")
@@ -1399,7 +1408,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUserExclusively(userId)
 	if err != nil {
-		l.Errorf("Errored: %+v", err)
+		l.Errorf("Errored : %+v ", err)
 		return nil, err
 	}
 	l.Debugf("Acquired")
@@ -1408,67 +1417,30 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		l.Debugf("Released exclusive write on user")
 	}()
 
+	/* Committing to database */
+	db := getDB()
+	tx := db.Begin()
+
 	allStocks.m[stockId].RLock()
 	mortgagePrice := allStocks.m[stockId].stock.AvgLastPrice
 	allStocks.m[stockId].RUnlock()
 
 	l.Infof("Taking current price of stock as %d", mortgagePrice)
 
-	var rate int32
+	var trTotal int64
 
 	if stockQuantity >= 0 {
-		rate = MORTGAGE_RETRIEVE_RATE
-		l.Debugf("stockQuantity positive. Retrieving stocks from mortgage @ %d%%", rate)
-
-		db := getDB()
-
-		stockCount := struct{ Sc int64 }{0}
-		sql := "Select sum(StockQuantity) as sc from Transactions where UserId=? and StockId=? and Type=?"
-		err = db.Raw(sql, user.Id, stockId, MortgageTransaction.String()).Scan(&stockCount).Error
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-
-		// Sc will be negative if stocks are there in mortgage.
-		// Change sign to mean number of stocks in mortgage
-		stockCount.Sc *= -1
-
-		l.Infof("%d stocks mortgaged currently", stockCount.Sc)
-
-		if stockQuantity > stockCount.Sc {
-			l.Errorf("Insufficient stocks in mortgage. Have %d, want %d", stockCount.Sc, stockQuantity)
-			return nil, NotEnoughStocksError{}
-		}
-
+		mortgagePrice = retrievePrice
+		trTotal, err = retrieveStocksAction(user.Id, stockId, stockQuantity, user.Cash, retrievePrice, tx)
 	} else {
-		MortgagePutLimitRWMutex.RLock()
-		lim := int64(MortgagePutLimit)
-		MortgagePutLimitRWMutex.RUnlock()
-		if user.Total > lim {
-			return nil, WayTooMuchCashError{}
-		}
-
-		rate = MORTGAGE_DEPOSIT_RATE
-		l.Debugf("stockQuantity negative. Depositing stocks to mortgage @ %d%%", rate)
-
-		stockOwned, err := getSingleStockCount(user, stockId)
-		if err != nil {
-			l.Error(err)
-			return nil, err
-		}
-
-		if stockOwned < -stockQuantity {
-			l.Errorf("Insufficient stocks in ownership. Have %d, want %d", stockOwned, stockQuantity)
-			return nil, NotEnoughStocksError{}
-		}
+		// Sending stockQuantity negative as stockQuantity itself is negative makeing -stockQuantity
+		trTotal, err = mortgageStocksAction(user, stockId, -stockQuantity, mortgagePrice, tx)
 	}
 
-	trTotal := -int64(mortgagePrice) * stockQuantity * int64(rate) / 100
-	l.Infof("lalalalalalalala %d %d %d", trTotal, stockQuantity, int64(rate/100))
-	if int64(user.Cash)+trTotal < 0 {
-		l.Debugf("User does not have enough cash. Want %d, Have %d. Failing.", trTotal, user.Cash)
-		return nil, NotEnoughCashError{}
+	if err != nil {
+		tx.Rollback()
+		l.Error(err)
+		return nil, err
 	}
 
 	transaction := &Transaction{
@@ -1476,7 +1448,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 		StockId:       stockId,
 		Type:          MortgageTransaction,
 		StockQuantity: stockQuantity,
-		Price:         0,
+		Price:         mortgagePrice,
 		Total:         trTotal,
 		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
@@ -1486,11 +1458,6 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64) (*T
 
 	oldCash := user.Cash
 	user.Cash = uint64(int64(user.Cash) + trTotal)
-
-	/* Committing to database */
-	db := getDB()
-
-	tx := db.Begin()
 
 	errorHelper := func(format string, args ...interface{}) (*Transaction, error) {
 		l.Errorf(format, args...)
