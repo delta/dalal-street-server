@@ -248,6 +248,10 @@ func getOrderFeePrice(price uint64, stockId uint32, o OrderType) uint64 {
 	return orderFee
 }
 
+func getOrderFee(quantity, price uint64) uint64 {
+	return uint64((ORDER_FEE_PERCENT / 100.0) * float64(quantity*price))
+}
+
 // createUser() creates a user given his email and name.
 func createUser(name string, email string) (*User, error) {
 	var l = logger.WithFields(logrus.Fields{
@@ -784,7 +788,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Check2: Passed.")
 	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
-	orderFee := uint64((ORDER_FEE_PERCENT / 100.0) * float64(ask.StockQuantity*orderPrice))
+	orderFee := getOrderFee(ask.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(orderFee)
 
 	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
@@ -928,7 +932,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	// Second Check: User should have enough cash
 	orderPrice := getOrderFeePrice(bid.Price, bid.StockId, bid.OrderType)
-	orderFee := uint64((ORDER_FEE_PERCENT / 100.0) * float64(bid.StockQuantity*orderPrice))
+	orderFee := getOrderFee(bid.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(bid.StockQuantity*bid.Price+orderFee)
 
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
