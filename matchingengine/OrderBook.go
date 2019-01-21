@@ -135,7 +135,15 @@ func (ob *orderBook) AddAskOrder(ask *models.Ask) {
 	// in case of stoploss order, add it to stoploss queue and return
 	if ask.OrderType == models.StopLoss {
 		l.Debugf("Adding stopLoss with ask_id %d to the queue", ask.Id)
-		ob.askStoploss.Push(ask)
+		stockCopy, _ := models.GetStockCopy(ask.StockId)
+
+		if stockCopy.CurrentPrice <= ask.Price {
+			ask.TriggerStoploss()
+			ob.askChan <- ask
+		} else {
+			ob.askStoploss.Push(ask)
+		}
+
 		return
 	}
 
@@ -154,7 +162,14 @@ func (ob *orderBook) AddBidOrder(bid *models.Bid) {
 	// in case of stoploss order, add it to queue and return
 	if bid.OrderType == models.StopLoss {
 		l.Debugf("Adding stopLoss with bid_id %d to the queue", bid.Id)
-		ob.bidStoploss.Push(bid)
+		stockCopy, _ := models.GetStockCopy(bid.StockId)
+
+		if stockCopy.CurrentPrice >= bid.Price {
+			bid.TriggerStoploss()
+			ob.bidChan <- bid
+		} else {
+			ob.bidStoploss.Push(bid)
+		}
 		return
 	}
 
