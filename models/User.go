@@ -234,18 +234,18 @@ func checkPasswordHash(password, hash string) bool {
 }
 
 func getOrderFeePrice(price uint64, stockId uint32, o OrderType) uint64 {
-	var orderFee uint64
+	var orderFeePrice uint64
 	switch o {
 	case Limit:
-		orderFee = price
+		orderFeePrice = price
 	case Market:
 		allStocks.m[stockId].RLock()
-		orderFee = allStocks.m[stockId].stock.CurrentPrice
+		orderFeePrice = allStocks.m[stockId].stock.CurrentPrice
 		allStocks.m[stockId].RUnlock()
 	case StopLoss:
-		orderFee = price
+		orderFeePrice = price
 	}
-	return orderFee
+	return orderFeePrice
 }
 
 func getOrderFee(quantity, price uint64) uint64 {
