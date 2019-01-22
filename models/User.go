@@ -14,6 +14,7 @@ import (
 
 	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/jinzhu/gorm"
 
 	"github.com/Sirupsen/logrus"
 
@@ -230,6 +231,25 @@ func checkPasswordHash(password, hash string) bool {
 	h.Write([]byte(password))
 	sha1Hash := hex.EncodeToString(h.Sum(nil))
 	return hash == sha1Hash
+}
+
+func getOrderFeePrice(price uint64, stockId uint32, o OrderType) uint64 {
+	var orderFeePrice uint64
+	switch o {
+	case Limit:
+		orderFeePrice = price
+	case Market:
+		allStocks.m[stockId].RLock()
+		orderFeePrice = allStocks.m[stockId].stock.CurrentPrice
+		allStocks.m[stockId].RUnlock()
+	case StopLoss:
+		orderFeePrice = price
+	}
+	return orderFeePrice
+}
+
+func getOrderFee(quantity, price uint64) uint64 {
+	return uint64((ORDER_FEE_PERCENT / 100.0) * float64(quantity*price))
 }
 
 // createUser() creates a user given his email and name.
@@ -663,6 +683,25 @@ func GetUserCopy(id uint32) (User, error) {
 	return *u.user, nil
 }
 
+// SubtractOrderFee subtracts cash for users account
+func SubtractOrderFee(user *User, orderFee uint64, tx *gorm.DB) error {
+	l := logger.WithFields(logrus.Fields{
+		"method":         "SubtractOrderFee",
+		"param_user":     fmt.Sprintf("%+v", user),
+		"param_orderFee": fmt.Sprintf("%d", orderFee),
+	})
+
+	user.Cash = user.Cash - orderFee
+
+	if err := tx.Save(user).Error; err != nil {
+		return err
+	}
+
+	l.Infof("Updated user cash. User now has %d", user.Cash)
+
+	return nil
+}
+
 // PlaceAskOrder places an Ask order for the user.
 //
 // The method is thread-safe like other exported methods of this package.
@@ -673,7 +712,7 @@ func GetUserCopy(id uint32) (User, error) {
 //  3. NotEnoughStocksError is returned
 //  4. Other error is returned (e.g. if Database connection doesn't open)
 func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
-	var l = logger.WithFields(logrus.Fields{
+	l := logger.WithFields(logrus.Fields{
 		"method":       "PlaceAskOrder",
 		"param_userId": userId,
 		"param_ask":    fmt.Sprintf("%+v", ask),
@@ -747,7 +786,19 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return 0, NotEnoughStocksError{currentAllowedQty}
 	}
 
-	l.Debugf("Check2: Passed. Creating Ask.")
+	l.Debugf("Check2: Passed.")
+	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
+	orderFee := getOrderFee(ask.StockQuantity, orderPrice)
+	cashLeft := int64(user.Cash) - int64(orderFee)
+
+	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
+
+	if cashLeft < MINIMUM_CASH_LIMIT {
+		l.Debugf("Check3: Failed. Not enough cash.")
+		return 0, NotEnoughCashError{}
+	}
+
+	l.Debugf("Check3: Passed. Creating Ask.")
 
 	if err := createAsk(ask); err != nil {
 		l.Errorf("Error creating the ask %+v", err)
@@ -756,9 +807,47 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Created Ask order. AskId: ", ask.Id)
 
+	db := getDB()
+	tx := db.Begin()
+
+	oldCash := user.Cash
+
+	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
+		return 0, err
+	}
+
+	if err := SubtractOrderFee(user, orderFee, tx); err != nil {
+		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
+	}
+
+	orderFeeTransaction := GetTransactionRef(
+		userId,
+		ask.StockId,
+		OrderFeeTransaction,
+		0,
+		0,
+		int64(-orderFee),
+		utils.GetCurrentTimeISO8601(),
+	)
+
+	if err := tx.Save(orderFeeTransaction).Error; err != nil {
+		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
+	}
+
+	l.Info("Saved OrderFeeTransaction for bid %d", ask.Id)
+
+	if err := tx.Commit().Error; err != nil {
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
+	}
+
+	l.Info("Commited successfully for bid %d", ask.Id)
+
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(ask *Ask) {
+	go func(ask *Ask, orderFeeTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+		transactionsStream := datastreamsManager.GetTransactionsStream()
 
 		myOrdersStream.SendOrder(ask.UserId, &datastreams_pb.MyOrderUpdate{
 			Id:            ask.Id,
@@ -769,9 +858,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 			OrderType:     ask.ToProto().OrderType,
 			StockQuantity: ask.StockQuantity,
 		})
+		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
 
 		l.Infof("Sent through the datastreams")
-	}(ask)
+	}(ask, orderFeeTransaction)
 
 	return ask.Id, nil
 }
@@ -785,7 +875,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 //  3. NotEnoughCashError is returned
 //  4. Other error is returned (e.g. if Database connection doesn't open)
 func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
-	var l = logger.WithFields(logrus.Fields{
+	l := logger.WithFields(logrus.Fields{
 		"method":    "PlaceBidOrder",
 		"param_id":  userId,
 		"param_bid": fmt.Sprintf("%+v", bid),
@@ -841,7 +931,9 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Debugf("Check1: Passed.")
 
 	// Second Check: User should have enough cash
-	var cashLeft = int64(user.Cash) - int64(bid.StockQuantity*bid.Price)
+	orderPrice := getOrderFeePrice(bid.Price, bid.StockId, bid.OrderType)
+	orderFee := getOrderFee(bid.StockQuantity, orderPrice)
+	cashLeft := int64(user.Cash) - int64(bid.StockQuantity*bid.Price+orderFee)
 
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
@@ -859,9 +951,48 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Infof("Created Bid order. BidId: %d", bid.Id)
 
+	db := getDB()
+	tx := db.Begin()
+
+	oldCash := user.Cash
+
+	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
+		l.Errorf(format, args...)
+		user.Cash = oldCash
+		return 0, err
+	}
+
+	if err := SubtractOrderFee(user, orderFee, tx); err != nil {
+		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
+	}
+
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(bid *Bid) {
+	orderFeeTransaction := GetTransactionRef(
+		userId,
+		bid.StockId,
+		OrderFeeTransaction,
+		0,
+		0,
+		int64(-orderFee),
+		utils.GetCurrentTimeISO8601(),
+	)
+
+	if err := tx.Save(orderFeeTransaction).Error; err != nil {
+		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
+	}
+
+	l.Info("Saved OrderFeeTransaction for bid %d", bid.Id)
+
+	if err := tx.Commit().Error; err != nil {
+		return errorHelper("Error committing the transaction. Failing. %+v", err)
+	}
+
+	l.Info("Commited successfully for bid %d", bid.Id)
+
+	// Update datastreams to add newly placed order in OpenOrders
+	go func(bid *Bid, orderFeeTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
+		transactionsStream := datastreamsManager.GetTransactionsStream()
 
 		myOrdersStream.SendOrder(bid.UserId, &datastreams_pb.MyOrderUpdate{
 			Id:            bid.Id,
@@ -872,12 +1003,12 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 			OrderType:     bid.ToProto().OrderType,
 			StockQuantity: bid.StockQuantity,
 		})
+		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
 
 		l.Infof("Sent through the datastreams")
-	}(bid)
+	}(bid, orderFeeTransaction)
 
 	return bid.Id, nil
-
 }
 
 // CancelOrder cancels a user's order. It'll check if the user was the one who placed it.

@@ -21,6 +21,8 @@ func (tt *TransactionType) Scan(value interface{}) error {
 		*tt = 2
 	case "DividendTransaction":
 		*tt = 3
+	case "OrderFeeTransaction":
+		*tt = 4
 	default:
 		return fmt.Errorf("Invalid value for TransactionType. Got %s", string(value.([]byte)))
 	}
@@ -34,6 +36,7 @@ const (
 	OrderFillTransaction
 	MortgageTransaction
 	DividendTransaction
+	OrderFeeTransaction
 )
 
 var transactionTypes = [...]string{
@@ -41,6 +44,7 @@ var transactionTypes = [...]string{
 	"OrderFillTransaction",
 	"MortgageTransaction",
 	"DividendTransaction",
+	"OrderFeeTransaction",
 }
 
 func (trType TransactionType) String() string {
@@ -82,6 +86,8 @@ func (t *Transaction) ToProto() *models_pb.Transaction {
 		pTrans.Type = models_pb.TransactionType_MORTGAGE_TRANSACTION
 	} else if t.Type == DividendTransaction {
 		pTrans.Type = models_pb.TransactionType_DIVIDEND_TRANSACTION
+	} else if t.Type == OrderFeeTransaction {
+		pTrans.Type = models_pb.TransactionType_ORDER_FEE_TRANSACTION
 	}
 
 	return pTrans
@@ -141,4 +147,17 @@ func GetAskTransactionsForStock(stockID, count uint32) ([]*Transaction, error) {
 
 	l.Debugf("Done")
 	return transactions, nil
+}
+
+// GetTransactionRef creates and returns a reference of a Transaction
+func GetTransactionRef(userID, stockID uint32, ttype TransactionType, qty int64, price uint64, total int64, createdAt string) *Transaction {
+	return &Transaction{
+		UserId:        userID,
+		StockId:       stockID,
+		Type:          ttype,
+		StockQuantity: qty,
+		Price:         price,
+		Total:         total,
+		CreatedAt:     createdAt,
+	}
 }
