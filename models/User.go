@@ -702,15 +702,15 @@ func GetUserCopy(id uint32) (User, error) {
 	return *u.user, nil
 }
 
-// SubtractOrderFee subtracts cash for users account
-func SubtractOrderFee(user *User, orderFee uint64, tx *gorm.DB) error {
+// SubtractUserCash subtracts cash for users account
+func SubtractUserCash(user *User, fee uint64, tx *gorm.DB) error {
 	l := logger.WithFields(logrus.Fields{
-		"method":         "SubtractOrderFee",
-		"param_user":     fmt.Sprintf("%+v", user),
-		"param_orderFee": fmt.Sprintf("%d", orderFee),
+		"method":     "SubtractUserCash",
+		"param_user": fmt.Sprintf("%+v", user),
+		"param_fee":  fmt.Sprintf("%d", fee),
 	})
 
-	user.Cash = user.Cash - orderFee
+	user.Cash = user.Cash - fee
 
 	if err := tx.Save(user).Error; err != nil {
 		return err
@@ -837,7 +837,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return 0, err
 	}
 
-	if err := SubtractOrderFee(user, orderFee, tx); err != nil {
+	if err := SubtractUserCash(user, orderFee, tx); err != nil {
 		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
 	}
 
@@ -857,6 +857,21 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Info("Saved OrderFeeTransaction for bid %d", ask.Id)
 
+	// Going to reserve stocks for this order
+	placeOrderTransaction := GetTransactionRef(
+		userId,
+		ask.StockId,
+		PlaceOrderTransaction,
+		-1*int64(ask.StockQuantity),
+		ask.Price,
+		0,
+		utils.GetCurrentTimeISO8601(),
+	)
+
+	if err := tx.Save(placeOrderTransaction); err != nil {
+		return errorHelper("Error reserving stocks. Rolling back. Error: %+v", err)
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
@@ -864,7 +879,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	l.Info("Commited successfully for bid %d", ask.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(ask *Ask, orderFeeTransaction *Transaction) {
+	go func(ask *Ask, orderFeeTransaction *Transaction, placeOrderTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -878,9 +893,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 			StockQuantity: ask.StockQuantity,
 		})
 		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
+		transactionsStream.SendTransaction(placeOrderTransaction.ToProto())
 
 		l.Infof("Sent through the datastreams")
-	}(ask, orderFeeTransaction)
+	}(ask, orderFeeTransaction, placeOrderTransaction)
 
 	return ask.Id, nil
 }
@@ -981,7 +997,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		return 0, err
 	}
 
-	if err := SubtractOrderFee(user, orderFee, tx); err != nil {
+	if err := SubtractUserCash(user, orderFee, tx); err != nil {
 		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
 	}
 
@@ -1002,6 +1018,25 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Info("Saved OrderFeeTransaction for bid %d", bid.Id)
 
+	// Going to reserve cash for this order
+	placeOrderTransaction := GetTransactionRef(
+		userId,
+		bid.StockId,
+		PlaceOrderTransaction,
+		0,
+		0,
+		-1*int64(bid.StockQuantity*bid.Price),
+		utils.GetCurrentTimeISO8601(),
+	)
+
+	if err := SubtractUserCash(user, bid.StockQuantity*bid.Price, tx); err != nil {
+		return errorHelper("Error subtracting cash. Rolling back. Error: %+v", err)
+	}
+
+	if err := tx.Save(placeOrderTransaction); err != nil {
+		return errorHelper("Error reserving cash. Rolling back. Error: %+v", err)
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
@@ -1009,7 +1044,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Info("Commited successfully for bid %d", bid.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(bid *Bid, orderFeeTransaction *Transaction) {
+	go func(bid *Bid, orderFeeTransaction *Transaction, placeOrderTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -1023,9 +1058,10 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 			StockQuantity: bid.StockQuantity,
 		})
 		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
+		transactionsStream.SendTransaction(placeOrderTransaction.ToProto())
 
 		l.Infof("Sent through the datastreams")
-	}(bid, orderFeeTransaction)
+	}(bid, orderFeeTransaction, placeOrderTransaction)
 
 	return bid.Id, nil
 }
