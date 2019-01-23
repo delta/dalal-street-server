@@ -6,6 +6,7 @@
 ## Prerequisites
 - Go 1.10 [Download link](https://golang.org/dl/#go1.10)
 - Protocol buffers [Download link](https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip)
+    - [Installation Instructions](https://gist.github.com/sofyanhadia/37787e5ed098c97919b8c593f0ec44d8)
 - MySQL
 
 ## Check prerequisites
