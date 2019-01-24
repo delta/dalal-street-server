@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
+	"github.com/jinzhu/gorm"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -149,15 +150,13 @@ func createBid(bid *Bid) error {
 	return nil
 }
 
-func (bid *Bid) Close() error {
+func (bid *Bid) Close(tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "Bid.Close",
 		"param_bid": fmt.Sprintf("%+v", bid),
 	})
 
 	l.Debugf("Attempting")
-
-	db := getDB()
 
 	bid.Lock()
 	if bid.IsClosed {
@@ -168,7 +167,7 @@ func (bid *Bid) Close() error {
 	bid.UpdatedAt = utils.GetCurrentTimeISO8601()
 	bid.Unlock()
 
-	if err := db.Save(bid).Error; err != nil {
+	if err := tx.Save(bid).Error; err != nil {
 		l.Error(err)
 		return err
 	}

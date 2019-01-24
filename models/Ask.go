@@ -7,6 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
+	"github.com/jinzhu/gorm"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -211,7 +212,7 @@ func (e AlreadyClosedError) Error() string {
 }
 
 // Marks an ask as closed and removes it from asksMap
-func (ask *Ask) Close() error {
+func (ask *Ask) Close(tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "Ask.Close",
 		"param_ask": fmt.Sprintf("%+v", ask),
@@ -228,8 +229,7 @@ func (ask *Ask) Close() error {
 	ask.UpdatedAt = utils.GetCurrentTimeISO8601()
 	ask.Unlock()
 
-	db := getDB()
-	if err := db.Save(ask).Error; err != nil {
+	if err := tx.Save(ask).Error; err != nil {
 		l.Error(err)
 		return err
 	}

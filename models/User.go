@@ -50,13 +50,14 @@ var TotalUserCount uint32
 
 // User models the User object.
 type User struct {
-	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	Email     string `gorm:"unique;not null" json:"email"`
-	Name      string `gorm:"not null" json:"name"`
-	Cash      uint64 `gorm:"not null" json:"cash"`
-	Total     int64  `gorm:"not null" json:"total"`
-	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
-	IsHuman   bool   `gorm:"column:isHuman;not null" json:"is_human"`
+	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Email        string `gorm:"unique;not null" json:"email"`
+	Name         string `gorm:"not null" json:"name"`
+	Cash         uint64 `gorm:"not null" json:"cash"`
+	Total        int64  `gorm:"not null" json:"total"`
+	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
+	IsHuman      bool   `gorm:"column:isHuman;not null" json:"is_human"`
+	CashInOrders uint64 `gorm:"column:cash_in_orders" json:"cash_in_hand"`
 }
 
 func (u *User) ToProto() *models_pb.User {
@@ -526,6 +527,13 @@ func (e InvalidRetrievePriceError) Error() string {
 	return fmt.Sprintf("Invalid retrieve price")
 }
 
+// InvalidTransaction is given out when a user tries to cancel an order he didn't make or that didn't exist
+type InvalidTransaction struct{}
+
+func (e InvalidTransaction) Error() string {
+	return fmt.Sprintf("No such transaction found")
+}
+
 //
 // Methods
 //
@@ -848,7 +856,6 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		0,
 		0,
 		int64(-orderFee),
-		utils.GetCurrentTimeISO8601(),
 	)
 
 	if err := tx.Save(orderFeeTransaction).Error; err != nil {
@@ -863,12 +870,13 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		ask.StockId,
 		PlaceOrderTransaction,
 		-1*int64(ask.StockQuantity),
-		ask.Price,
 		0,
-		utils.GetCurrentTimeISO8601(),
+		0,
 	)
 
-	if err := tx.Save(placeOrderTransaction); err != nil {
+	l.Info("Reserving stocks for ask %d", ask.Id)
+
+	if err := SavePlaceOrderTransaction(ask.Id, placeOrderTransaction, true, tx); err != nil {
 		return errorHelper("Error reserving stocks. Rolling back. Error: %+v", err)
 	}
 
@@ -1009,7 +1017,6 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		0,
 		0,
 		int64(-orderFee),
-		utils.GetCurrentTimeISO8601(),
 	)
 
 	if err := tx.Save(orderFeeTransaction).Error; err != nil {
@@ -1026,14 +1033,17 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		0,
 		0,
 		-1*int64(bid.StockQuantity*bid.Price),
-		utils.GetCurrentTimeISO8601(),
 	)
+
+	l.Info("Subtracting User Cash for bid %d", bid.Id)
 
 	if err := SubtractUserCash(user, bid.StockQuantity*bid.Price, tx); err != nil {
 		return errorHelper("Error subtracting cash. Rolling back. Error: %+v", err)
 	}
 
-	if err := tx.Save(placeOrderTransaction); err != nil {
+	l.Info("Reserving cash for bid %d", bid.Id)
+
+	if err := SavePlaceOrderTransaction(bid.Id, placeOrderTransaction, true, tx); err != nil {
 		return errorHelper("Error reserving cash. Rolling back. Error: %+v", err)
 	}
 
@@ -1093,6 +1103,9 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		l.Debugf("Released exclusive write on user")
 	}()
 
+	db := getDB()
+	tx := db.Begin()
+
 	if isAsk {
 		l.Debugf("Acquiring lock on ask order")
 		askOrder, err := getAsk(orderId)
@@ -1104,13 +1117,43 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 			return nil, nil, err
 		}
 
-		err = askOrder.Close()
+		err = askOrder.Close(tx)
 		// don't log if order is already closed
 		if _, ok := err.(AlreadyClosedError); !ok {
 			l.Errorf("Unknown error while saving that ask is cancelled %+v", err)
 		}
 		// return the error anyway
 		if err != nil {
+			tx.Rollback()
+			return nil, nil, err
+		}
+
+		// Place CancelOrderTransaction to return stocks
+		cancelOrderTransaction := GetTransactionRef(
+			userId,
+			orderId,
+			CancelOrderTransaction,
+			int64(askOrder.StockQuantity),
+			0,
+			0,
+		)
+
+		if err := tx.Save(cancelOrderTransaction).Error; err != nil {
+			tx.Rollback()
+			l.Errorf("Error while commiting %+v", err)
+			return nil, nil, err
+		}
+
+		go func(cancelOrderTransaction *Transaction) {
+			transactionsStream := datastreamsManager.GetTransactionsStream()
+			transactionsStream.SendTransaction(cancelOrderTransaction.ToProto())
+
+			l.Infof("Sent through the datastreams")
+		}(cancelOrderTransaction)
+
+		if err := tx.Commit().Error; err != nil {
+			tx.Rollback()
+			l.Errorf("Error while commiting %+v", err)
 			return nil, nil, err
 		}
 
@@ -1127,13 +1170,44 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 			return nil, nil, err
 		}
 
-		err = bidOrder.Close()
+		err = bidOrder.Close(tx)
 		// don't log if order is already closed
 		if _, ok := err.(AlreadyClosedError); !ok {
 			l.Errorf("Unknown error while saving that bid is cancelled %+v", err)
 		}
 		// return the error anyway
 		if err != nil {
+			tx.Rollback()
+			return nil, nil, err
+		}
+
+		// Place CancelOrderTransaction to return stocks
+		price, quantity, err := GetPlaceOrderTransactionDetails(orderId, isAsk)
+		cancelOrderTransaction := GetTransactionRef(
+			userId,
+			orderId,
+			CancelOrderTransaction,
+			0,
+			0,
+			price,
+		)
+
+		if err := tx.Save(cancelOrderTransaction).Error; err != nil {
+			tx.Rollback()
+			l.Errorf("Error while commiting %+v", err)
+			return nil, nil, err
+		}
+
+		go func(cancelOrderTransaction *Transaction) {
+			transactionsStream := datastreamsManager.GetTransactionsStream()
+			transactionsStream.SendTransaction(cancelOrderTransaction.ToProto())
+
+			l.Infof("Sent through the datastreams")
+		}(cancelOrderTransaction)
+
+		if err := tx.Commit().Error; err != nil {
+			tx.Rollback()
+			l.Errorf("Error while commiting %+v", err)
 			return nil, nil, err
 		}
 
@@ -1975,6 +2049,25 @@ func GetStocksOwned(userId uint32) (map[uint32]int64, error) {
 	}
 
 	return stocksOwned, nil
+}
+
+// SavePlaceOrderTransaction saves PlaceOrderTransaction and creates a mapping between orderId and
+func SavePlaceOrderTransaction(orderID uint32, placeOrderTransaction *Transaction, isAsk bool, tx *gorm.DB) error {
+	if err := tx.Save(placeOrderTransaction).Error; err != nil {
+		return err
+	}
+
+	orderDepositTransaction := GetOrderDepositTransactionRef(
+		placeOrderTransaction.Id,
+		orderID,
+		isAsk,
+	)
+
+	if err := tx.Save(orderDepositTransaction).Error; err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Logout removes the user from RAM.

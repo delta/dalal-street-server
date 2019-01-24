@@ -168,7 +168,7 @@ func GetAskTransactionsForStock(stockID, count uint32) ([]*Transaction, error) {
 }
 
 // GetTransactionRef creates and returns a reference of a Transaction
-func GetTransactionRef(userID, stockID uint32, ttype TransactionType, qty int64, price uint64, total int64, createdAt string) *Transaction {
+func GetTransactionRef(userID, stockID uint32, ttype TransactionType, qty int64, price uint64, total int64) *Transaction {
 	return &Transaction{
 		UserId:        userID,
 		StockId:       stockID,
@@ -176,6 +176,6 @@ func GetTransactionRef(userID, stockID uint32, ttype TransactionType, qty int64,
 		StockQuantity: qty,
 		Price:         price,
 		Total:         total,
-		CreatedAt:     createdAt,
+		CreatedAt:     utils.GetCurrentTimeISO8601(),
 	}
 }
