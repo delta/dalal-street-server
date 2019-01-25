@@ -50,14 +50,13 @@ var TotalUserCount uint32
 
 // User models the User object.
 type User struct {
-	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	Email        string `gorm:"unique;not null" json:"email"`
-	Name         string `gorm:"not null" json:"name"`
-	Cash         uint64 `gorm:"not null" json:"cash"`
-	Total        int64  `gorm:"not null" json:"total"`
-	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
-	IsHuman      bool   `gorm:"column:isHuman;not null" json:"is_human"`
-	CashInOrders uint64 `gorm:"column:cash_in_orders" json:"cash_in_hand"`
+	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Email     string `gorm:"unique;not null" json:"email"`
+	Name      string `gorm:"not null" json:"name"`
+	Cash      uint64 `gorm:"not null" json:"cash"`
+	Total     int64  `gorm:"not null" json:"total"`
+	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
+	IsHuman   bool   `gorm:"column:isHuman;not null" json:"is_human"`
 }
 
 func (u *User) ToProto() *models_pb.User {
@@ -1032,18 +1031,18 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		PlaceOrderTransaction,
 		0,
 		0,
-		-1*int64(bid.StockQuantity*bid.Price),
+		-1*int64(bid.StockQuantity*orderPrice),
 	)
 
 	l.Info("Subtracting User Cash for bid %d", bid.Id)
 
-	if err := SubtractUserCash(user, bid.StockQuantity*bid.Price, tx); err != nil {
+	if err := SubtractUserCash(user, bid.StockQuantity*orderPrice, tx); err != nil {
 		return errorHelper("Error subtracting cash. Rolling back. Error: %+v", err)
 	}
 
 	l.Info("Reserving cash for bid %d", bid.Id)
 
-	if err := SavePlaceOrderTransaction(bid.Id, placeOrderTransaction, true, tx); err != nil {
+	if err := SavePlaceOrderTransaction(bid.Id, placeOrderTransaction, false, tx); err != nil {
 		return errorHelper("Error reserving cash. Rolling back. Error: %+v", err)
 	}
 
@@ -1092,7 +1091,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 
 	l.Debugf("Acquiring exclusive write on user")
 
-	ch, _, err := getUserExclusively(userId)
+	ch, user, err := getUserExclusively(userId)
 	if err != nil {
 		l.Errorf("Errored: %+v", err)
 		return nil, nil, err
@@ -1131,9 +1130,9 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		// Place CancelOrderTransaction to return stocks
 		cancelOrderTransaction := GetTransactionRef(
 			userId,
-			orderId,
+			askOrder.StockId,
 			CancelOrderTransaction,
-			int64(askOrder.StockQuantity),
+			int64(askOrder.StockQuantity-askOrder.StockQuantityFulfilled),
 			0,
 			0,
 		)
@@ -1182,19 +1181,34 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		}
 
 		// Place CancelOrderTransaction to return stocks
-		price, quantity, err := GetPlaceOrderTransactionDetails(orderId, isAsk)
+		reservedCash, _, err := GetPlaceOrderTransactionDetails(orderId, false)
+		if err != nil {
+			l.Errorf("Could not retrieve reserved cash. Error: %+v")
+			return nil, nil, err
+		}
+
+		l.Infof("Reserved cash for order %d was found to be %d", bidOrder.Id, reservedCash)
+		stocksFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
+		reservedCash = int64(float64(reservedCash) * float64(stocksFulfilled) / float64(bidOrder.StockQuantity))
 		cancelOrderTransaction := GetTransactionRef(
 			userId,
-			orderId,
+			bidOrder.StockId,
 			CancelOrderTransaction,
 			0,
 			0,
-			price,
+			reservedCash,
 		)
+
+		user.Cash += uint64(reservedCash)
+		if err := tx.Save(user).Error; err != nil {
+			tx.Rollback()
+			l.Errorf("Error while adding reserved cash back to user. Error: %+v", err)
+			return nil, nil, err
+		}
 
 		if err := tx.Save(cancelOrderTransaction).Error; err != nil {
 			tx.Rollback()
-			l.Errorf("Error while commiting %+v", err)
+			l.Errorf("Error while saving cancelOrderTransaction %+v", err)
 			return nil, nil, err
 		}
 
@@ -1699,55 +1713,34 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		l.Infof("Sent through the datastreams")
 	}
 
+	// Begin transaction
+	db := getDB()
+	tx := db.Begin()
+
 	//Check if bidder has enough cash
-	var cashLeft = int64(biddingUser.Cash) - int64(stockTradePrice*stockTradeQty)
+	reservedCashForOrder, _, err := GetPlaceOrderTransactionDetails(bid.Id, false) // Total cash reserved for whole order
+	if err != nil {
+		l.Errorf("Error while returning reserved cash. Error: %+v", err)
+		return AskUndone, BidUndone, nil
+	}
+	reservedCashForTrade := int64(float64(reservedCashForOrder) * float64(stockTradeQty) / float64(bid.StockQuantity)) // Part of total allowed for stockTradeQty
+	total := int64(stockTradePrice * stockTradeQty)
+	cashLeft := int64(biddingUser.Cash) - total + reservedCashForTrade
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
 		l.Errorf("Check1: Failed. Not enough cash.")
-		bid.Close()
+		bid.Close(tx)
+		err := tx.Commit() // Error will still go on to return AskUndone
+		l.Errorf("Error while commiting bidClose. Error: %+v", err)
 		go updateDataStreams(nil, nil, nil, nil)
 		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
 		return AskUndone, BidDone, nil
 	}
 
-	//Check if askingUser has enough stocks
-	numStocks, err := getSingleStockCount(askingUser, ask.StockId)
-	if err != nil {
-		l.Errorf("Error getting stock count for askingUser: %+v", err)
-		return AskUndone, BidUndone, nil
-	}
+	//User has enough stocks reserved. Use that to make transaction
 
-	var numStocksLeft = numStocks - int64(stockTradeQty)
-
-	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
-		l.Debugf("Check2: Failed. Not enough stocks.")
-		currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
-		if currentAllowedQty > ASK_LIMIT {
-			currentAllowedQty = ASK_LIMIT
-		}
-		ask.Close()
-		go updateDataStreams(nil, nil, nil, nil)
-		go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
-		return AskDone, BidUndone, nil
-	}
-
-	//helper function to return a transaction object
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
-		return &Transaction{
-			UserId:        userId,
-			StockId:       stockId,
-			Type:          transType,
-			StockQuantity: stockQty,
-			Price:         price,
-			Total:         total,
-			CreatedAt:     utils.GetCurrentTimeISO8601(),
-		}
-	}
-
-	total := int64(stockTradePrice * stockTradeQty)
-
-	askTransaction := makeTrans(ask.UserId, ask.StockId, OrderFillTransaction, -int64(stockTradeQty), stockTradePrice, total)
-	bidTransaction := makeTrans(bid.UserId, bid.StockId, OrderFillTransaction, int64(stockTradeQty), stockTradePrice, -total)
+	askTransaction := GetTransactionRef(ask.UserId, ask.StockId, OrderFillTransaction, 0, stockTradePrice, total)
+	bidTransaction := GetTransactionRef(bid.UserId, bid.StockId, OrderFillTransaction, int64(stockTradeQty), stockTradePrice, -total+reservedCashForTrade)
 
 	// save old cash for rolling back
 	askingUserOldCash := askingUser.Cash
@@ -1755,7 +1748,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	//calculate user's updated cash
 	askingUser.Cash += uint64(stockTradeQty) * stockTradePrice
-	biddingUser.Cash -= uint64(stockTradeQty) * stockTradePrice
+	biddingUser.Cash = uint64(cashLeft)
 
 	// in case things go wrong and we've to roll back
 	oldAskStockQuantityFulfilled := ask.StockQuantityFulfilled
@@ -1768,12 +1761,6 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	bid.StockQuantityFulfilled += uint64(stockTradeQty)
 	ask.IsClosed = ask.StockQuantity == ask.StockQuantityFulfilled
 	bid.IsClosed = bid.StockQuantity == bid.StockQuantityFulfilled
-
-	//Committing to database
-	db := getDB()
-
-	//Begin transaction
-	tx := db.Begin()
 
 	var errorHelper = func(fmt string, args ...interface{}) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
 		l.Errorf(fmt, args...)

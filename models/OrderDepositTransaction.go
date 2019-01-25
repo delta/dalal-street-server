@@ -12,7 +12,7 @@ type OrderDepositTransaction struct {
 	CreatedAt     string `gorm:"column:createdAt;not null" json:"created_at"`
 }
 
-func (OrderFill) TableName() string {
+func (OrderDepositTransaction) TableName() string {
 	return "OrderDepositTransactions"
 }
 
@@ -37,6 +37,7 @@ func GetPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, 
 	sql := "SELECT transactionId FROM OrderDepositTransactions WHERE orderID = ? and isAsk = ?"
 	rows, err := db.Raw(sql, orderID, isAsk).Rows()
 	if err != nil {
+		l.Errorf("Error retrieving transacitonId. Error: %+v", err)
 		return 0, 0, err
 	}
 
@@ -48,10 +49,13 @@ func GetPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, 
 	var transactionId uint32
 	rows.Scan(&transactionId)
 
+	l.Infof("Retrieving reserved asset for transactionId %d", transactionId)
+
 	sql = "SELECT total, stockQuantity from Transactions WHERE id = ?"
 	trows, err := db.Raw(sql, transactionId).Rows()
 
 	if err != nil {
+		l.Errorf("Error while retrieving reserve details. Error: %+v", err)
 		return 0, 0, err
 	}
 
@@ -62,7 +66,9 @@ func GetPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, 
 
 	var total int64
 	var stockQuantity int64
-	rows.Scan(&total, &stockQuantity)
+	trows.Scan(&total, &stockQuantity)
 
-	return total, stockQuantity, nil
+	l.Infof("Retrieved reserved asset. Cash reserved %d and Stock Reserved %d for transaction %d", total, stockQuantity, transactionId)
+
+	return -total, stockQuantity, nil
 }
