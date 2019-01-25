@@ -36,15 +36,19 @@ func Test_RecordNMinuteOHLCs(t *testing.T) {
 	db := getDB()
 
 	stock := &Stock{
-		Id:           1,
-		CurrentPrice: 2000,
+		Id:               1,
+		CurrentPrice:     2000,
+		StocksInExchange: 0,
+		StocksInMarket:   100,
 	}
 	db.Save(stock)
 	defer db.Delete(stock)
 
 	stock1 := &Stock{
-		Id:           2,
-		CurrentPrice: 1500,
+		Id:               2,
+		CurrentPrice:     1500,
+		StocksInExchange: 0,
+		StocksInMarket:   100,
 	}
 	db.Save(stock1)
 	defer db.Delete(stock1)
@@ -54,7 +58,7 @@ func Test_RecordNMinuteOHLCs(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		//Update StockPrice with multiples of i
-		UpdateStockPrice(1, uint64(250*i))
+		UpdateStockPrice(1, uint64(250*i), 1)
 		UpdateStockVolume(1, 1)
 		recordOneMinuteOHLC(db, fakeTime.Add(time.Duration(i)*time.Minute))
 		//Check if minute is a multiple of 5
@@ -113,8 +117,10 @@ func Test_VolumeRecording(t *testing.T) {
 	db := getDB()
 
 	stock := &Stock{
-		Id:           1,
-		CurrentPrice: 2000,
+		Id:               1,
+		CurrentPrice:     2000,
+		StocksInExchange: 0,
+		StocksInMarket:   100,
 	}
 	db.Save(stock)
 	defer db.Delete(stock)
@@ -172,33 +178,37 @@ func Test_RecordOneMinuteOHLC(t *testing.T) {
 	defer db.Exec("DELETE FROM StockHistory")
 	defer db.Exec("DELETE FROM Users")
 	stock := &Stock{
-		Id:           1,
-		CurrentPrice: 2000,
+		Id:               1,
+		CurrentPrice:     2000,
+		StocksInExchange: 0,
+		StocksInMarket:   100,
 	}
 	db.Save(stock)
 	defer db.Delete(stock)
 	stock1 := &Stock{
-		Id:           2,
-		CurrentPrice: 1500,
+		Id:               2,
+		CurrentPrice:     1500,
+		StocksInExchange: 0,
+		StocksInMarket:   100,
 	}
 	db.Save(stock1)
 	defer db.Delete(stock1)
 
 	LoadStocks()
 
-	UpdateStockPrice(1, 2500)
-	UpdateStockPrice(2, 500)
-	UpdateStockPrice(2, 1500)
-	UpdateStockPrice(1, 900)
+	UpdateStockPrice(1, 2500, 1)
+	UpdateStockPrice(2, 500, 1)
+	UpdateStockPrice(2, 1500, 1)
+	UpdateStockPrice(1, 900, 1)
 	UpdateStockVolume(1, 30)
 	UpdateStockVolume(1, 20)
 	_ = recordOneMinuteOHLC(db, fakeTime)
 
 	fakeTime1 := fakeTime.Add(time.Minute)
-	UpdateStockPrice(1, 300)
-	UpdateStockPrice(2, 2500)
-	UpdateStockPrice(1, 500)
-	UpdateStockPrice(2, 600)
+	UpdateStockPrice(1, 300, 1)
+	UpdateStockPrice(2, 2500, 1)
+	UpdateStockPrice(1, 500, 1)
+	UpdateStockPrice(2, 600, 1)
 	UpdateStockVolume(2, 30)
 	UpdateStockVolume(2, 20)
 	err := recordOneMinuteOHLC(db, fakeTime1)
@@ -231,7 +241,12 @@ func Test_RecordOneMinuteOHLC(t *testing.T) {
 }
 func Test_GetStockHistory(t *testing.T) {
 	t.Logf("Testing getstockhistory")
-	var stock = &Stock{Id: 1, CurrentPrice: 2000}
+	var stock = &Stock{
+		Id:               1,
+		CurrentPrice:     2000,
+		StocksInExchange: 0,
+		StocksInMarket:   100,
+	}
 	now := time.Now()
 	db := getDB()
 	db.Save(stock)
@@ -242,7 +257,7 @@ func Test_GetStockHistory(t *testing.T) {
 	LoadStocks()
 
 	for i := 0; i <= 75; i++ {
-		UpdateStockPrice(1, uint64(i*20))
+		UpdateStockPrice(1, uint64(i*20), 1)
 		recordOneMinuteOHLC(db, now.Add(time.Minute*time.Duration(i)))
 	}
 	retrievedHistories, err := GetStockHistory(1, 1)

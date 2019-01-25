@@ -1,0 +1,1 @@
+ALTER TABLE Stocks CHANGE lastTradePrice avgLastPrice bigint(11);

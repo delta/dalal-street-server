@@ -792,9 +792,9 @@ func Test_PerformMortgageTransaction(t *testing.T) {
 	}
 
 	stocks := []*Stock{
-		{Id: 1, CurrentPrice: 100, AvgLastPrice: 100},
-		{Id: 2, CurrentPrice: 500, AvgLastPrice: 500},
-		{Id: 3, CurrentPrice: 200, AvgLastPrice: 200},
+		{Id: 1, CurrentPrice: 100, LastTradePrice: 100},
+		{Id: 2, CurrentPrice: 500, LastTradePrice: 500},
+		{Id: 3, CurrentPrice: 200, LastTradePrice: 200},
 	}
 
 	transactions := []*Transaction{
