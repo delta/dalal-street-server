@@ -1075,6 +1075,87 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	return bid.Id, nil
 }
 
+// SaveAskCancelOrderTransaction creates a CancelOrderTransaction for Ask orders and pushses to stream
+func SaveAskCancelOrderTransaction(askOrder *Ask, user *User, tx *gorm.DB) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "SaveAskCancelOrderTransaction",
+		"userId":  user.Id,
+		"orderId": askOrder.Id,
+	})
+
+	cancelOrderTransaction := GetTransactionRef(
+		user.Id,
+		askOrder.StockId,
+		CancelOrderTransaction,
+		int64(askOrder.StockQuantity-askOrder.StockQuantityFulfilled),
+		0,
+		0,
+	)
+
+	if err := tx.Save(cancelOrderTransaction).Error; err != nil {
+		tx.Rollback()
+		l.Errorf("Error while commiting %+v", err)
+		return err
+	}
+
+	go func(cancelOrderTransaction *Transaction) {
+		transactionsStream := datastreamsManager.GetTransactionsStream()
+		transactionsStream.SendTransaction(cancelOrderTransaction.ToProto())
+
+		l.Infof("Sent through the datastreams")
+	}(cancelOrderTransaction)
+
+	return nil
+}
+
+// SaveBidCancelOrderTransaction creates a CancelOrderTransaction for Ask orders and pushses to stream
+func SaveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "SaveBidCancelOrderTransaction",
+		"userId":  user.Id,
+		"orderId": bidOrder.Id,
+	})
+
+	reservedCash, _, err := GetPlaceOrderTransactionDetails(bidOrder.Id, false)
+	if err != nil {
+		l.Errorf("Could not retrieve reserved cash. Error: %+v")
+		return err
+	}
+
+	stocksFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
+	reservedCash = int64(float64(reservedCash) * float64(stocksFulfilled) / float64(bidOrder.StockQuantity))
+	cancelOrderTransaction := GetTransactionRef(
+		user.Id,
+		bidOrder.StockId,
+		CancelOrderTransaction,
+		0,
+		0,
+		reservedCash,
+	)
+
+	user.Cash += uint64(reservedCash)
+	if err := tx.Save(user).Error; err != nil {
+		tx.Rollback()
+		l.Errorf("Error while adding reserved cash back to user. Error: %+v", err)
+		return err
+	}
+
+	if err := tx.Save(cancelOrderTransaction).Error; err != nil {
+		tx.Rollback()
+		l.Errorf("Error while saving cancelOrderTransaction %+v", err)
+		return err
+	}
+
+	go func(cancelOrderTransaction *Transaction) {
+		transactionsStream := datastreamsManager.GetTransactionsStream()
+		transactionsStream.SendTransaction(cancelOrderTransaction.ToProto())
+
+		l.Infof("Sent through the datastreams")
+	}(cancelOrderTransaction)
+
+	return nil
+}
+
 // CancelOrder cancels a user's order. It'll check if the user was the one who placed it.
 // It returns the pointer to Ask/Bid (whichever it was - the other is nil) that got cancelled.
 // This pointer will have to be passed to the CancelOrder of the matching engine to remove it
@@ -1128,27 +1209,11 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		}
 
 		// Place CancelOrderTransaction to return stocks
-		cancelOrderTransaction := GetTransactionRef(
-			userId,
-			askOrder.StockId,
-			CancelOrderTransaction,
-			int64(askOrder.StockQuantity-askOrder.StockQuantityFulfilled),
-			0,
-			0,
-		)
-
-		if err := tx.Save(cancelOrderTransaction).Error; err != nil {
+		if err := SaveAskCancelOrderTransaction(askOrder, user, tx); err != nil {
+			l.Errorf("Error while trying to cancel ask order %d. Error: %+v", askOrder.Id, err)
 			tx.Rollback()
-			l.Errorf("Error while commiting %+v", err)
 			return nil, nil, err
 		}
-
-		go func(cancelOrderTransaction *Transaction) {
-			transactionsStream := datastreamsManager.GetTransactionsStream()
-			transactionsStream.SendTransaction(cancelOrderTransaction.ToProto())
-
-			l.Infof("Sent through the datastreams")
-		}(cancelOrderTransaction)
 
 		if err := tx.Commit().Error; err != nil {
 			tx.Rollback()
@@ -1181,43 +1246,11 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		}
 
 		// Place CancelOrderTransaction to return stocks
-		reservedCash, _, err := GetPlaceOrderTransactionDetails(orderId, false)
-		if err != nil {
-			l.Errorf("Could not retrieve reserved cash. Error: %+v")
-			return nil, nil, err
-		}
-
-		l.Infof("Reserved cash for order %d was found to be %d", bidOrder.Id, reservedCash)
-		stocksFulfilled := bidOrder.StockQuantity - bidOrder.StockQuantityFulfilled
-		reservedCash = int64(float64(reservedCash) * float64(stocksFulfilled) / float64(bidOrder.StockQuantity))
-		cancelOrderTransaction := GetTransactionRef(
-			userId,
-			bidOrder.StockId,
-			CancelOrderTransaction,
-			0,
-			0,
-			reservedCash,
-		)
-
-		user.Cash += uint64(reservedCash)
-		if err := tx.Save(user).Error; err != nil {
+		if err := SaveBidCancelOrderTransaction(bidOrder, user, tx); err != nil {
 			tx.Rollback()
-			l.Errorf("Error while adding reserved cash back to user. Error: %+v", err)
+			l.Errorf("Error while cancelling bid order. Error: %+v", err)
 			return nil, nil, err
 		}
-
-		if err := tx.Save(cancelOrderTransaction).Error; err != nil {
-			tx.Rollback()
-			l.Errorf("Error while saving cancelOrderTransaction %+v", err)
-			return nil, nil, err
-		}
-
-		go func(cancelOrderTransaction *Transaction) {
-			transactionsStream := datastreamsManager.GetTransactionsStream()
-			transactionsStream.SendTransaction(cancelOrderTransaction.ToProto())
-
-			l.Infof("Sent through the datastreams")
-		}(cancelOrderTransaction)
 
 		if err := tx.Commit().Error; err != nil {
 			tx.Rollback()
@@ -1724,12 +1757,13 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		return AskUndone, BidUndone, nil
 	}
 	reservedCashForTrade := int64(float64(reservedCashForOrder) * float64(stockTradeQty) / float64(bid.StockQuantity)) // Part of total allowed for stockTradeQty
-	total := int64(stockTradePrice * stockTradeQty)
+	total := int64(stockTradePrice * stockTradeQty)                                                                    // Cash required for the Ask order
 	cashLeft := int64(biddingUser.Cash) - total + reservedCashForTrade
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Errorf("Check1: Failed. Not enough cash.")
+		l.Errorf("Check1: Failed. Not enough cash. Returning reserved cash back to user.")
 		bid.Close(tx)
+		SaveBidCancelOrderTransaction(bid, biddingUser, tx)
 		err := tx.Commit() // Error will still go on to return AskUndone
 		l.Errorf("Error while commiting bidClose. Error: %+v", err)
 		go updateDataStreams(nil, nil, nil, nil)
