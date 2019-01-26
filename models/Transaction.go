@@ -26,9 +26,9 @@ func (tt *TransactionType) Scan(value interface{}) error {
 	case "TaxTransaction":
 		*tt = 5
 	case "PlaceOrderTransaction":
-		*tt = 5
-	case "CancelOrderTransaction":
 		*tt = 6
+	case "CancelOrderTransaction":
+		*tt = 7
 	default:
 		return fmt.Errorf("Invalid value for TransactionType. Got %s", string(value.([]byte)))
 	}
