@@ -1126,7 +1126,7 @@ func getTaxPercent(netCash int64) uint64 {
 // Helper to calculate tax for bidding user.
 // It is assumed that an Exclusive Read and Write lock is already obtained for the user.
 // DO NOT call this function without obtaining the lock.
-func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stockPrice uint64, biddingUser *User) *TransactionSummary {
+func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stockPrice uint64, biddingUser *User) (*TransactionSummary, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "getTaxForBiddingUser",
 		"param_stockId":       stockId,
@@ -1138,6 +1138,9 @@ func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, sto
 	userId := biddingUser.Id
 	stockPriceFloat64 := float64(stockPrice)
 	stockQuantityFloat64 := float64(stockQuantity)
+
+	// Default value = 0
+	var tax uint64
 
 	transactionSummary := &TransactionSummary{UserId: userId, StockId: stockId}
 	tx.First(&transactionSummary)
@@ -1162,7 +1165,7 @@ func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, sto
 			profit := taxableStockQty * (transactionSummary.Price - stockPriceFloat64)
 			if profit > 0 {
 				netCash := biddingUser.Total
-				tax := uint64(profit) * getTaxPercent(netCash) / 100
+				tax = uint64(profit) * getTaxPercent(netCash) / 100
 				biddingUser.Cash -= tax
 				l.Debugf("Profit = %v. Tax = %v * %v / 100 = %v", profit, profit, getTaxPercent(netCash), tax)
 			} else {
@@ -1191,13 +1194,27 @@ func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, sto
 		l.Debugf("Effectively the first time user is buying these stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
 	}
 
-	return transactionSummary
+	taxTransaction := &Transaction{
+		UserId:        userId,
+		StockId:       stockId,
+		Type:          TaxTransaction,
+		StockQuantity: 0,
+		Price:         0,
+		Total:         -int64(tax),
+		CreatedAt:     utils.GetCurrentTimeISO8601(),
+	}
+
+	if tax == 0 {
+		return transactionSummary, nil
+	}
+
+	return transactionSummary, taxTransaction
 }
 
 // Helper to calculate tax for asking user
 // It is assumed that an Exclusive Read and Write lock is already obtained for the user.
 // DO NOT call this function without obtaining the lock.
-func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stockPrice uint64, askingUser *User) *TransactionSummary {
+func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stockPrice uint64, askingUser *User) (*TransactionSummary, *Transaction) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":              "getTaxForAskingUser",
 		"param_stockId":       stockId,
@@ -1209,6 +1226,9 @@ func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stoc
 	userId := askingUser.Id
 	stockPriceFloat64 := float64(stockPrice)
 	stockQuantityFloat64 := float64(stockQuantity)
+
+	// Default value = 0
+	var tax uint64
 
 	transactionSummary := &TransactionSummary{UserId: userId, StockId: stockId}
 	tx.First(&transactionSummary)
@@ -1233,7 +1253,7 @@ func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stoc
 			profit := taxableStockQty * (stockPriceFloat64 - transactionSummary.Price)
 			if profit > 0 {
 				netCash := askingUser.Total
-				tax := uint64(profit) * getTaxPercent(netCash) / 100
+				tax = uint64(profit) * getTaxPercent(netCash) / 100
 				askingUser.Cash -= tax
 				l.Debugf("Profit = %v. Tax = %v * %v / 100 = %v", profit, profit, getTaxPercent(netCash), tax)
 			} else {
@@ -1262,7 +1282,21 @@ func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stoc
 		l.Debugf("Effectively the first time user is short selling these stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
 	}
 
-	return transactionSummary
+	taxTransaction := &Transaction{
+		UserId:        userId,
+		StockId:       stockId,
+		Type:          TaxTransaction,
+		StockQuantity: 0,
+		Price:         0,
+		Total:         -int64(tax),
+		CreatedAt:     utils.GetCurrentTimeISO8601(),
+	}
+
+	if tax == 0 {
+		return transactionSummary, nil
+	}
+
+	return transactionSummary, taxTransaction
 }
 
 func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuantity uint64) (*Transaction, error) {
@@ -1358,7 +1392,7 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 	}
 
 	// Tax Calculation
-	transactionSummary := getTaxForBiddingUser(tx, stockId, stockQuantityRemoved, price, user)
+	transactionSummary, TaxTransaction := getTaxForBiddingUser(tx, stockId, stockQuantityRemoved, price, user)
 
 	if err := tx.Save(transactionSummary).Error; err != nil {
 		return errorHelper("Error updating the transaction summary. Rolling back. Error : +%v", err)
@@ -1371,6 +1405,14 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 	}
 
 	l.Debugf("Added transaction to Transactions table")
+
+	//save taxTransaction
+	if TaxTransaction != nil {
+		if err := tx.Save(TaxTransaction).Error; err != nil {
+			return errorHelper("Error creating the TaxTransaction for asking user in the db. Rolling back. Error : +%v", err)
+		}
+		l.Debugf("Added TaxTransaction to Transactions table.")
+	}
 
 	if err := tx.Save(user).Error; err != nil {
 		return errorHelper("Error deducting the cash from user's account. Rolling back. Error: %+v", err)
@@ -1400,6 +1442,9 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 			StocksInMarket:   inMarket,
 		})
 		transactionsStream.SendTransaction(transaction.ToProto())
+		if TaxTransaction != nil {
+			transactionsStream.SendTransaction(TaxTransaction.ToProto())
+		}
 
 		l.Infof("Sent through the datastreams")
 	}(stock.StocksInExchange, stock.StocksInMarket)
@@ -1505,7 +1550,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	/* We're here, so both orders are open now */
 
-	var updateDataStreams = func(askTrans, bidTrans *Transaction) {
+	var updateDataStreams = func(askTrans, bidTrans, askTaxTrans, bidTaxTrans *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -1533,6 +1578,14 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 			transactionsStream.SendTransaction(bidTrans.ToProto())
 		}
 
+		if askTaxTrans != nil {
+			transactionsStream.SendTransaction(askTaxTrans.ToProto())
+		}
+
+		if bidTaxTrans != nil {
+			transactionsStream.SendTransaction(bidTaxTrans.ToProto())
+		}
+
 		l.Infof("Sent through the datastreams")
 	}
 
@@ -1542,7 +1595,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	if cashLeft < MINIMUM_CASH_LIMIT {
 		l.Errorf("Check1: Failed. Not enough cash.")
 		bid.Close()
-		go updateDataStreams(nil, nil)
+		go updateDataStreams(nil, nil, nil, nil)
 		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
 		return AskUndone, BidDone, nil
 	}
@@ -1563,7 +1616,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 			currentAllowedQty = ASK_LIMIT
 		}
 		ask.Close()
-		go updateDataStreams(nil, nil)
+		go updateDataStreams(nil, nil, nil, nil)
 		go SendNotification(askingUser.Id, fmt.Sprintf("Your Sell order#%d has been closed due to insufficient stocks", ask.Id), false)
 		return AskDone, BidUndone, nil
 	}
@@ -1628,23 +1681,21 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	}
 
 	// Tax Calculation for asking user
-	transactionSummary := getTaxForAskingUser(tx, ask.StockId, stockTradeQty, stockTradePrice, askingUser)
+	transactionSummary, askTaxTransaction := getTaxForAskingUser(tx, ask.StockId, stockTradeQty, stockTradePrice, askingUser)
 
 	// Update transaction summary table for asking user
 	if err := tx.Save(transactionSummary).Error; err != nil {
 		return errorHelper("Error updating the transaction summary for asking user. Rolling back. Error : +%v", err)
 	}
-
 	l.Debugf("TransactionSummary table for asking user updated successfully.")
 
 	// Calculate tax for bidding user
-	transactionSummary = getTaxForBiddingUser(tx, bid.StockId, stockTradeQty, stockTradePrice, biddingUser)
+	transactionSummary, bidTaxTransaction := getTaxForBiddingUser(tx, bid.StockId, stockTradeQty, stockTradePrice, biddingUser)
 
 	// Update transaction summary table for bidding user
 	if err := tx.Save(transactionSummary).Error; err != nil {
 		return errorHelper("Error updating the transaction summary for bidding user. Rolling back. Error : +%v", err)
 	}
-
 	l.Debugf("TransactionSummary table updated successfully for bidding user.")
 
 	//save askTransaction
@@ -1658,6 +1709,22 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		return errorHelper("Error creating the bidTransaction. Rolling back. Error: %+v", err)
 	}
 	l.Debugf("Added bidTransaction to Transactions table")
+
+	//save askTaxTransaction
+	if askTaxTransaction != nil {
+		if err := tx.Save(askTaxTransaction).Error; err != nil {
+			return errorHelper("Error creating the askTaxTransaction for asking user in the db. Rolling back. Error : +%v", err)
+		}
+		l.Debugf("Added askTaxTransaction to Transactions table.")
+	}
+
+	//save bidTaxTransaction
+	if bidTaxTransaction != nil {
+		if err := tx.Save(bidTaxTransaction).Error; err != nil {
+			return errorHelper("Error creating the bidTaxTransaction for asking user in the db. Rolling back. Error : +%v", err)
+		}
+		l.Debugf("Added bidTaxTransaction to Transactions table.")
+	}
 
 	//update askingUser
 	if err := tx.Save(askingUser).Error; err != nil {
@@ -1695,7 +1762,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		return AskUndone, BidUndone, nil
 	}
 
-	go updateDataStreams(askTransaction, bidTransaction)
+	go updateDataStreams(askTransaction, bidTransaction, askTaxTransaction, bidTaxTransaction)
 
 	UpdateStockVolume(ask.StockId, stockTradeQty)
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
