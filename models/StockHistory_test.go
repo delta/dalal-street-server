@@ -118,7 +118,7 @@ func Test_VolumeRecording(t *testing.T) {
 
 	stock := &Stock{
 		Id:               1,
-		CurrentPrice:     2000,
+		CurrentPrice:     5,
 		StocksInExchange: 0,
 		StocksInMarket:   100,
 	}
@@ -155,11 +155,12 @@ func Test_VolumeRecording(t *testing.T) {
 		StockQuantity: 6,
 		IsClosed:      false,
 	}
-	db.Save(ask)
+	PlaceAskOrder(ask.UserId, ask)
 	defer db.Delete(ask)
-	db.Save(bid)
+	PlaceBidOrder(bid.UserId, bid)
 	defer db.Delete(bid)
 	PerformOrderFillTransaction(ask, bid, 5, 6)
+	defer db.Exec("DELETE FROM OrderDepositTransactions")
 	defer db.Exec("Delete FROM Transactions")
 	defer db.Exec("DELETE FROM OrderFills")
 	defer db.Exec("DELETE FROM TransactionSummary")

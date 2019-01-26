@@ -9,6 +9,7 @@ import (
 	httpmock "gopkg.in/jarcoal/httpmock.v1"
 
 	testutils "github.com/delta/dalal-street-server/utils/test"
+	"github.com/jinzhu/gorm"
 )
 
 func Test_Login(t *testing.T) {
@@ -184,6 +185,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		for _, tc := range testcases {
 			db.Delete(tc.ask)
 		}
+		db.Exec("DELETE FROM OrderDepositTransactions")
 		db.Exec("DELETE FROM Transactions") // Because we create additional OrderFee Transactions
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
@@ -269,6 +271,11 @@ func Test_PlaceBidOrder(t *testing.T) {
 		}
 	}
 
+	var updateUserCash = func(user *User, cash uint64, db *gorm.DB) {
+		user.Cash = cash
+		db.Save(user)
+	}
+
 	var user = &User{Id: 2, Cash: 2000}
 	var stock = &Stock{Id: 1, CurrentPrice: 200}
 
@@ -284,7 +291,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 	}{
 		{makeBid(2, 1, Limit, 5, 200), true},
 		{makeBid(2, 1, Limit, 2, 200), true},
-		{makeBid(2, 1, Limit, 3, 200), true},
+		{makeBid(2, 1, Limit, 2, 200), true},
 		{makeBid(2, 1, Limit, 11, 200), false},
 		{makeBid(2, 1, Limit, 11, 2000), false}, // too high a price won't be allowed
 		{makeBid(2, 1, Limit, 10, 200), false},  // with transaction fee, cash wont be enough
@@ -299,7 +306,8 @@ func Test_PlaceBidOrder(t *testing.T) {
 		for _, tc := range testcases {
 			db.Delete(tc.bid)
 		}
-		db.Exec("DELETE FROM Transactions") // Cuz we add new OrderFillTransaction
+		db.Exec("DELETE FROM OrderDepositTransactions")
+		db.Exec("DELETE FROM Transactions") // Cuz we add new OrderFeeTransaction
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
@@ -336,7 +344,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 			if err != nil {
 				fm.Lock()
 				defer fm.Unlock()
-				t.Fatalf("Did not expect error. Got %+v", err)
+				t.Fatalf("Did not expect error. Bid: %+v. Error: %+v", tc.bid, err)
 			}
 
 			b := &Bid{}
@@ -351,11 +359,13 @@ func Test_PlaceBidOrder(t *testing.T) {
 
 	wg.Wait()
 
+	updateUserCash(user, 2000, db)
 	tid, terr := PlaceBidOrder(2, testcases[len(testcases)-2].bid)
 	if terr == nil {
 		t.Fatalf("Did not expect success. Failing %+v %+v", tid, terr)
 	}
 
+	updateUserCash(user, 2000, db)
 	id, err := PlaceBidOrder(2, testcases[len(testcases)-1].bid)
 	if err == nil {
 		t.Fatalf("Did not expect success. Failing %+v %+v", id, err)
@@ -385,7 +395,7 @@ func Test_CancelOrder(t *testing.T) {
 		}
 	}
 
-	var user = &User{Id: 2}
+	var user = &User{Id: 2, Cash: 3000}
 	var stock = &Stock{Id: 1}
 
 	var bids = []*Bid{
@@ -421,6 +431,8 @@ func Test_CancelOrder(t *testing.T) {
 		for _, b := range bids {
 			db.Delete(b)
 		}
+		db.Exec("DELETE FROM OrderDepositTransactions")
+		db.Exec("DELETE FROM Transactions")
 		db.Exec("DELETE FROM StockHistory")
 		db.Delete(stock)
 		db.Delete(user)
@@ -436,13 +448,13 @@ func Test_CancelOrder(t *testing.T) {
 	}
 
 	for _, a := range asks {
-		if err := db.Create(a).Error; err != nil {
+		if _, err := PlaceAskOrder(2, a); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	for _, b := range bids {
-		if err := db.Create(b).Error; err != nil {
+		if _, err := PlaceBidOrder(2, b); err != nil {
 			t.Fatal(err)
 		}
 	}
