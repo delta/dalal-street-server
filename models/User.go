@@ -1143,11 +1143,11 @@ func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, sto
 	var tax uint64
 
 	transactionSummary := &TransactionSummary{UserId: userId, StockId: stockId}
-	tx.First(&transactionSummary)
+	tx.Where("userId = ? AND stockId = ?", userId, stockId).First(&transactionSummary)
 
 	l.Debugf("TransactionSummary object retrieved : %+v", transactionSummary)
 
-	if transactionSummary.StockQuantity != 0 {
+	if transactionSummary.Id != 0 {
 		// This user has already placed orders for this stock before
 		currentStocksHeld := float64(transactionSummary.StockQuantity)
 		if currentStocksHeld < 0 {
@@ -1231,11 +1231,11 @@ func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stoc
 	var tax uint64
 
 	transactionSummary := &TransactionSummary{UserId: userId, StockId: stockId}
-	tx.First(&transactionSummary)
+	tx.Where("userId = ? AND stockId = ?", userId, stockId).First(&transactionSummary)
 
 	l.Debugf("TransactionSummary object retrieved : %+v", transactionSummary)
 
-	if transactionSummary.StockQuantity != 0 {
+	if transactionSummary.Id != 0 {
 		// This user has already placed orders for this stock before
 
 		currentStocksHeld := float64(transactionSummary.StockQuantity)
