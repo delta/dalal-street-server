@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -915,4 +916,88 @@ func TestGetTaxPercent(t *testing.T) {
 	testutils.AssertEqual(t, 9, getTaxPercent(750000))
 	testutils.AssertEqual(t, 15, getTaxPercent(1500000))
 	testutils.AssertEqual(t, 25, getTaxPercent(2500000))
+}
+
+// Helper for the deadlock test written below. If you want to test any table OTHER than TransactionSummary,
+// all you need to do is update this helper function. The actual Test_Deadlock function need not be updated.
+func saveTransSum(userID int, t *testing.T, oneIfCreateTwoIfSave int) {
+	db := getDB().Debug()
+	tx := db.Begin()
+
+	transactionSummary := &TransactionSummary{
+		UserId:        uint32(userID),
+		StockId:       uint32(userID),
+		StockQuantity: 10,
+		Price:         12.5,
+	}
+
+	var err error
+	exists := 0
+	if err = tx.Model(transactionSummary).Where("userID = ? AND stockID = ?", userID, userID).Count(&exists).Error; err != nil {
+		t.Errorf("Error reading the transaction summary. Rolling back. Error: %+v", err)
+		tx.Rollback()
+		return
+	}
+
+	if exists != 1 {
+		err = tx.Create(transactionSummary).Error
+	} else {
+		err = tx.Update(transactionSummary).Error
+	}
+
+	if err != nil {
+		t.Errorf("Error updating the transaction summary. Rolling back. Error : %+v", err)
+		tx.Rollback()
+		return
+	}
+	t.Logf("Created/Updated txSummary for %d", userID)
+
+	if err := tx.Commit().Error; err != nil {
+		t.Errorf("Error committing the transaction. Failing. %+v", err)
+		tx.Rollback()
+		return
+	}
+
+	t.Logf("TransactionSummary table updated successfully - %+v", transactionSummary)
+}
+
+// This is a test for deadlock when multiple goroutines spam insert statements into the TransactionSummary table.
+// However, with a few modifications, it can be made to test any table for deadlock possibilities. Feel free to modify
+// this test if there's any other table you'd like to test insert statements on.
+func Test_Deadlock(t *testing.T) {
+
+	db := getDB()
+	numUsers := 10
+
+	for i := 1; i <= numUsers; i++ {
+		user := &User{Id: uint32(i), Email: fmt.Sprintf("user%v@deadlock.com", i), Cash: 1000000}
+		if err := db.Create(user).Error; err != nil {
+			t.Fatal(err)
+		} else {
+			t.Logf("Created user %v", i)
+		}
+
+		stock := &Stock{Id: uint32(i), StocksInExchange: 30, CurrentPrice: 100}
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	defer func() {
+		db.Exec("DELETE FROM TransactionSummary")
+		db.Exec("DELETE FROM Users")
+		db.Exec("DELETE FROM Stocks")
+	}()
+
+	wg := &sync.WaitGroup{}
+
+	for i := 1; i <= numUsers; i++ {
+		wg.Add(1)
+		go func(userID int) {
+			defer wg.Done()
+			saveTransSum(userID, t, 2)
+		}(i)
+	}
+
+	wg.Wait()
 }
