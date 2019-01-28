@@ -824,7 +824,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return 0, err
 	}
 
-	l.Infof("Created Ask order. AskId: ", ask.Id)
+	l.Infof("Created Ask order. AskId: %d", ask.Id)
 
 	db := getDB()
 	tx := db.Begin()
@@ -855,13 +855,13 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
 	}
 
-	l.Info("Saved OrderFeeTransaction for bid %d", ask.Id)
+	l.Infof("Saved OrderFeeTransaction for bid %d", ask.Id)
 
 	if err := tx.Commit().Error; err != nil {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
 
-	l.Info("Commited successfully for bid %d", ask.Id)
+	l.Infof("Commited successfully for bid %d", ask.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(ask *Ask, orderFeeTransaction *Transaction) {
@@ -1000,13 +1000,13 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
 	}
 
-	l.Info("Saved OrderFeeTransaction for bid %d", bid.Id)
+	l.Infof("Saved OrderFeeTransaction for bid %d", bid.Id)
 
 	if err := tx.Commit().Error; err != nil {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
 
-	l.Info("Commited successfully for bid %d", bid.Id)
+	l.Infof("Commited successfully for bid %d", bid.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(bid *Bid, orderFeeTransaction *Transaction) {
@@ -1544,7 +1544,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	}
 
 	if askStatus == AskAlreadyClosed || bidStatus == BidAlreadyClosed {
-		l.Infof("Done. One of the orders already closed. %+s and %+s", askStatus, bidStatus)
+		l.Infof("Done. One of the orders already closed. %+v and %+v", askStatus, bidStatus)
 		return askStatus, bidStatus, nil
 	}
 
