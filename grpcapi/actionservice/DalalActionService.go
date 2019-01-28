@@ -332,6 +332,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		"GET_NOTIFICATION_COUNT":  models.GET_NOTIFICATION_COUNT,
 		"GET_TRANSACTION_COUNT":   models.GET_TRANSACTION_COUNT,
 		"LEADERBOARD_COUNT":       models.LEADERBOARD_COUNT,
+		"ORDER_FEE_PERCENT":       models.ORDER_FEE_PERCENT,
 	}
 
 	resp = &actions_pb.LoginResponse{
