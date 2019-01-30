@@ -118,7 +118,10 @@ func GetAllStocks() map[uint32]*Stock {
 
 func UpdateStockPrice(stockId uint32, price uint64, quantity uint64) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "UpdateStockPrice",
+		"method":        "UpdateStockPrice",
+		"param_stockId": stockId,
+		"param_price":   price,
+		"param_qty":     quantity,
 	})
 
 	l.Infof("Attempting")
@@ -147,7 +150,14 @@ func UpdateStockPrice(stockId uint32, price uint64, quantity uint64) error {
 	finalQuantity := uint64(math.Min(float64(quantity), float64(averageStockCount)))
 
 	avgLastPrice.Lock()
-	avgLastPrice.m[stock.Id] += (finalQuantity * (price - avgLastPrice.m[stock.Id])) / averageStockCount
+	l.Infof("Average stock count = %v, finalQuantity = %v, Previous avgLastPrice = %v", averageStockCount, finalQuantity, avgLastPrice.m[stockId])
+
+	tempAvgLastPriceInt64 := int64(avgLastPrice.m[stockId])
+	priceDifference := int64(price) - tempAvgLastPriceInt64
+	stockPriceChange := (int64(finalQuantity) * priceDifference) / int64(averageStockCount)
+	tempAvgLastPriceInt64 += stockPriceChange
+
+	avgLastPrice.m[stock.Id] = uint64(tempAvgLastPriceInt64)
 	l.Infof("New Current Price = Average of last %v stock trades = +%v", averageStockCount, avgLastPrice.m[stock.Id])
 	stock.CurrentPrice = avgLastPrice.m[stock.Id]
 	avgLastPrice.Unlock()
