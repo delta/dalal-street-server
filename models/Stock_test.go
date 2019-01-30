@@ -23,6 +23,7 @@ func TestStockToProto(t *testing.T) {
 		UpOrDown:         true,
 		PreviousDayClose: 1000,
 		LastTradePrice:   120,
+		RealAvgPrice:     200,
 		CreatedAt:        "2017-02-09T00:00:00",
 		UpdatedAt:        "2017-02-09T00:00:00",
 	}
@@ -43,6 +44,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 		AllTimeHigh:      1000,
 		StocksInExchange: 0,
 		StocksInMarket:   200,
+		RealAvgPrice:     1000,
 	}
 
 	db := getDB()
@@ -72,6 +74,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 		PreviousDayClose: 1000,
 		StocksInExchange: 0,
 		StocksInMarket:   200,
+		RealAvgPrice:     1500,
 		UpdatedAt:        retrievedStock.UpdatedAt,
 	}
 	if !testutils.AssertEqual(t, stock1, retrievedStock) {
