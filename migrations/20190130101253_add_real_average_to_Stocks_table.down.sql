@@ -1,0 +1,1 @@
+ALTER TABLE Stocks DROP COLUMN realAvgPrice;

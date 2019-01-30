@@ -1,1 +1,1 @@
-ALTER TABLE Stocks ADD COLUMN avgLastPrice int(11);
+ALTER TABLE Stocks ADD COLUMN avgLastPrice bigint(11);

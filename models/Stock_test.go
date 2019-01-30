@@ -22,7 +22,8 @@ func TestStockToProto(t *testing.T) {
 		StocksInMarket:   234,
 		UpOrDown:         true,
 		PreviousDayClose: 1000,
-		AvgLastPrice:     120,
+		LastTradePrice:   120,
+		RealAvgPrice:     200,
 		CreatedAt:        "2017-02-09T00:00:00",
 		UpdatedAt:        "2017-02-09T00:00:00",
 	}
@@ -41,6 +42,9 @@ func Test_UpdateStockPrice(t *testing.T) {
 		AllTimeLow:       1000,
 		PreviousDayClose: 1000,
 		AllTimeHigh:      1000,
+		StocksInExchange: 0,
+		StocksInMarket:   200,
+		RealAvgPrice:     1000,
 	}
 
 	db := getDB()
@@ -52,7 +56,7 @@ func Test_UpdateStockPrice(t *testing.T) {
 	}()
 
 	LoadStocks()
-	err := UpdateStockPrice(1, 2000)
+	err := UpdateStockPrice(1, 2000, 1)
 	if err != nil {
 		t.Fatalf("UpdateStockPrice failed with %+v", err)
 	}
@@ -61,13 +65,16 @@ func Test_UpdateStockPrice(t *testing.T) {
 	db.First(retrievedStock, 1)
 	var stock1 = &Stock{
 		Id:               1,
-		CurrentPrice:     2000,
-		DayHigh:          2000,
-		AllTimeHigh:      2000,
+		CurrentPrice:     1500,
+		DayHigh:          1500,
+		AllTimeHigh:      1500,
 		AllTimeLow:       1000,
 		UpOrDown:         true,
-		AvgLastPrice:     1050,
+		LastTradePrice:   2000,
 		PreviousDayClose: 1000,
+		StocksInExchange: 0,
+		StocksInMarket:   200,
+		RealAvgPrice:     1500,
 		UpdatedAt:        retrievedStock.UpdatedAt,
 	}
 	if !testutils.AssertEqual(t, stock1, retrievedStock) {

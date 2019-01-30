@@ -1,0 +1,1 @@
+ALTER TABLE Stocks ADD realAvgPrice float(11,4) UNSIGNED NOT NULL;

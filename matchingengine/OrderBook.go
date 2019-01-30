@@ -143,7 +143,6 @@ func (ob *orderBook) AddAskOrder(ask *models.Ask) {
 		} else {
 			ob.askStoploss.Push(ask)
 		}
-
 		return
 	}
 

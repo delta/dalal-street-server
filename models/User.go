@@ -1392,7 +1392,7 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 	}
 
 	// Tax Calculation
-	transactionSummary, TaxTransaction := getTaxForBiddingUser(tx, stockId, stockQuantityRemoved, price, user)
+	transactionSummary, taxTransaction := getTaxForBiddingUser(tx, stockId, stockQuantityRemoved, price, user)
 
 	if err := tx.Save(transactionSummary).Error; err != nil {
 		return errorHelper("Error updating the transaction summary. Rolling back. Error : +%v", err)
@@ -1407,9 +1407,9 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 	l.Debugf("Added transaction to Transactions table")
 
 	//save taxTransaction
-	if TaxTransaction != nil {
-		if err := tx.Save(TaxTransaction).Error; err != nil {
-			return errorHelper("Error creating the TaxTransaction for asking user in the db. Rolling back. Error : +%v", err)
+	if taxTransaction != nil {
+		if err := tx.Save(taxTransaction).Error; err != nil {
+			return errorHelper("Error creating the TaxTransaction - %+v - for asking user in the db. Rolling back. Error : +%v", taxTransaction, err)
 		}
 		l.Debugf("Added TaxTransaction to Transactions table.")
 	}
@@ -1442,8 +1442,8 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 			StocksInMarket:   inMarket,
 		})
 		transactionsStream.SendTransaction(transaction.ToProto())
-		if TaxTransaction != nil {
-			transactionsStream.SendTransaction(TaxTransaction.ToProto())
+		if taxTransaction != nil {
+			transactionsStream.SendTransaction(taxTransaction.ToProto())
 		}
 
 		l.Infof("Sent through the datastreams")
@@ -1713,7 +1713,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	//save askTaxTransaction
 	if askTaxTransaction != nil {
 		if err := tx.Save(askTaxTransaction).Error; err != nil {
-			return errorHelper("Error creating the askTaxTransaction for asking user in the db. Rolling back. Error : +%v", err)
+			return errorHelper("Error creating the askTaxTransaction - %+v. Rolling back. Error : +%v", askTaxTransaction, err)
 		}
 		l.Debugf("Added askTaxTransaction to Transactions table.")
 	}
@@ -1721,7 +1721,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	//save bidTaxTransaction
 	if bidTaxTransaction != nil {
 		if err := tx.Save(bidTaxTransaction).Error; err != nil {
-			return errorHelper("Error creating the bidTaxTransaction for asking user in the db. Rolling back. Error : +%v", err)
+			return errorHelper("Error creating the bidTaxTransaction - %+v. Rolling back. Error : +%v", bidTaxTransaction, err)
 		}
 		l.Debugf("Added bidTaxTransaction to Transactions table.")
 	}
@@ -1767,7 +1767,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	UpdateStockVolume(ask.StockId, stockTradeQty)
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
 
-	if err := UpdateStockPrice(ask.StockId, stockTradePrice); err != nil {
+	if err := UpdateStockPrice(ask.StockId, stockTradePrice, stockTradeQty); err != nil {
 		l.Errorf("Error updating stock price. BUT SUPRRESSING IT.")
 	}
 
@@ -1827,7 +1827,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 	tx := db.Begin()
 
 	allStocks.m[stockId].RLock()
-	mortgagePrice := allStocks.m[stockId].stock.AvgLastPrice
+	mortgagePrice := allStocks.m[stockId].stock.CurrentPrice
 	allStocks.m[stockId].RUnlock()
 
 	l.Infof("Taking current price of stock as %d", mortgagePrice)

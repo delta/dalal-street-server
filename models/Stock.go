@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -13,22 +14,23 @@ import (
 const TIMES_RESOLUTION = 60
 
 type Stock struct {
-	Id               uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	ShortName        string `gorm:"column:shortName;not null" json:"short_name"`
-	FullName         string `gorm:"column:fullName;not null" json:"full_name"`
-	Description      string `gorm:"not null" json:"description"`
-	CurrentPrice     uint64 `gorm:"column:currentPrice;not null"  json:"current_price"`
-	DayHigh          uint64 `gorm:"column:dayHigh;not null" json:"day_high"`
-	DayLow           uint64 `gorm:"column:dayLow;not null" json:"day_low"`
-	AllTimeHigh      uint64 `gorm:"column:allTimeHigh;not null" json:"all_time_high"`
-	AllTimeLow       uint64 `gorm:"column:allTimeLow;not null" json:"all_time_low"`
-	StocksInExchange uint64 `gorm:"column:stocksInExchange;not null" json:"stocks_in_exchange"`
-	StocksInMarket   uint64 `gorm:"column:stocksInMarket;not null" json:"stocks_in_market"`
-	PreviousDayClose uint64 `gorm:"column:previousDayClose;not null" json:"previous_day_close"`
-	UpOrDown         bool   `gorm:"column:upOrDown;not null" json:"up_or_down"`
-	AvgLastPrice     uint64 `gorm:"column:avgLastPrice;not null" json:"avg_last_price"`
-	CreatedAt        string `gorm:"column:createdAt;not null" json:"created_at"`
-	UpdatedAt        string `gorm:"column:updatedAt;not null" json:"updated_at"`
+	Id               uint32  `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	ShortName        string  `gorm:"column:shortName;not null" json:"short_name"`
+	FullName         string  `gorm:"column:fullName;not null" json:"full_name"`
+	Description      string  `gorm:"not null" json:"description"`
+	CurrentPrice     uint64  `gorm:"column:currentPrice;not null"  json:"current_price"`
+	DayHigh          uint64  `gorm:"column:dayHigh;not null" json:"day_high"`
+	DayLow           uint64  `gorm:"column:dayLow;not null" json:"day_low"`
+	AllTimeHigh      uint64  `gorm:"column:allTimeHigh;not null" json:"all_time_high"`
+	AllTimeLow       uint64  `gorm:"column:allTimeLow;not null" json:"all_time_low"`
+	StocksInExchange uint64  `gorm:"column:stocksInExchange;not null" json:"stocks_in_exchange"`
+	StocksInMarket   uint64  `gorm:"column:stocksInMarket;not null" json:"stocks_in_market"`
+	PreviousDayClose uint64  `gorm:"column:previousDayClose;not null" json:"previous_day_close"`
+	UpOrDown         bool    `gorm:"column:upOrDown;not null" json:"up_or_down"`
+	LastTradePrice   uint64  `gorm:"column:lastTradePrice;not null" json:"last_trade_price"`
+	RealAvgPrice     float64 `gorm:"column:realAvgPrice;not null" json:"real_avg_price"`
+	CreatedAt        string  `gorm:"column:createdAt;not null" json:"created_at"`
+	UpdatedAt        string  `gorm:"column:updatedAt;not null" json:"updated_at"`
 
 	// HACK: Getting last minute's hl from transactions used by stock history
 	open   uint64 // Used to store Open for the last minute
@@ -56,7 +58,8 @@ func (gStock *Stock) ToProto() *models_pb.Stock {
 		StocksInMarket:   gStock.StocksInMarket,
 		UpOrDown:         gStock.UpOrDown,
 		PreviousDayClose: gStock.PreviousDayClose,
-		AvgLastPrice:     gStock.AvgLastPrice,
+		LastTradePrice:   gStock.LastTradePrice,
+		RealAvgPrice:     gStock.RealAvgPrice,
 		CreatedAt:        gStock.CreatedAt,
 		UpdatedAt:        gStock.UpdatedAt,
 	}
@@ -77,10 +80,10 @@ var allStocks = struct {
 
 var avgLastPrice = struct {
 	sync.RWMutex
-	m map[uint32]uint64
+	m map[uint32]float64
 }{
 	sync.RWMutex{},
-	make(map[uint32]uint64),
+	make(map[uint32]float64),
 }
 
 func GetStockCopy(stockId uint32) (Stock, error) {
@@ -115,9 +118,12 @@ func GetAllStocks() map[uint32]*Stock {
 	return allStocksCopy
 }
 
-func UpdateStockPrice(stockId uint32, price uint64) error {
+func UpdateStockPrice(stockId uint32, price uint64, quantity uint64) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "UpdateStockPrice",
+		"method":        "UpdateStockPrice",
+		"param_stockId": stockId,
+		"param_price":   price,
+		"param_qty":     quantity,
 	})
 
 	l.Infof("Attempting")
@@ -135,39 +141,51 @@ func UpdateStockPrice(stockId uint32, price uint64) error {
 	stock := stockNLock.stock
 	oldStockCopy := *stock
 
-	stock.CurrentPrice = price
-	if price > stock.DayHigh {
-		stock.DayHigh = price
-	} else if price < stock.DayLow {
-		stock.DayLow = price
+	stock.LastTradePrice = price
+
+	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
+
+	// averageStockCount should not be 0, so the math.Max ensures that it is at least 1.
+	// averageStockCount should not be above MAX_AVERAGE_STOCK_COUNT so the math.Min ensures that.
+	// The reason for this upper limit is that if the averageStockCount is too high, the price will never change.
+	averageStockCount := uint64(math.Min(math.Max(float64(STOCK_AVERAGE_PERCENT*(stock.StocksInExchange+stock.StocksInMarket)/100), 1), MAX_AVERAGE_STOCK_COUNT))
+	finalQuantity := uint64(math.Min(float64(quantity), float64(averageStockCount)))
+
+	avgLastPrice.Lock()
+	l.Infof("Average stock count = %v, finalQuantity = %v, Previous avgLastPrice = %v", averageStockCount, finalQuantity, avgLastPrice.m[stockId])
+
+	priceDifference := float64(price) - avgLastPrice.m[stockId]
+	stockPriceChange := (float64(finalQuantity) * priceDifference) / float64(averageStockCount)
+
+	avgLastPrice.m[stock.Id] += stockPriceChange
+	l.Infof("New Current Price = Average of last %v stock trades = +%v", averageStockCount, avgLastPrice.m[stock.Id])
+	stock.CurrentPrice = uint64(avgLastPrice.m[stock.Id])
+	stock.RealAvgPrice = avgLastPrice.m[stockId]
+	avgLastPrice.Unlock()
+
+	if stock.CurrentPrice > stock.DayHigh {
+		stock.DayHigh = stock.CurrentPrice
+	} else if stock.CurrentPrice < stock.DayLow {
+		stock.DayLow = stock.CurrentPrice
 	}
 
-	if price > stock.high {
-		stock.high = price
-	} else if price < stock.low {
-		stock.low = price
+	if stock.CurrentPrice > stock.high {
+		stock.high = stock.CurrentPrice
+	} else if stock.CurrentPrice < stock.low {
+		stock.low = stock.CurrentPrice
 	}
 
-	if price > stock.AllTimeHigh {
-		stock.AllTimeHigh = price
-	} else if price < stock.AllTimeLow {
-		stock.AllTimeLow = price
+	if stock.CurrentPrice > stock.AllTimeHigh {
+		stock.AllTimeHigh = stock.CurrentPrice
+	} else if stock.CurrentPrice < stock.AllTimeLow {
+		stock.AllTimeLow = stock.CurrentPrice
 	}
 
-	if price > stock.PreviousDayClose {
+	if stock.CurrentPrice > stock.PreviousDayClose {
 		stock.UpOrDown = true
 	} else {
 		stock.UpOrDown = false
 	}
-
-	stock.UpdatedAt = utils.GetCurrentTimeISO8601()
-
-	avgLastPrice.Lock()
-	avgLastPrice.m[stock.Id] -= uint64((avgLastPrice.m[stock.Id] / 20))
-	avgLastPrice.m[stock.Id] += uint64((stock.CurrentPrice) / 20)
-	l.Infof("Average Price +%v", avgLastPrice.m[stock.Id])
-	stock.AvgLastPrice = avgLastPrice.m[stock.Id]
-	avgLastPrice.Unlock()
 
 	db := getDB()
 
@@ -177,7 +195,7 @@ func UpdateStockPrice(stockId uint32, price uint64) error {
 	}
 
 	stockPriceStream := datastreamsManager.GetStockPricesStream()
-	stockPriceStream.SendStockPriceUpdate(stockId, price)
+	stockPriceStream.SendStockPriceUpdate(stockId, stock.CurrentPrice)
 
 	l.Infof("Done")
 
@@ -206,7 +224,7 @@ func LoadStocks() error {
 	allStocks.Lock()
 	avgLastPrice.Lock()
 	allStocks.m = make(map[uint32]*stockAndLock)
-	avgLastPrice.m = make(map[uint32]uint64)
+	avgLastPrice.m = make(map[uint32]float64)
 
 	for _, stock := range stocks {
 		allStocks.m[stock.Id] = &stockAndLock{stock: stock}
@@ -214,7 +232,7 @@ func LoadStocks() error {
 		allStocks.m[stock.Id].stock.open = allStocks.m[stock.Id].stock.CurrentPrice
 		allStocks.m[stock.Id].stock.high = allStocks.m[stock.Id].stock.CurrentPrice
 		allStocks.m[stock.Id].stock.low = allStocks.m[stock.Id].stock.CurrentPrice
-		avgLastPrice.m[stock.Id] = stock.CurrentPrice
+		avgLastPrice.m[stock.Id] = stock.RealAvgPrice
 	}
 
 	avgLastPrice.Unlock()

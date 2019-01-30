@@ -245,7 +245,7 @@ var replCmds = map[string]replCmdFn{
 		c := 'N'
 		s.read("%c", &c)
 		if c == 'Y' {
-			err := models.UpdateStockPrice(stockId, newPrice)
+			err := models.UpdateStockPrice(stockId, newPrice, 10000)
 			if err != nil {
 				models.AdminLog(aun, fmt.Sprintf("Updating stock price of %d to Rs. %d failed due to '%+v'", stockId, newPrice, err))
 				s.error(err)
