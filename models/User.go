@@ -826,23 +826,23 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Check3: Passed. Creating Ask.")
 
-	if err := createAsk(ask); err != nil {
-		l.Errorf("Error creating the ask %+v", err)
-		return 0, err
-	}
-
-	l.Infof("Created Ask order. AskId: ", ask.Id)
+	oldCash := user.Cash
 
 	db := getDB()
 	tx := db.Begin()
 
-	oldCash := user.Cash
-
 	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
 		l.Errorf(format, args...)
 		user.Cash = oldCash
+		tx.Rollback()
 		return 0, err
 	}
+
+	if err := createAsk(ask, tx); err != nil {
+		return errorHelper("Error while creating Ask. Rolling back. Error: %+v", err)
+	}
+
+	l.Infof("Created Ask order. AskId: ", ask.Id)
 
 	if err := SubtractUserCash(user, orderFee, tx); err != nil {
 		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
@@ -975,7 +975,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	// Second Check: User should have enough cash
 	orderPrice := getOrderFeePrice(bid.Price, bid.StockId, bid.OrderType)
 	orderFee := getOrderFee(bid.StockQuantity, orderPrice)
-	cashLeft := int64(user.Cash) - int64(bid.StockQuantity*bid.Price+orderFee)
+	cashLeft := int64(user.Cash) - int64(bid.StockQuantity*orderPrice+orderFee)
 
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
@@ -986,13 +986,6 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Debugf("Check2: Passed. Creating Bid")
 
-	if err := createBid(bid); err != nil {
-		l.Errorf("Error creating the bid %+v", err)
-		return 0, err
-	}
-
-	l.Infof("Created Bid order. BidId: %d", bid.Id)
-
 	db := getDB()
 	tx := db.Begin()
 
@@ -1001,8 +994,15 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
 		l.Errorf(format, args...)
 		user.Cash = oldCash
+		tx.Rollback()
 		return 0, err
 	}
+
+	if err := createBid(bid, tx); err != nil {
+		return errorHelper("Error while creating bid. Rolling back. Error: %+v", err)
+	}
+
+	l.Infof("Created Bid order. BidId: %d", bid.Id)
 
 	if err := SubtractUserCash(user, orderFee, tx); err != nil {
 		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
@@ -1022,7 +1022,11 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
 	}
 
-	l.Info("Saved OrderFeeTransaction for bid %d", bid.Id)
+	l.Info("Saved OrderFeeTransaction for bid. Now subtracting user cash for bid %d", bid.Id)
+
+	if err := SubtractUserCash(user, bid.StockQuantity*orderPrice, tx); err != nil {
+		return errorHelper("Error subtracting cash. Rolling back. Error: %+v", err)
+	}
 
 	// Going to reserve cash for this order
 	placeOrderTransaction := GetTransactionRef(
@@ -1033,12 +1037,6 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		0,
 		-1*int64(bid.StockQuantity*orderPrice),
 	)
-
-	l.Info("Subtracting User Cash for bid %d", bid.Id)
-
-	if err := SubtractUserCash(user, bid.StockQuantity*orderPrice, tx); err != nil {
-		return errorHelper("Error subtracting cash. Rolling back. Error: %+v", err)
-	}
 
 	l.Info("Reserving cash for bid %d", bid.Id)
 

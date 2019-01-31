@@ -124,7 +124,7 @@ func getBid(id uint32) (*Bid, error) {
 	return bid, nil
 }
 
-func createBid(bid *Bid) error {
+func createBid(bid *Bid, tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "CreateBid",
 		"param_bid": fmt.Sprintf("%+v", bid),
@@ -132,12 +132,10 @@ func createBid(bid *Bid) error {
 
 	l.Debugf("Attempting")
 
-	db := getDB()
-
 	bid.CreatedAt = utils.GetCurrentTimeISO8601()
 	bid.UpdatedAt = bid.CreatedAt
 
-	if err := db.Create(bid).Error; err != nil {
+	if err := tx.Create(bid).Error; err != nil {
 		return err
 	}
 
