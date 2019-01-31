@@ -37,7 +37,7 @@ func GetPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, 
 	sql := "SELECT transactionId FROM OrderDepositTransactions WHERE orderID = ? and isAsk = ?"
 	rows, err := db.Raw(sql, orderID, isAsk).Rows()
 	if err != nil {
-		l.Errorf("Error retrieving transacitonId. Error: %+v", err)
+		l.Errorf("Error retrieving transactionId. Error: %+v", err)
 		return 0, 0, err
 	}
 

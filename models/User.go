@@ -710,6 +710,7 @@ func GetUserCopy(id uint32) (User, error) {
 }
 
 // SubtractUserCash subtracts cash for users account
+// This function should be called ONLY AFTER lock is obtained on user
 func SubtractUserCash(user *User, fee uint64, tx *gorm.DB) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "SubtractUserCash",
@@ -886,7 +887,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	l.Info("Commited successfully for bid %d", ask.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(ask *Ask, orderFeeTransaction *Transaction, placeOrderTransaction *Transaction) {
+	go func(ask *Ask, orderFeeTransaction, placeOrderTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -1051,7 +1052,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	l.Info("Commited successfully for bid %d", bid.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
-	go func(bid *Bid, orderFeeTransaction *Transaction, placeOrderTransaction *Transaction) {
+	go func(bid *Bid, orderFeeTransaction, placeOrderTransaction *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -1091,7 +1092,6 @@ func SaveAskCancelOrderTransaction(askOrder *Ask, user *User, tx *gorm.DB) error
 	)
 
 	if err := tx.Save(cancelOrderTransaction).Error; err != nil {
-		tx.Rollback()
 		l.Errorf("Error while commiting %+v", err)
 		return err
 	}
@@ -1133,13 +1133,11 @@ func SaveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error
 
 	user.Cash += uint64(reservedCash)
 	if err := tx.Save(user).Error; err != nil {
-		tx.Rollback()
 		l.Errorf("Error while adding reserved cash back to user. Error: %+v", err)
 		return err
 	}
 
 	if err := tx.Save(cancelOrderTransaction).Error; err != nil {
-		tx.Rollback()
 		l.Errorf("Error while saving cancelOrderTransaction %+v", err)
 		return err
 	}
@@ -1157,7 +1155,7 @@ func SaveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error
 // CancelOrder cancels a user's order. It'll check if the user was the one who placed it.
 // It returns the pointer to Ask/Bid (whichever it was - the other is nil) that got cancelled.
 // This pointer will have to be passed to the CancelOrder of the matching engine to remove it
-// from there.
+// from there. At the same time, whatever was reserved will be returned via a CancelOrderTransaction
 func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":  "CancelOrder",
@@ -1758,17 +1756,6 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	total := int64(stockTradePrice * stockTradeQty)                                                                    // Cash required for the Ask order
 	cashLeft := int64(biddingUser.Cash) - total + reservedCashForTrade
 
-	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Errorf("Check1: Failed. Not enough cash. Returning reserved cash back to user.")
-		bid.Close(tx)
-		SaveBidCancelOrderTransaction(bid, biddingUser, tx)
-		err := tx.Commit() // Error will still go on to return AskUndone
-		l.Errorf("Error while commiting bidClose. Error: %+v", err)
-		go updateDataStreams(nil, nil, nil, nil)
-		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
-		return AskUndone, BidDone, nil
-	}
-
 	//User has enough stocks reserved. Use that to make transaction
 
 	askTransaction := GetTransactionRef(ask.UserId, ask.StockId, OrderFillTransaction, 0, stockTradePrice, total)
@@ -1794,7 +1781,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	ask.IsClosed = ask.StockQuantity == ask.StockQuantityFulfilled
 	bid.IsClosed = bid.StockQuantity == bid.StockQuantityFulfilled
 
-	var errorHelper = func(fmt string, args ...interface{}) (AskOrderFillStatus, BidOrderFillStatus, *Transaction) {
+	var errorHelper = func(fmt string, args ...interface{}) {
 		l.Errorf(fmt, args...)
 		askingUser.Cash = askingUserOldCash
 		biddingUser.Cash = biddingUserOldCash
@@ -1806,7 +1793,22 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		bid.IsClosed = oldBidIsClosed
 
 		tx.Rollback()
-		return AskUndone, BidUndone, nil
+	}
+
+	if cashLeft < MINIMUM_CASH_LIMIT {
+		l.Errorf("Check1: Failed. Not enough cash. Returning reserved cash back to user.")
+		if err := bid.Close(tx); err != nil {
+			errorHelper("Unable to close bid. Rolling back. Error: %+v", err)
+			return AskUndone, BidUndone, nil
+		}
+		SaveBidCancelOrderTransaction(bid, biddingUser, tx)
+		if err := tx.Commit(); err != nil {
+			errorHelper("Error while commiting. Rolling back. Error: %+v", err)
+			return AskUndone, BidUndone, nil
+		}
+		go updateDataStreams(nil, nil, nil, nil)
+		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
+		return AskUndone, BidDone, nil
 	}
 
 	// Tax Calculation for asking user
@@ -1814,7 +1816,9 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	// Update transaction summary table for asking user
 	if err := tx.Save(transactionSummary).Error; err != nil {
-		return errorHelper("Error updating the transaction summary for asking user. Rolling back. Error : +%v", err)
+		errorHelper("Error updating the transaction summary for asking user. Rolling back. Error : +%v", err)
+		return AskUndone, BidDone, nil
+
 	}
 	l.Debugf("TransactionSummary table for asking user updated successfully.")
 
@@ -1823,26 +1827,30 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	// Update transaction summary table for bidding user
 	if err := tx.Save(transactionSummary).Error; err != nil {
-		return errorHelper("Error updating the transaction summary for bidding user. Rolling back. Error : +%v", err)
+		errorHelper("Error updating the transaction summary for bidding user. Rolling back. Error : +%v", err)
+		return AskUndone, BidDone, nil
 	}
 	l.Debugf("TransactionSummary table updated successfully for bidding user.")
 
 	//save askTransaction
 	if err := tx.Save(askTransaction).Error; err != nil {
-		return errorHelper("Error creating the askTransaction. Rolling back. Error: %+v", err)
+		errorHelper("Error creating the askTransaction. Rolling back. Error: %+v", err)
+		return AskUndone, BidDone, nil
 	}
 	l.Debugf("Added askTransaction to Transactions table")
 
 	//save bidTransaction
 	if err := tx.Save(bidTransaction).Error; err != nil {
-		return errorHelper("Error creating the bidTransaction. Rolling back. Error: %+v", err)
+		errorHelper("Error creating the bidTransaction. Rolling back. Error: %+v", err)
+		return AskUndone, BidDone, nil
 	}
 	l.Debugf("Added bidTransaction to Transactions table")
 
 	//save askTaxTransaction
 	if askTaxTransaction != nil {
 		if err := tx.Save(askTaxTransaction).Error; err != nil {
-			return errorHelper("Error creating the askTaxTransaction - %+v. Rolling back. Error : +%v", askTaxTransaction, err)
+			errorHelper("Error creating the askTaxTransaction - %+v. Rolling back. Error : +%v", askTaxTransaction, err)
+			return AskUndone, BidDone, nil
 		}
 		l.Debugf("Added askTaxTransaction to Transactions table.")
 	}
@@ -1850,29 +1858,34 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	//save bidTaxTransaction
 	if bidTaxTransaction != nil {
 		if err := tx.Save(bidTaxTransaction).Error; err != nil {
-			return errorHelper("Error creating the bidTaxTransaction - %+v. Rolling back. Error : +%v", bidTaxTransaction, err)
+			errorHelper("Error creating the bidTaxTransaction - %+v. Rolling back. Error : +%v", bidTaxTransaction, err)
+			return AskUndone, BidDone, nil
 		}
 		l.Debugf("Added bidTaxTransaction to Transactions table.")
 	}
 
 	//update askingUser
 	if err := tx.Save(askingUser).Error; err != nil {
-		return errorHelper("Error updating askingUser.Cash Rolling back. Error: %+v", err)
+		errorHelper("Error updating askingUser.Cash Rolling back. Error: %+v", err)
+		return AskUndone, BidDone, nil
 	}
 
 	//update biddingUserCash
 	if err := tx.Save(biddingUser).Error; err != nil {
-		return errorHelper("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
+		errorHelper("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
+		return AskUndone, BidDone, nil
 	}
 
 	//update StockQuantityFulfilled and IsClosed for ask order
 	if err := tx.Save(ask).Error; err != nil {
-		return errorHelper("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
+		errorHelper("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
+		return AskUndone, BidDone, nil
 	}
 
 	//update StockQuantityFulfilled and IsClosed for bid order
 	if err := tx.Save(bid).Error; err != nil {
-		return errorHelper("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
+		errorHelper("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
+		return AskUndone, BidDone, nil
 	}
 
 	// insert an OrderFill
@@ -1882,7 +1895,8 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		TransactionId: askTransaction.Id, // We'll always store Ask
 	}
 	if err := tx.Save(of).Error; err != nil {
-		return errorHelper("Error saving an orderfill. Rolling back. Error: %+v", err)
+		errorHelper("Error saving an orderfill. Rolling back. Error: %+v", err)
+		return AskUndone, BidDone, nil
 	}
 
 	//Commit transaction
