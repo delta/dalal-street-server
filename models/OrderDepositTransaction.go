@@ -16,8 +16,8 @@ func (OrderDepositTransaction) TableName() string {
 	return "OrderDepositTransactions"
 }
 
-// MakeOrderDepositTransactionRef returns a reference of OrderDepositTransaction
-func MakeOrderDepositTransactionRef(transactionID, orderID uint32, isAsk bool) *OrderDepositTransaction {
+// makeOrderDepositTransactionRef returns a reference of OrderDepositTransaction
+func makeOrderDepositTransactionRef(transactionID, orderID uint32, isAsk bool) *OrderDepositTransaction {
 	return &OrderDepositTransaction{
 		TransactionId: transactionID,
 		OrderId:       orderID,
@@ -26,10 +26,10 @@ func MakeOrderDepositTransactionRef(transactionID, orderID uint32, isAsk bool) *
 	}
 }
 
-// GetPlaceOrderTransactionDetails returns price and quantity at which PlaceOrderTransaction was created
-func GetPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, error) {
+// getPlaceOrderTransactionDetails returns price and quantity at which PlaceOrderTransaction was created
+func getPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "GetPlaceOrderTransactionDetails",
+		"method": "getPlaceOrderTransactionDetails",
 		"userID": orderID,
 	})
 
