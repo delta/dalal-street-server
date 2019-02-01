@@ -16,8 +16,8 @@ func (OrderDepositTransaction) TableName() string {
 	return "OrderDepositTransactions"
 }
 
-// GetOrderDepositTransactionRef returns a reference of
-func GetOrderDepositTransactionRef(transactionID, orderID uint32, isAsk bool) *OrderDepositTransaction {
+// MakeOrderDepositTransactionRef returns a reference of OrderDepositTransaction
+func MakeOrderDepositTransactionRef(transactionID, orderID uint32, isAsk bool) *OrderDepositTransaction {
 	return &OrderDepositTransaction{
 		TransactionId: transactionID,
 		OrderId:       orderID,
@@ -34,7 +34,11 @@ func GetPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, 
 	})
 
 	db := getDB()
-	sql := "SELECT transactionId FROM OrderDepositTransactions WHERE orderID = ? and isAsk = ?"
+
+	var totalPrice int64
+	var stocksInBank int64
+
+	sql := "Select tx.total as totalPrice, tx.stockQuantity as stocksInBank from Transactions tx INNER JOIN OrderDepositTransactions odtx on tx.id = odtx.transactionID WHERE odtx.orderID = ? and isAsk = ?"
 	rows, err := db.Raw(sql, orderID, isAsk).Rows()
 	if err != nil {
 		l.Errorf("Error retrieving transactionId. Error: %+v", err)
@@ -46,29 +50,9 @@ func GetPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, 
 		return 0, 0, InvalidOrderIDError{}
 	}
 
-	var transactionId uint32
-	rows.Scan(&transactionId)
+	rows.Scan(&totalPrice, &stocksInBank)
 
-	l.Infof("Retrieving reserved asset for transactionId %d", transactionId)
+	l.Infof("Retrieved reserved asset. Cash reserved %d and Stock Reserved %d for order %d %d", totalPrice, stocksInBank, orderID, isAsk)
 
-	sql = "SELECT total, stockQuantity from Transactions WHERE id = ?"
-	trows, err := db.Raw(sql, transactionId).Rows()
-
-	if err != nil {
-		l.Errorf("Error while retrieving reserve details. Error: %+v", err)
-		return 0, 0, err
-	}
-
-	defer trows.Close()
-	if !trows.Next() {
-		return 0, 0, InvalidTransaction{}
-	}
-
-	var total int64
-	var stockQuantity int64
-	trows.Scan(&total, &stockQuantity)
-
-	l.Infof("Retrieved reserved asset. Cash reserved %d and Stock Reserved %d for transaction %d", total, stockQuantity, transactionId)
-
-	return -total, stockQuantity, nil
+	return -totalPrice, stocksInBank, nil
 }

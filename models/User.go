@@ -876,7 +876,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Info("Reserving stocks for ask %d", ask.Id)
 
-	if err := SavePlaceOrderTransaction(ask.Id, placeOrderTransaction, true, tx); err != nil {
+	if err := savePlaceOrderTransaction(ask.Id, placeOrderTransaction, true, tx); err != nil {
 		return errorHelper("Error reserving stocks. Rolling back. Error: %+v", err)
 	}
 
@@ -1041,7 +1041,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	l.Info("Reserving cash for bid %d", bid.Id)
 
-	if err := SavePlaceOrderTransaction(bid.Id, placeOrderTransaction, false, tx); err != nil {
+	if err := savePlaceOrderTransaction(bid.Id, placeOrderTransaction, false, tx); err != nil {
 		return errorHelper("Error reserving cash. Rolling back. Error: %+v", err)
 	}
 
@@ -1074,10 +1074,10 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	return bid.Id, nil
 }
 
-// SaveAskCancelOrderTransaction creates a CancelOrderTransaction for Ask orders and pushses to stream
-func SaveAskCancelOrderTransaction(askOrder *Ask, user *User, tx *gorm.DB) error {
+// saveAskCancelOrderTransaction creates a CancelOrderTransaction for Ask orders and pushses to stream
+func saveAskCancelOrderTransaction(askOrder *Ask, user *User, tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":  "SaveAskCancelOrderTransaction",
+		"method":  "saveAskCancelOrderTransaction",
 		"userId":  user.Id,
 		"orderId": askOrder.Id,
 	})
@@ -1106,10 +1106,10 @@ func SaveAskCancelOrderTransaction(askOrder *Ask, user *User, tx *gorm.DB) error
 	return nil
 }
 
-// SaveBidCancelOrderTransaction creates a CancelOrderTransaction for Ask orders and pushses to stream
-func SaveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error {
+// saveBidCancelOrderTransaction creates a CancelOrderTransaction for Ask orders and pushses to stream
+func saveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":  "SaveBidCancelOrderTransaction",
+		"method":  "saveBidCancelOrderTransaction",
 		"userId":  user.Id,
 		"orderId": bidOrder.Id,
 	})
@@ -1205,7 +1205,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		}
 
 		// Place CancelOrderTransaction to return stocks
-		if err := SaveAskCancelOrderTransaction(askOrder, user, tx); err != nil {
+		if err := saveAskCancelOrderTransaction(askOrder, user, tx); err != nil {
 			l.Errorf("Error while trying to cancel ask order %d. Error: %+v", askOrder.Id, err)
 			tx.Rollback()
 			return nil, nil, err
@@ -1242,7 +1242,7 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		}
 
 		// Place CancelOrderTransaction to return stocks
-		if err := SaveBidCancelOrderTransaction(bidOrder, user, tx); err != nil {
+		if err := saveBidCancelOrderTransaction(bidOrder, user, tx); err != nil {
 			tx.Rollback()
 			l.Errorf("Error while cancelling bid order. Error: %+v", err)
 			return nil, nil, err
@@ -1801,7 +1801,10 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 			errorHelper("Unable to close bid. Rolling back. Error: %+v", err)
 			return AskUndone, BidUndone, nil
 		}
-		SaveBidCancelOrderTransaction(bid, biddingUser, tx)
+		if err := saveBidCancelOrderTransaction(bid, biddingUser, tx); err != nil {
+			errorHelper("Error saving BidCancelOrderTransaction. Rolling back. Error: %+v", err)
+			return AskUndone, BidUndone, nil
+		}
 		if err := tx.Commit(); err != nil {
 			errorHelper("Error while commiting. Rolling back. Error: %+v", err)
 			return AskUndone, BidUndone, nil
@@ -1817,7 +1820,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	// Update transaction summary table for asking user
 	if err := tx.Save(transactionSummary).Error; err != nil {
 		errorHelper("Error updating the transaction summary for asking user. Rolling back. Error : +%v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 
 	}
 	l.Debugf("TransactionSummary table for asking user updated successfully.")
@@ -1828,21 +1831,21 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	// Update transaction summary table for bidding user
 	if err := tx.Save(transactionSummary).Error; err != nil {
 		errorHelper("Error updating the transaction summary for bidding user. Rolling back. Error : +%v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 	l.Debugf("TransactionSummary table updated successfully for bidding user.")
 
 	//save askTransaction
 	if err := tx.Save(askTransaction).Error; err != nil {
 		errorHelper("Error creating the askTransaction. Rolling back. Error: %+v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 	l.Debugf("Added askTransaction to Transactions table")
 
 	//save bidTransaction
 	if err := tx.Save(bidTransaction).Error; err != nil {
 		errorHelper("Error creating the bidTransaction. Rolling back. Error: %+v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 	l.Debugf("Added bidTransaction to Transactions table")
 
@@ -1850,7 +1853,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	if askTaxTransaction != nil {
 		if err := tx.Save(askTaxTransaction).Error; err != nil {
 			errorHelper("Error creating the askTaxTransaction - %+v. Rolling back. Error : +%v", askTaxTransaction, err)
-			return AskUndone, BidDone, nil
+			return AskUndone, BidUndone, nil
 		}
 		l.Debugf("Added askTaxTransaction to Transactions table.")
 	}
@@ -1859,7 +1862,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	if bidTaxTransaction != nil {
 		if err := tx.Save(bidTaxTransaction).Error; err != nil {
 			errorHelper("Error creating the bidTaxTransaction - %+v. Rolling back. Error : +%v", bidTaxTransaction, err)
-			return AskUndone, BidDone, nil
+			return AskUndone, BidUndone, nil
 		}
 		l.Debugf("Added bidTaxTransaction to Transactions table.")
 	}
@@ -1867,25 +1870,25 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	//update askingUser
 	if err := tx.Save(askingUser).Error; err != nil {
 		errorHelper("Error updating askingUser.Cash Rolling back. Error: %+v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	//update biddingUserCash
 	if err := tx.Save(biddingUser).Error; err != nil {
 		errorHelper("Error updating biddingUser.Cash Rolling back. Error: %+v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	//update StockQuantityFulfilled and IsClosed for ask order
 	if err := tx.Save(ask).Error; err != nil {
 		errorHelper("Error updating ask.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	//update StockQuantityFulfilled and IsClosed for bid order
 	if err := tx.Save(bid).Error; err != nil {
 		errorHelper("Error updating bid.{StockQuantityFulfilled,IsClosed}. Rolling back. Error: %+v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	// insert an OrderFill
@@ -1896,7 +1899,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	}
 	if err := tx.Save(of).Error; err != nil {
 		errorHelper("Error saving an orderfill. Rolling back. Error: %+v", err)
-		return AskUndone, BidDone, nil
+		return AskUndone, BidUndone, nil
 	}
 
 	//Commit transaction
@@ -2084,13 +2087,13 @@ func GetStocksOwned(userId uint32) (map[uint32]int64, error) {
 	return stocksOwned, nil
 }
 
-// SavePlaceOrderTransaction saves PlaceOrderTransaction and creates a mapping between orderId and
-func SavePlaceOrderTransaction(orderID uint32, placeOrderTransaction *Transaction, isAsk bool, tx *gorm.DB) error {
+// savePlaceOrderTransaction saves PlaceOrderTransaction and creates a mapping between orderId and
+func savePlaceOrderTransaction(orderID uint32, placeOrderTransaction *Transaction, isAsk bool, tx *gorm.DB) error {
 	if err := tx.Save(placeOrderTransaction).Error; err != nil {
 		return err
 	}
 
-	orderDepositTransaction := GetOrderDepositTransactionRef(
+	orderDepositTransaction := MakeOrderDepositTransactionRef(
 		placeOrderTransaction.Id,
 		orderID,
 		isAsk,
