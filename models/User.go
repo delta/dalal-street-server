@@ -1933,6 +1933,12 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		bidStatus = BidUndone
 	}
 
+	// HACK. The line below is a hack to ensure that nothing breaks in existing code.
+	// Previously, askTransaction would have negative stockTradeQty which would get sent to the datastream
+	// Now, it's 0 as user doesn't actually have to lose stocks anymore. Re-setting the object just before sending back the tranasction
+	// ensures that the rest of the matching engine / order book code functions without requiring changes. It's not ideal but I think it'll
+	// do for now.
+	askTransaction.StockQuantity = -int64(stockTradeQty)
 	return askStatus, bidStatus, askTransaction
 }
 
