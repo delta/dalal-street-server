@@ -160,10 +160,10 @@ func Test_VolumeRecording(t *testing.T) {
 	PlaceBidOrder(bid.UserId, bid)
 	defer db.Delete(bid)
 	PerformOrderFillTransaction(ask, bid, 5, 6)
-	defer db.Exec("DELETE FROM OrderDepositTransactions")
 	defer db.Exec("Delete FROM Transactions")
 	defer db.Exec("DELETE FROM OrderFills")
 	defer db.Exec("DELETE FROM TransactionSummary")
+	defer db.Exec("DELETE FROM OrderDepositTransactions")
 	allStocks.Lock()
 	defer allStocks.Unlock()
 	if allStocks.m[1].stock.volume != 6 {
