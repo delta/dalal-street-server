@@ -7,6 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
+	"github.com/jinzhu/gorm"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -176,7 +177,7 @@ func getAsk(id uint32) (*Ask, error) {
 
 // createAsk adds the ask to the database, fills the Id field of the ask
 // and adds it to the asksMap
-func createAsk(ask *Ask) error {
+func createAsk(ask *Ask, tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "CreateAsk",
 		"param_ask": fmt.Sprintf("%+v", ask),
@@ -187,8 +188,7 @@ func createAsk(ask *Ask) error {
 	ask.CreatedAt = utils.GetCurrentTimeISO8601()
 	ask.UpdatedAt = ask.CreatedAt
 
-	db := getDB()
-	if err := db.Create(ask).Error; err != nil {
+	if err := tx.Create(ask).Error; err != nil {
 		return err
 	}
 
@@ -211,7 +211,7 @@ func (e AlreadyClosedError) Error() string {
 }
 
 // Marks an ask as closed and removes it from asksMap
-func (ask *Ask) Close() error {
+func (ask *Ask) Close(tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "Ask.Close",
 		"param_ask": fmt.Sprintf("%+v", ask),
@@ -228,8 +228,7 @@ func (ask *Ask) Close() error {
 	ask.UpdatedAt = utils.GetCurrentTimeISO8601()
 	ask.Unlock()
 
-	db := getDB()
-	if err := db.Save(ask).Error; err != nil {
+	if err := tx.Save(ask).Error; err != nil {
 		l.Error(err)
 		return err
 	}

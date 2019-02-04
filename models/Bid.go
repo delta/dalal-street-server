@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
+	"github.com/jinzhu/gorm"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -123,7 +124,7 @@ func getBid(id uint32) (*Bid, error) {
 	return bid, nil
 }
 
-func createBid(bid *Bid) error {
+func createBid(bid *Bid, tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "CreateBid",
 		"param_bid": fmt.Sprintf("%+v", bid),
@@ -131,12 +132,10 @@ func createBid(bid *Bid) error {
 
 	l.Debugf("Attempting")
 
-	db := getDB()
-
 	bid.CreatedAt = utils.GetCurrentTimeISO8601()
 	bid.UpdatedAt = bid.CreatedAt
 
-	if err := db.Create(bid).Error; err != nil {
+	if err := tx.Create(bid).Error; err != nil {
 		return err
 	}
 
@@ -149,15 +148,13 @@ func createBid(bid *Bid) error {
 	return nil
 }
 
-func (bid *Bid) Close() error {
+func (bid *Bid) Close(tx *gorm.DB) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":    "Bid.Close",
 		"param_bid": fmt.Sprintf("%+v", bid),
 	})
 
 	l.Debugf("Attempting")
-
-	db := getDB()
 
 	bid.Lock()
 	if bid.IsClosed {
@@ -168,7 +165,7 @@ func (bid *Bid) Close() error {
 	bid.UpdatedAt = utils.GetCurrentTimeISO8601()
 	bid.Unlock()
 
-	if err := db.Save(bid).Error; err != nil {
+	if err := tx.Save(bid).Error; err != nil {
 		l.Error(err)
 		return err
 	}

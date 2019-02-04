@@ -132,6 +132,14 @@ func UpdateLeaderboard() {
 			return
 		}
 		user.Total = result.Total
+
+		// It was found that the total column in user table was not accurate
+		// This ensures that the total column in User table is in sync with the leaderboard total
+		if err := tx.Save(user).Error; err != nil {
+			l.Errorf("Error saving user data. Rolling back. Error: %+v", err)
+			tx.Rollback()
+			return
+		}
 		close(ch)
 
 		counter += 1
@@ -143,7 +151,7 @@ func UpdateLeaderboard() {
 	tx.Exec("TRUNCATE TABLE Leaderboard")
 
 	for _, leaderboardEntry := range leaderboardEntries {
-		if err := db.Save(leaderboardEntry).Error; err != nil {
+		if err := tx.Save(leaderboardEntry).Error; err != nil {
 			l.Errorf("Error updating leaderboard. Failing. %+v", err)
 			tx.Rollback()
 			return
@@ -153,6 +161,7 @@ func UpdateLeaderboard() {
 	//commit transaction
 	if err := tx.Commit().Error; err != nil {
 		l.Errorf("Error committing leaderboardUpdate transaction. Failing. %+v", err)
+		tx.Rollback()
 		return
 	}
 
