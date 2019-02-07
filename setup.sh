@@ -1,17 +1,23 @@
 #!/bin/bash
 
+echo "######## Setting up protobuf ########"
 if [ ! -f protoc-3.2.0rc2-linux-x86_64.zip ]; then
     wget --tries=3 https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip
 
     echo "######## Unzipping protoc compiler ##########"
     unzip protoc-3.2.0rc2-linux-x86_64.zip -d protobuf
+
+    echo "######## Installing protoc-gen-go ########"
+    go get -u -v github.com/golang/protobuf/{proto,protoc-gen-go}
+    cd $GOPATH/src/github.com/golang/protobuf/protoc-gen-go/
+    git reset --hard 1918e1ff6ffd2be7bed0553df8650672c3bfe80d
+    go install
 fi
 
 echo "######## Adding to path ##########"
 export PATH=$PATH:$(pwd)/protobuf/bin
 
 echo "######## Fetching Go dependencies ##########"
-go get -u -v github.com/golang/protobuf/{proto,protoc-gen-go}
 go get -u -v golang.org/x/net/context
 go get -u -v google.golang.org/grpc
 go get -v github.com/gemnasium/migrate
