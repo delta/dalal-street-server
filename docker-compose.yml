@@ -16,6 +16,7 @@ services:
         build: .
         volumes: 
             - $GOPATH:/go
+            - ./:go/src/github.com/delta/dalal-street-server
         ports:
             - "443:8000"
         depends_on:
@@ -33,6 +34,8 @@ services:
             - ./docker/mysql:/var/lib/mysql
         env_file:
             - .env
+        ports:
+            - "3306:3306"
         environment:
             MYSQL_DATABASE: ${DB_NAME}
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
