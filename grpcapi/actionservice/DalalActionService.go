@@ -205,9 +205,16 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 		return makeError(actions_pb.GetPortfolioResponse_InternalServerError, "")
 	}
 
+	reservedStocksOwned, err := models.GetReservedStocksOwned(user.Id)
+	if err != nil {
+		l.Errorf("Unable to get Reserved Stocks for User Id. Error: %+v", err)
+		return makeError(actions_pb.GetPortfolioResponse_InternalServerError, "")
+	}
+
 	resp.SessionId = sess.GetID()
 	resp.User = user.ToProto()
 	resp.StocksOwned = stocksOwned
+	resp.ReservedStocksOwned = reservedStocksOwned
 
 	return resp, nil
 }
@@ -335,6 +342,12 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		"ORDER_FEE_PERCENT":       models.ORDER_FEE_PERCENT,
 	}
 
+	reservedStocksOwned, err := models.GetReservedStocksOwned(user.Id)
+	if err != nil {
+		l.Errorf("Unable to get Reserved Stocks for User Id. Error: %+v", err)
+		return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
 	resp = &actions_pb.LoginResponse{
 		SessionId:                sess.GetID(),
 		User:                     user.ToProto(),
@@ -344,6 +357,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		IsMarketOpen:             models.IsMarketOpen(),
 		MarketIsClosedHackyNotif: models.MARKET_IS_CLOSED_HACKY_NOTIF,
 		MarketIsOpenHackyNotif:   models.MARKET_IS_OPEN_HACKY_NOTIF,
+		ReservedStocksOwned:      reservedStocksOwned,
 	}
 
 	l.Infof("Request completed successfully")

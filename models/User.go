@@ -50,24 +50,26 @@ var TotalUserCount uint32
 
 // User models the User object.
 type User struct {
-	Id        uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	Email     string `gorm:"unique;not null" json:"email"`
-	Name      string `gorm:"not null" json:"name"`
-	Cash      uint64 `gorm:"not null" json:"cash"`
-	Total     int64  `gorm:"not null" json:"total"`
-	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
-	IsHuman   bool   `gorm:"column:isHuman;not null" json:"is_human"`
+	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Email        string `gorm:"unique;not null" json:"email"`
+	Name         string `gorm:"not null" json:"name"`
+	Cash         uint64 `gorm:"not null" json:"cash"`
+	Total        int64  `gorm:"not null" json:"total"`
+	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
+	IsHuman      bool   `gorm:"column:isHuman;not null" json:"is_human"`
+	ReservedCash uint64 `gorm:"column:reservedCash;not null" json:"reserved_cash"`
 }
 
 func (u *User) ToProto() *models_pb.User {
 	return &models_pb.User{
-		Id:        u.Id,
-		Email:     u.Email,
-		Name:      u.Name,
-		Cash:      u.Cash,
-		Total:     u.Total,
-		CreatedAt: u.CreatedAt,
-		IsHuman:   u.IsHuman,
+		Id:           u.Id,
+		Email:        u.Email,
+		Name:         u.Name,
+		Cash:         u.Cash,
+		Total:        u.Total,
+		CreatedAt:    u.CreatedAt,
+		IsHuman:      u.IsHuman,
+		ReservedCash: u.ReservedCash,
 	}
 }
 
@@ -284,12 +286,13 @@ func createUser(name string, email string) (*User, error) {
 	db := getDB()
 
 	u := &User{
-		Email:     email,
-		Name:      name,
-		Cash:      STARTING_CASH,
-		Total:     STARTING_CASH,
-		CreatedAt: utils.GetCurrentTimeISO8601(),
-		IsHuman:   true,
+		Email:        email,
+		Name:         name,
+		Cash:         STARTING_CASH,
+		Total:        STARTING_CASH,
+		CreatedAt:    utils.GetCurrentTimeISO8601(),
+		IsHuman:      true,
+		ReservedCash: 0,
 	}
 
 	err := db.Save(u).Error
@@ -355,7 +358,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	}
 
 	l.Debugf("Attempting login to Pragyan")
-	resp, err := http.PostForm("https://api.pragyan.org/event/login", form)
+	resp, err := http.PostForm("https://api.pragyan.org/19/event/login", form)
 	if err != nil {
 		l.Errorf("Pragyan API call failed: '%s'", err)
 		return pragyanUser{}, err
@@ -729,6 +732,26 @@ func SubtractUserCash(user *User, fee uint64, tx *gorm.DB) error {
 	return nil
 }
 
+// AddUserReservedCash adds reservedCash to the users account
+// This function should be called ONLY AFTER lock is obtained on user
+func AddUserReservedCash(user *User, reservedCash uint64, tx *gorm.DB) error {
+	l := logger.WithFields(logrus.Fields{
+		"method":             "AddUserReservedCash",
+		"param_user":         fmt.Sprintf("%+v", user),
+		"param_reservedCash": fmt.Sprintf("%d", reservedCash),
+	})
+
+	user.ReservedCash = user.ReservedCash + reservedCash
+
+	if err := tx.Save(user).Error; err != nil {
+		return err
+	}
+
+	l.Infof("Updated user reserved cash. User now has %d", user.ReservedCash)
+
+	return nil
+}
+
 // PlaceAskOrder places an Ask order for the user.
 //
 // The method is thread-safe like other exported methods of this package.
@@ -978,6 +1001,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	orderFee := getOrderFee(bid.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(bid.StockQuantity*orderPrice+orderFee)
 
+	reservedCash := uint64(bid.StockQuantity * orderPrice)
+	l.Debugf("Cash to be reserved is %d", reservedCash)
 	l.Debugf("Check2: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
@@ -991,10 +1016,12 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	tx := db.Begin()
 
 	oldCash := user.Cash
+	oldReservedCash := user.ReservedCash
 
 	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
 		l.Errorf(format, args...)
 		user.Cash = oldCash
+		user.ReservedCash = oldReservedCash
 		tx.Rollback()
 		return 0, err
 	}
@@ -1007,6 +1034,10 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 
 	if err := SubtractUserCash(user, orderFee, tx); err != nil {
 		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
+	}
+
+	if err := AddUserReservedCash(user, reservedCash, tx); err != nil {
+		return errorHelper("Error while adding reserved cash to the user. Rolling back. Error: %+v", err)
 	}
 
 	// Update datastreams to add newly placed order in OpenOrders
@@ -1132,6 +1163,8 @@ func saveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error
 	)
 
 	user.Cash += uint64(reservedCash)
+	user.ReservedCash -= uint64(reservedCash)
+
 	if err := tx.Save(user).Error; err != nil {
 		l.Errorf("Error while adding reserved cash back to user. Error: %+v", err)
 		return err
@@ -1241,14 +1274,21 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 			return nil, nil, err
 		}
 
+		oldCash := user.Cash
+		oldReservedCash := user.ReservedCash
+
 		// Place CancelOrderTransaction to return stocks
 		if err := saveBidCancelOrderTransaction(bidOrder, user, tx); err != nil {
+			user.Cash = oldCash
+			user.ReservedCash = oldReservedCash
 			tx.Rollback()
 			l.Errorf("Error while cancelling bid order. Error: %+v", err)
 			return nil, nil, err
 		}
 
 		if err := tx.Commit().Error; err != nil {
+			user.Cash = oldCash
+			user.ReservedCash = oldReservedCash
 			tx.Rollback()
 			l.Errorf("Error while commiting %+v", err)
 			return nil, nil, err
@@ -1764,10 +1804,14 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	// save old cash for rolling back
 	askingUserOldCash := askingUser.Cash
 	biddingUserOldCash := biddingUser.Cash
+	biddingUserOldReservedCash := biddingUser.ReservedCash
 
 	//calculate user's updated cash
 	askingUser.Cash += uint64(stockTradeQty) * stockTradePrice
+
+	// bidding user's cash will first be subtracted from reserved cash and then if required from bidding user's cash
 	biddingUser.Cash = uint64(cashLeft)
+	biddingUser.ReservedCash = uint64(math.Max(0, float64(int64(biddingUser.ReservedCash)-reservedCashForTrade)))
 
 	// in case things go wrong and we've to roll back
 	oldAskStockQuantityFulfilled := ask.StockQuantityFulfilled
@@ -1785,6 +1829,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		l.Errorf(fmt, args...)
 		askingUser.Cash = askingUserOldCash
 		biddingUser.Cash = biddingUserOldCash
+		biddingUser.ReservedCash = biddingUserOldReservedCash
 
 		ask.StockQuantityFulfilled = oldAskStockQuantityFulfilled
 		bid.StockQuantityFulfilled = oldBidStockQuantityFulfilled
@@ -2093,6 +2138,50 @@ func GetStocksOwned(userId uint32) (map[uint32]int64, error) {
 	}
 
 	return stocksOwned, nil
+}
+
+func GetReservedStocksOwned(userId uint32) (map[uint32]int64, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetReservedStocksOwned",
+		"userId": userId,
+	})
+
+	l.Info("GetReservedStocksOwned requested")
+
+	l.Debugf("Acquiring lock on user")
+
+	ch, _, err := getUserExclusively(userId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return nil, err
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released lock on user")
+	}()
+
+	db := getDB()
+
+	sql := "SELECT SUM(stockQuantity), SUM(stockQuantityFulFilled), stockId FROM `Asks` WHERE `userId` = ? AND isClosed = 0 GROUP BY `stockId`"
+	rows, err := db.Raw(sql, userId).Rows()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	reservedStocksOwned := make(map[uint32]int64)
+	for rows.Next() {
+		var stockId uint32
+		var stockQty int64
+		var stockQuantityFulFilled int64
+		rows.Scan(&stockId, &stockQty, &stockQuantityFulFilled)
+
+		reservedStocksOwned[stockId] = (stockQty - stockQuantityFulFilled)
+	}
+
+	return reservedStocksOwned, nil
 }
 
 // savePlaceOrderTransaction saves PlaceOrderTransaction and creates a mapping between orderId and
