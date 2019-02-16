@@ -106,7 +106,12 @@ func TestCancelBidOrder(t *testing.T) {
 }
 
 func Test_LoadOldOrders(t *testing.T) {
-	var l = logger.WithFields(logrus.Fields{
+
+	config := utils.GetConfiguration()
+	utils.Init(config)
+	models.Init(config, datastreams.GetManager())
+
+	var l = utils.Logger.WithFields(logrus.Fields{
 		"method": "Test_LoadOldOrders",
 	})
 

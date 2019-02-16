@@ -261,20 +261,6 @@ func TestOrderBookAddAskOrder(t *testing.T) {
 
 }
 
-func TestOrderBookAddAskOrderStoploss(t *testing.T) {
-
-	config := utils.GetConfiguration()
-	utils.Init(config)
-
-	mockControl, ob, _, _, mockAskStoplossQueue, _, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
-	defer mockControl.Finish()
-
-	stopLossAsk := makeAsk(1, stockID, models.StopLoss, stockQuantity, stockPrice, "")
-	mockAskStoplossQueue.EXPECT().Push(stopLossAsk).Times(1)
-
-	ob.AddAskOrder(stopLossAsk)
-}
-
 func TestOrderBookAddBidOrder(t *testing.T) {
 
 	config := utils.GetConfiguration()
@@ -300,20 +286,6 @@ func TestOrderBookAddBidOrder(t *testing.T) {
 		t.Fail()
 	}
 
-}
-
-func TestOrderBookAddBidOrderStoploss(t *testing.T) {
-
-	config := utils.GetConfiguration()
-	utils.Init(config)
-
-	mockControl, ob, _, _, _, mockBidStoplossQueue, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
-	defer mockControl.Finish()
-
-	stopLossBid := makeBid(1, stockID, models.StopLoss, stockQuantity, stockPrice, "")
-	mockBidStoplossQueue.EXPECT().Push(stopLossBid).Times(1)
-
-	ob.AddBidOrder(stopLossBid)
 }
 
 func TestOrderBookCancelAskOrder(t *testing.T) {
