@@ -846,3 +846,195 @@ func Test_TriggerStoploss(t *testing.T) {
 	}
 
 }
+
+func Test_AddAskOrderStoploss(t *testing.T) {
+
+	config := utils.GetConfiguration()
+	utils.Init(config)
+	models.Init(config, datastreams.GetManager())
+
+	var l = utils.Logger.WithFields(logrus.Fields{
+		"method": "Test_AddAskOrderStoploss",
+	})
+
+	var stockID uint32 = 1
+	var stockQuantity uint64 = 10
+	// var stockPrice uint32 = 20
+	var userID1 uint32 = 3
+	var userID2 uint32 = 4
+
+	var makeAsk = func(userId uint32, stockId uint32, ot models.OrderType, stockQty uint64, price uint64, placedAt string) *models.Ask {
+		return &models.Ask{
+			UserId:        userId,
+			StockId:       stockId,
+			OrderType:     ot,
+			StockQuantity: stockQty,
+			Price:         price,
+			CreatedAt:     placedAt,
+		}
+	}
+
+	stock := &models.Stock{
+		Id:               1,
+		StocksInExchange: 100,
+		CurrentPrice:     100,
+	}
+
+	user1 := &models.User{Id: userID1, Cash: 2000000, Email: "test1@test.com"}
+	user2 := &models.User{Id: userID2, Cash: 2000000, Email: "test2@test.com"}
+
+	stoplossAsk := makeAsk(userID2, stockID, models.StopLoss, stockQuantity, 70, "")
+
+	db := utils.GetDB()
+
+	defer func() {
+		db.Exec("DELETE from OrderFills")
+		db.Exec("DELETE from Transactions")
+		db.Exec("DELETE from TransactionSummary")
+		db.Delete(stoplossAsk)
+		db.Delete(user1)
+		db.Delete(user2)
+		db.Delete(stock)
+	}()
+
+	if err := db.Create(user1).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(user2).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(stoplossAsk).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testAskQueue := NewAskPQueue(1)
+	testBidQueue := NewBidPQueue(0)
+	testAskStoplossQueue := NewAskPQueue(1)
+	testBidStoplossQueue := NewBidPQueue(0)
+	testDepth := datastreams.GetManager().GetMarketDepthStream(stockID)
+
+	ob := &orderBook{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module":        "matchingengine.OrderBook.test",
+			"param_stockId": stockID,
+		}),
+		stockId:     stockID,
+		askChan:     make(chan *models.Ask),
+		bidChan:     make(chan *models.Bid),
+		asks:        testAskQueue,
+		bids:        testBidQueue,
+		askStoploss: testAskStoplossQueue,
+		bidStoploss: testBidStoplossQueue,
+		depth:       testDepth,
+	}
+
+	go ob.StartStockMatching()
+	ob.AddAskOrder(stoplossAsk)
+
+	if ob.askStoploss.Head() != stoplossAsk {
+		l.Errorf("Errored in addAskOrderStoploss")
+	}
+
+}
+
+func Test_AddBidOrderStoploss(t *testing.T) {
+
+	config := utils.GetConfiguration()
+	utils.Init(config)
+	models.Init(config, datastreams.GetManager())
+
+	var l = utils.Logger.WithFields(logrus.Fields{
+		"method": "Test_AddBidOrderStoploss",
+	})
+
+	var stockID uint32 = 1
+	var stockQuantity uint64 = 10
+	// var stockPrice uint32 = 20
+	var userID1 uint32 = 3
+	var userID2 uint32 = 4
+
+	var makeBid = func(userId uint32, stockId uint32, ot models.OrderType, stockQty uint64, price uint64, placedAt string) *models.Bid {
+		return &models.Bid{
+			UserId:        userId,
+			StockId:       stockId,
+			OrderType:     ot,
+			StockQuantity: stockQty,
+			Price:         price,
+			CreatedAt:     placedAt,
+		}
+	}
+
+	stock := &models.Stock{
+		Id:               1,
+		StocksInExchange: 100,
+		CurrentPrice:     50,
+	}
+
+	user1 := &models.User{Id: userID1, Cash: 2000000, Email: "test1@test.com"}
+	user2 := &models.User{Id: userID2, Cash: 2000000, Email: "test2@test.com"}
+
+	stoplossBid := makeBid(userID1, stockID, models.StopLoss, stockQuantity, 70, "")
+
+	db := utils.GetDB()
+
+	defer func() {
+		db.Exec("DELETE from OrderFills")
+		db.Exec("DELETE from Transactions")
+		db.Exec("DELETE from TransactionSummary")
+		db.Delete(stoplossBid)
+		db.Delete(user1)
+		db.Delete(user2)
+		db.Delete(stock)
+	}()
+
+	if err := db.Create(user1).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(user2).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(stoplossBid).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testAskQueue := NewAskPQueue(1)
+	testBidQueue := NewBidPQueue(0)
+	testAskStoplossQueue := NewAskPQueue(1)
+	testBidStoplossQueue := NewBidPQueue(0)
+	testDepth := datastreams.GetManager().GetMarketDepthStream(stockID)
+
+	ob := &orderBook{
+		logger: utils.Logger.WithFields(logrus.Fields{
+			"module":        "matchingengine.OrderBook.test",
+			"param_stockId": stockID,
+		}),
+		stockId:     stockID,
+		askChan:     make(chan *models.Ask),
+		bidChan:     make(chan *models.Bid),
+		asks:        testAskQueue,
+		bids:        testBidQueue,
+		askStoploss: testAskStoplossQueue,
+		bidStoploss: testBidStoplossQueue,
+		depth:       testDepth,
+	}
+
+	go ob.StartStockMatching()
+	ob.AddBidOrder(stoplossBid)
+
+	if ob.bidStoploss.Head() != stoplossBid {
+		l.Errorf("Errored in addBidOrderStoploss")
+	}
+
+}
