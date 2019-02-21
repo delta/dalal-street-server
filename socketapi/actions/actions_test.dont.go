@@ -18,7 +18,7 @@ func Test_Login(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": "2", "user_fullname": "TestName" }}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/19/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": "2", "user_fullname": "TestName" }}`))
 
 	req := &actions_proto.LoginRequest{
 		Email:    "test@testmail.com",

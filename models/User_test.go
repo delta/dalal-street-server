@@ -16,7 +16,7 @@ func Test_Login(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	//Tests case for first time pragyan login
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India" }}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/19/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India" }}`))
 
 	u, err := Login("test@testmail.com", "password")
 	if err != nil {
@@ -63,7 +63,7 @@ func Test_Regsiter(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	//Tests case for first time pragyan login
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India"}}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/19/event/login", httpmock.NewStringResponder(200, `{"status_code":200,"message": { "user_id": 2, "user_fullname": "TestName" , "user_name":"UserName", "user_country":"India"}}`))
 	err := RegisterUser("test@testname.com", "password", "FullName")
 	defer func() {
 		db := getDB()
@@ -75,7 +75,7 @@ func Test_Regsiter(t *testing.T) {
 	}
 	httpmock.DeactivateAndReset()
 	httpmock.Activate()
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(401, `{"status_code":401,"message": "Invalid Credentials"}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/19/event/login", httpmock.NewStringResponder(401, `{"status_code":401,"message": "Invalid Credentials"}`))
 	err = RegisterUser("test@testname.com", "password", "FullName")
 
 	if err != AlreadyRegisteredError {
@@ -83,7 +83,7 @@ func Test_Regsiter(t *testing.T) {
 	}
 	httpmock.DeactivateAndReset()
 	httpmock.Activate()
-	httpmock.RegisterResponder("POST", "https://api.pragyan.org/event/login", httpmock.NewStringResponder(400, `{"status_code":400,"message": "Account Not Registered"}`))
+	httpmock.RegisterResponder("POST", "https://api.pragyan.org/19/event/login", httpmock.NewStringResponder(400, `{"status_code":400,"message": "Account Not Registered"}`))
 	err = RegisterUser("test@testname.com", "password", "FullName")
 	db := getDB()
 	registeredTestUser := &Registration{
@@ -116,13 +116,14 @@ func Test_Regsiter(t *testing.T) {
 
 func TestUserToProto(t *testing.T) {
 	o := &User{
-		Id:        2,
-		Email:     "test@testmail.com",
-		Name:      "test user",
-		Cash:      10000,
-		Total:     -200,
-		CreatedAt: "2017-06-08T00:00:00",
-		IsHuman:   true,
+		Id:           2,
+		Email:        "test@testmail.com",
+		Name:         "test user",
+		Cash:         10000,
+		Total:        -200,
+		CreatedAt:    "2017-06-08T00:00:00",
+		IsHuman:      true,
+		ReservedCash: 10,
 	}
 
 	oProto := o.ToProto()
@@ -276,7 +277,7 @@ func Test_PlaceBidOrder(t *testing.T) {
 		db.Save(user)
 	}
 
-	var user = &User{Id: 2, Cash: 2000}
+	var user = &User{Id: 2, Cash: 2000, ReservedCash: 0}
 	var stock = &Stock{Id: 1, CurrentPrice: 200}
 
 	transactions := []*Transaction{
@@ -395,7 +396,7 @@ func Test_CancelOrder(t *testing.T) {
 		}
 	}
 
-	var user = &User{Id: 2, Cash: 3000}
+	var user = &User{Id: 2, Cash: 3000, ReservedCash: 0}
 	var stock = &Stock{Id: 1}
 
 	var bids = []*Bid{
