@@ -1743,7 +1743,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	/* We're here, so both orders are open now */
 
-	var updateDataStreams = func(askTrans, bidTrans, askTaxTrans, bidTaxTrans *Transaction) {
+	var updateDataStreams = func(askTrans, bidTrans, askTaxTrans, bidTaxTrans, askReserveUpdateTrans, bidReserveUpdateTrans *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -1779,6 +1779,13 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 			transactionsStream.SendTransaction(bidTaxTrans.ToProto())
 		}
 
+		if askReserveUpdateTrans != nil {
+			transactionsStream.SendTransaction(askReserveUpdateTrans.ToProto())
+		}
+		if bidReserveUpdateTrans != nil {
+			transactionsStream.SendTransaction(bidReserveUpdateTrans.ToProto())
+		}
+
 		l.Infof("Sent through the datastreams")
 	}
 
@@ -1800,6 +1807,10 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	askTransaction := GetTransactionRef(ask.UserId, ask.StockId, OrderFillTransaction, 0, stockTradePrice, total)
 	bidTransaction := GetTransactionRef(bid.UserId, bid.StockId, OrderFillTransaction, int64(stockTradeQty), stockTradePrice, -total+reservedCashForTrade)
+
+	//Transaction to update cash used for Bid Order and Stocks reserved for Ask Order
+	askReserveUpdateTransaction := GetTransactionRef(ask.UserId, ask.StockId, ReserveUpdateTransaction, int64(stockTradeQty), stockTradePrice, 0)
+	bidReserveUpdateTransaction := GetTransactionRef(bid.UserId, bid.StockId, ReserveUpdateTransaction, 0, 0, reservedCashForTrade)
 
 	// save old cash for rolling back
 	askingUserOldCash := askingUser.Cash
@@ -1856,7 +1867,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 			revertToOldState("Error while commiting. Rolling back. Error: %+v", true, err)
 			return AskUndone, BidUndone, nil
 		}
-		go updateDataStreams(nil, nil, nil, nil)
+		go updateDataStreams(nil, nil, nil, nil, nil, nil)
 		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
 		return AskUndone, BidDone, nil
 	}
@@ -1955,7 +1966,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		return AskUndone, BidUndone, nil
 	}
 
-	go updateDataStreams(askTransaction, bidTransaction, askTaxTransaction, bidTaxTransaction)
+	go updateDataStreams(askTransaction, bidTransaction, askTaxTransaction, bidTaxTransaction, askReserveUpdateTransaction, bidReserveUpdateTransaction)
 
 	UpdateStockVolume(ask.StockId, stockTradeQty)
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
