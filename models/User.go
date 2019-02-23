@@ -2176,7 +2176,7 @@ func GetReservedStocksOwned(userId uint32) (map[uint32]int64, error) {
 		var stockId uint32
 		var stockQty int64
 		var stockQuantityFulFilled int64
-		rows.Scan(&stockId, &stockQty, &stockQuantityFulFilled)
+		rows.Scan(&stockQty, &stockQuantityFulFilled, &stockId)
 
 		reservedStocksOwned[stockId] = (stockQty - stockQuantityFulFilled)
 	}
