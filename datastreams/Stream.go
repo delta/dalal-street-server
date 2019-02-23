@@ -7,6 +7,8 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
+//go:generate mockgen -source Stream.go -destination ../mocks/mock_Stream.go -package mocks
+
 var logger *logrus.Entry
 
 // listener represents a single listener in the stream

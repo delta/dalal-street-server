@@ -8,6 +8,8 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
+//go:generate mockgen -source OrderBook.go -destination ../mocks/mock_OrderBook.go -package mocks
+
 // FillOrder is a type definition for a function that fills an order with given ask, bid, stockPrice and stockQty
 type FillOrder func(ask *models.Ask, bid *models.Bid, stockTradePrice uint64, stockTradeQty uint64) (models.AskOrderFillStatus, models.BidOrderFillStatus, *models.Transaction)
 

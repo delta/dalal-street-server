@@ -10,6 +10,8 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
+//go:generate mockgen -source MatchingEngine.go -destination ../mocks/mock_MatchingEngine.go -package mocks
+
 var logger *logrus.Entry
 
 // MatchingEngine represents a collection of OrderBooks for all stocks in the exchange.

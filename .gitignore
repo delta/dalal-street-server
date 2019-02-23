@@ -43,4 +43,3 @@ tls_keys/prod/*
 
 # config.json contains database credentials
 config.json
-mocks/
