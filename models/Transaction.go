@@ -29,6 +29,8 @@ func (tt *TransactionType) Scan(value interface{}) error {
 		*tt = 6
 	case "CancelOrderTransaction":
 		*tt = 7
+	case "ReserveUpdateTransaction":
+		*tt = 8
 	default:
 		return fmt.Errorf("Invalid value for TransactionType. Got %s", string(value.([]byte)))
 	}
@@ -46,6 +48,7 @@ const (
 	TaxTransaction
 	PlaceOrderTransaction
 	CancelOrderTransaction
+	ReserveUpdateTransaction
 )
 
 var transactionTypes = [...]string{
@@ -57,6 +60,7 @@ var transactionTypes = [...]string{
 	"TaxTransaction",
 	"PlaceOrderTransaction",
 	"CancelOrderTransaction",
+	"ReserveUpdateTransaction",
 }
 
 func (trType TransactionType) String() string {
@@ -106,6 +110,8 @@ func (t *Transaction) ToProto() *models_pb.Transaction {
 		pTrans.Type = models_pb.TransactionType_PLACE_ORDER_TRANSACTION
 	} else if t.Type == CancelOrderTransaction {
 		pTrans.Type = models_pb.TransactionType_CANCEL_ORDER_TRANSACTION
+	} else if t.Type == ReserveUpdateTransaction {
+		pTrans.Type = models_pb.TransactionType_RESERVE_UPDATE_TRANSACTION
 	}
 
 	return pTrans
