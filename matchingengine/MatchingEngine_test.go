@@ -2,7 +2,6 @@ package matchingengine
 
 import (
 	"testing"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/golang/mock/gomock"
@@ -116,8 +115,6 @@ func Test_LoadOldOrders(t *testing.T) {
 	})
 
 	var stockID uint32 = 1
-	// var stockQuantity uint64 = 10
-	// var stockPrice uint64 = 20
 	var userID1 uint32 = 3
 	var userID2 uint32 = 4
 
@@ -198,9 +195,8 @@ func Test_LoadOldOrders(t *testing.T) {
 		depth:       testDepth,
 	}
 
-	go ob.LoadOldAsk(ask)
-	go ob.LoadOldBid(bid)
-	time.Sleep(time.Second * 2)
+	ob.LoadOldAsk(ask)
+	ob.LoadOldBid(bid)
 
 	if testAskQueue.Head() != ask || testBidQueue.Head() != bid {
 		l.Errorf("Error in testLoadOrders")

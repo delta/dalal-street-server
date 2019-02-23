@@ -13,7 +13,7 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-func helperForOrderBookTests(t *testing.T) (
+func getMockObjects(t *testing.T) (
 	*gomock.Controller,
 	*orderBook,
 	*mocks.MockAskPQueue,
@@ -55,7 +55,7 @@ func helperForOrderBookTests(t *testing.T) (
 	return mockControl, ob, mockAskQueue, mockBidQueue, mockAskStoplossQueue, mockBidStoplossQueue, mockDepth, stockID, stockQuantity, stockPrice
 }
 
-func helperForOrderBookTestsWithoutMockPQ(t *testing.T) (
+func getMockAndTestObjects(t *testing.T) (
 	*gomock.Controller,
 	*orderBook,
 	*AskPQueue,
@@ -102,7 +102,7 @@ func TestLoadOldAsk(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, mockAskQueue, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, mockAskQueue, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitAsk := makeAsk(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -119,7 +119,7 @@ func TestLoadOldAskStopLoss(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, mockAskStoplossQueue, _, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, mockAskStoplossQueue, _, _, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	stopLossAsk := makeAsk(1, stockID, models.StopLoss, stockQuantity, stockPrice, "")
@@ -135,7 +135,7 @@ func TestLoadOldBid(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, mockBidQueue, _, _, mockDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, mockBidQueue, _, _, mockDepth, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitBid := makeBid(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -152,7 +152,7 @@ func TestLoadOldBidStopLoss(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, mockBidStoplossQueue, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, mockBidStoplossQueue, _, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	stopLossBid := makeBid(1, stockID, models.StopLoss, stockQuantity, stockPrice, "")
@@ -168,7 +168,7 @@ func TestLoadOldTransactions(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, mockDepth, stockID, _, _ := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, mockDepth, stockID, _, _ := getMockObjects(t)
 	defer mockControl.Finish()
 
 	t1 := &models.Transaction{
@@ -207,7 +207,7 @@ func TestAddAskToDepth(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitAsk := makeAsk(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -223,7 +223,7 @@ func TestAddBidToDepth(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitBid := makeBid(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -239,7 +239,7 @@ func TestOrderBookAddAskOrder(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitAsk1 := makeAsk(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -266,7 +266,7 @@ func TestOrderBookAddBidOrder(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitBid1 := makeBid(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -293,7 +293,7 @@ func TestOrderBookCancelAskOrder(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitAsk := makeAsk(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -310,7 +310,7 @@ func TestOrderBookCancelAskOrderStoploss(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	stoplossAsk := makeAsk(1, stockID, models.StopLoss, stockQuantity, stockPrice, "")
@@ -324,7 +324,7 @@ func TestOrderBookCancelBidOrder(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, mockDepth, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	limitBid := makeBid(1, stockID, models.Limit, stockQuantity, stockPrice, "")
@@ -340,7 +340,7 @@ func TestOrderBookCancelBidOrderStoploss(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := helperForOrderBookTests(t)
+	mockControl, ob, _, _, _, _, _, stockID, stockQuantity, stockPrice := getMockObjects(t)
 	defer mockControl.Finish()
 
 	stoplossBid := makeBid(1, stockID, models.StopLoss, stockQuantity, stockPrice, "")
@@ -354,7 +354,7 @@ func TestTopMatchingAsk(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, mockMarketDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTestsWithoutMockPQ(t)
+	mockControl, ob, _, _, _, _, mockMarketDepth, stockID, stockQuantity, stockPrice := getMockAndTestObjects(t)
 	defer mockControl.Finish()
 
 	marketBid := makeBid(1, stockID, models.Market, stockQuantity, stockPrice, "")
@@ -377,7 +377,7 @@ func TestTopMatchingBid(t *testing.T) {
 	config := utils.GetConfiguration()
 	utils.Init(config)
 
-	mockControl, ob, _, _, _, _, mockMarketDepth, stockID, stockQuantity, stockPrice := helperForOrderBookTestsWithoutMockPQ(t)
+	mockControl, ob, _, _, _, _, mockMarketDepth, stockID, stockQuantity, stockPrice := getMockAndTestObjects(t)
 	defer mockControl.Finish()
 
 	marketBid := makeBid(1, stockID, models.Market, stockQuantity, stockPrice, "")
@@ -407,8 +407,6 @@ func Test_MakeTrade(t *testing.T) {
 	})
 
 	var stockID uint32 = 1
-	// var stockQuantity uint32 = 10
-	// var stockPrice uint32 = 20
 	var userID1 uint32 = 3
 	var userID2 uint32 = 4
 
@@ -495,7 +493,6 @@ func Test_MakeTrade(t *testing.T) {
 	ob.LoadOldAsk(ask)
 	ob.LoadOldBid(bid)
 	models.LoadStocks()
-	time.Sleep(time.Second * 2)
 
 	askStatus, bidStatus := ob.makeTrade(ask, bid, false, false)
 
@@ -516,8 +513,6 @@ func Test_ProcessAsk(t *testing.T) {
 	})
 
 	var stockID uint32 = 1
-	// var stockQuantity uint32 = 10
-	// var stockPrice uint32 = 20
 	var userID1 uint32 = 3
 	var userID2 uint32 = 4
 
@@ -604,7 +599,6 @@ func Test_ProcessAsk(t *testing.T) {
 	ob.LoadOldAsk(ask)
 	ob.LoadOldBid(bid)
 	models.LoadStocks()
-	time.Sleep(time.Second * 2)
 
 	ob.processAsk(ask)
 
@@ -625,8 +619,6 @@ func Test_ProcessBid(t *testing.T) {
 	})
 
 	var stockID uint32 = 1
-	// var stockQuantity uint32 = 10
-	// var stockPrice uint32 = 20
 	var userID1 uint32 = 3
 	var userID2 uint32 = 4
 
@@ -713,7 +705,6 @@ func Test_ProcessBid(t *testing.T) {
 	ob.LoadOldAsk(ask)
 	ob.LoadOldBid(bid)
 	models.LoadStocks()
-	time.Sleep(time.Second * 2)
 
 	ob.processBid(bid)
 
@@ -735,7 +726,6 @@ func Test_TriggerStoploss(t *testing.T) {
 
 	var stockID uint32 = 1
 	var stockQuantity uint64 = 10
-	// var stockPrice uint32 = 20
 	var userID1 uint32 = 3
 	var userID2 uint32 = 4
 
@@ -859,7 +849,6 @@ func Test_AddAskOrderStoploss(t *testing.T) {
 
 	var stockID uint32 = 1
 	var stockQuantity uint64 = 10
-	// var stockPrice uint32 = 20
 	var userID1 uint32 = 3
 	var userID2 uint32 = 4
 
@@ -955,7 +944,6 @@ func Test_AddBidOrderStoploss(t *testing.T) {
 
 	var stockID uint32 = 1
 	var stockQuantity uint64 = 10
-	// var stockPrice uint32 = 20
 	var userID1 uint32 = 3
 	var userID2 uint32 = 4
 
