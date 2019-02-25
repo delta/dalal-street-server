@@ -50,3 +50,13 @@ services:
             - "9040:80"
         depends_on:
             - db
+    bots:
+        container_name: dalalstreet_bots_1
+        build: 
+            context: ./bots
+        volumes:
+            -  ./bots/dalalstreetbots:/var/www/dalalstreet/bots
+        ports:
+            -  "7050:5000"
+        depends_on:
+            - dalalserver
