@@ -8,5 +8,6 @@ RUN apt-get update && \
     curl
 
 WORKDIR  /go/src/github.com/delta/dalal-street-server 
+COPY . .
 
 CMD ["./docker-entry.sh"]

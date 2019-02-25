@@ -9,15 +9,17 @@ services:
             - ./frontend/conf:/etc/nginx/conf.d
             - ./frontend:/var/www/dalalstreet
         ports:
-            - "9000:80"
+            - "80:80"
+            - "443:443"
     
     dalalserver:
         container_name: dalalstreet_server_1
         build: .
         volumes: 
             - $GOPATH:/go
+            - ./:/go/src/github.com/delta/dalal-street-server
         ports:
-            - "443:8000"
+            - "8000:8000"
         depends_on:
             - db
         env_file:
@@ -28,11 +30,13 @@ services:
 
     db:
         container_name: dalalstreet_db_1
-        image: mysql:latest
+        image: mysql:5.7
         volumes:
             - ./docker/mysql:/var/lib/mysql
         env_file:
             - .env
+        ports:
+            - "3306:3306"
         environment:
             MYSQL_DATABASE: ${DB_NAME}
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
