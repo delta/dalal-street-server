@@ -58,3 +58,5 @@ services:
             -  ./bots/dalalstreetbots:/var/www/dalalstreet/bots
         ports:
             -  "7050:5000"
+        depends_on:
+            - dalalserver
