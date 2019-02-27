@@ -6,6 +6,7 @@ sleep 10
 
 # Run the migrations
 echo "################## Running setup script ##################"
+mkdir /root/.ssh
 bash setup.sh
 
 # Start server
