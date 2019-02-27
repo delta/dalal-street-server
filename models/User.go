@@ -249,7 +249,7 @@ func RegisterUser(email, password, fullName string) error {
 	}
 
 	// Send verification email only if running on prod
-	if config.Stage == "Prod" {
+	if config.Stage == "Docker" {
 		l.Debugf("Sending verification email to %s", email)
 		verificationURL := fmt.Sprintf("https://0.0.0.0%s/verify?key=%s", config.ServerPort, verificationKey)
 		htmlContent := fmt.Sprintf(templates.HtmlEmailVerificationTemplate, verificationURL)
