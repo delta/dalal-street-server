@@ -262,12 +262,23 @@ func (mds *marketDepthStream) AddTrade(price, qty uint64, createdAt string) {
 // CloseOrder will close an order from the order book. It should be called every time an order closes
 // either due to cancellation or due to fulfillment
 func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint64, stockQuantity uint64) {
+	var l = mds.logger.WithFields(logrus.Fields{
+		"method":      "MarketDepth.CloseOrder",
+		"param_price": price,
+		"param_qty":   stockQuantity,
+	})
 	// Market orders have not even been added to depth
 	if isMarket {
 		price = 0 // special value for market orders.
 	}
 	if isAsk {
 		mds.askDepthLock.Lock()
+		// IMPORTANT: This needs to be inspected and fixed
+		// Without this hack, we get an unsigned integer wraparound in Market Depth
+		if stockQuantity > mds.askDepth[price] {
+			l.Errorf("%d stockQuantity, %d price, %b isAsk, %b isMarket", stockQuantity, price, isAsk, isMarket)
+			stockQuantity = mds.askDepth[price]
+		}
 		mds.askDepth[price] -= stockQuantity
 		mds.askDepthDiff[price] -= int64(stockQuantity)
 		if mds.askDepth[price] == 0 {
@@ -280,6 +291,12 @@ func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint64
 		return
 	}
 	mds.bidDepthLock.Lock()
+	// IMPORTANT: This needs to be inspected and fixed
+	// Without this hack, we get an unsigned integer wraparound in Market Depth
+	if stockQuantity > mds.bidDepth[price] {
+		l.Errorf("%d stockQuantity, %d price, %b isAsk, %b isMarket", stockQuantity, price, isAsk, isMarket)
+		stockQuantity = mds.bidDepth[price]
+	}
 	mds.bidDepth[price] -= stockQuantity
 	mds.bidDepthDiff[price] -= int64(stockQuantity)
 	if mds.bidDepth[price] == 0 {
