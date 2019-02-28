@@ -160,7 +160,7 @@ func Login(email, password string) (User, error) {
 	}
 
 	// Check if user has been verified or not only on docker
-	if config.Stage == "dev" && registeredUser.IsVerified == false {
+	if config.Stage == "docker" && registeredUser.IsVerified == false {
 		l.Errorf("User (%s) attempted login before verification", email)
 		return User{}, UnverifiedUserError
 	}
@@ -249,7 +249,7 @@ func RegisterUser(email, password, fullName string) error {
 	}
 
 	// Send verification email only if running on docker
-	if config.Stage == "dev" {
+	if config.Stage == "docker" {
 		l.Debugf("Sending verification email to %s", email)
 		verificationURL := fmt.Sprintf("https://dalal.pragyan.org/api/verify?key=%s", verificationKey)
 		htmlContent := fmt.Sprintf(`%s
