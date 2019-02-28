@@ -96,14 +96,17 @@ func Test_Regsiter(t *testing.T) {
 	if !checkPasswordHash("password", registeredTestUser.Password) {
 		t.Fatalf("Incorrect password")
 	}
+
+	expectedKey, _ := getVerificationKey("test@testname.com")
 	expectedUser := &Registration{
-		Id:         registeredTestUser.Id,
-		UserId:     registeredTestUser.UserId,
-		Email:      "test@testname.com",
-		Password:   registeredTestUser.Password,
-		Name:       "FullName",
-		IsPragyan:  false,
-		IsVerified: false,
+		Id:              registeredTestUser.Id,
+		UserId:          registeredTestUser.UserId,
+		Email:           "test@testname.com",
+		Password:        registeredTestUser.Password,
+		Name:            "FullName",
+		IsPragyan:       false,
+		IsVerified:      false,
+		VerificationKey: expectedKey,
 	}
 	if !testutils.AssertEqual(t, expectedUser, registeredTestUser) {
 		t.Fatalf("Expected %+v but got %+v", expectedUser, registeredTestUser)

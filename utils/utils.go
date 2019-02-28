@@ -1,11 +1,15 @@
 package utils
 
 import (
+	"errors"
 	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	sendgrid "github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -85,4 +89,18 @@ func GetImageBasePath() string {
 
 func IsProdEnv() bool {
 	return strings.Contains(strings.ToLower(config.Stage), "prod")
+}
+
+func SendEmail(fromAddr, subject, toAddr, plainTextContent, htmlContent string) error {
+	from := mail.NewEmail("DalalStreet", fromAddr)
+	to := mail.NewEmail("Example User", toAddr)
+	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+	client := sendgrid.NewSendClient(os.Getenv("SENDGRID_API_KEY"))
+	response, err := client.Send(message)
+	if err != nil {
+		return err
+	} else if response.StatusCode >= 300 {
+		return errors.New(response.Body)
+	}
+	return nil
 }

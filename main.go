@@ -7,6 +7,7 @@ import (
 
 	"github.com/delta/dalal-street-server/datastreams"
 	"github.com/delta/dalal-street-server/grpcapi"
+	"github.com/delta/dalal-street-server/httpapi"
 	"github.com/delta/dalal-street-server/matchingengine"
 	"github.com/delta/dalal-street-server/models"
 	"github.com/delta/dalal-street-server/session"
@@ -74,6 +75,13 @@ func RealMain() {
 					grpcapi.GrpcHandlerFunc(resp, req)
 				} else if req.URL.Path == "/ws" {
 					socketapi.Handle(resp, req)
+				} else if req.URL.Path == "/verify" {
+					if err := httpapi.HandleVerification(req); err != nil {
+						respText := fmt.Sprintf("%s", err.Error())
+						resp.Write([]byte(respText))
+					} else {
+						resp.Write([]byte("Successfully verified account!"))
+					}
 				} else {
 					resp.WriteHeader(http.StatusBadRequest)
 					resp.Write([]byte("Invalid URL requested"))
