@@ -15,6 +15,7 @@ go get -u -v github.com/golang/protobuf/{proto,protoc-gen-go}
 go get -u -v golang.org/x/net/context
 go get -u -v google.golang.org/grpc
 go get -v github.com/gemnasium/migrate
+go get -v github.com/sendgrid/sendgrid-go
 go get -v ./...
 
 echo "########## Building proto files ###########"
