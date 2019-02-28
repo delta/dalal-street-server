@@ -187,7 +187,11 @@ func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm 
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService(dsm))
 
-	wrappedServer = grpcweb.WrapServer(grpcServer)
+	wrappedServer = grpcweb.WrapServer(grpcServer,
+		grpcweb.WithOriginFunc(func(origin string) bool {
+			return true
+		}),
+	)
 }
 
 // Handler func to handle incoming grpc requests
