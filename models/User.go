@@ -159,8 +159,8 @@ func Login(email, password string) (User, error) {
 		return u, nil
 	}
 
-	// Check if user has been verified or not only on prod
-	if config.Stage == "Prod" && registeredUser.IsVerified == false {
+	// Check if user has been verified or not only on docker
+	if config.Stage == "dev" && registeredUser.IsVerified == false {
 		l.Errorf("User (%s) attempted login before verification", email)
 		return User{}, UnverifiedUserError
 	}
@@ -248,11 +248,13 @@ func RegisterUser(email, password, fullName string) error {
 		return err
 	}
 
-	// Send verification email only if running on prod
-	if config.Stage == "Docker" {
+	// Send verification email only if running on docker
+	if config.Stage == "dev" {
 		l.Debugf("Sending verification email to %s", email)
-		verificationURL := fmt.Sprintf("https://0.0.0.0%s/verify?key=%s", config.ServerPort, verificationKey)
-		htmlContent := fmt.Sprintf(templates.HtmlEmailVerificationTemplate, verificationURL)
+		verificationURL := fmt.Sprintf("https://dalal.pragyan.org/api/verify?key=%s", verificationKey)
+		htmlContent := fmt.Sprintf(`%s
+							%s
+							%s`, templates.HtmlEmailVerificationTemplateHead, verificationURL, templates.HtmlEmailVerificationTemplateTail)
 		plainContent := fmt.Sprintf(templates.PlainEmailVerificationTemplate, verificationURL)
 		err = utils.SendEmail("noreply@dalalstreet.com", "Account Verification", email, plainContent, htmlContent)
 		if err != nil {
