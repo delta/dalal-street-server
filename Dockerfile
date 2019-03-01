@@ -5,9 +5,12 @@ RUN apt-get update && \
     zip \
     unzip \
     vim \
-    curl
+    curl \
+    netcat
 
 WORKDIR  /go/src/github.com/delta/dalal-street-server 
 COPY . .
+
+RUN ["./build-server-img.sh"]
 
 CMD ["./docker-entry.sh"]
