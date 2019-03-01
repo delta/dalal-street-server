@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"time"
 
 	"github.com/delta/dalal-street-server/datastreams"
@@ -52,8 +54,9 @@ func RealMain() {
 
 	httpServer := http.Server{
 		Addr: config.ServerPort,
-		Handler: http.HandlerFunc(
+		Handler: h2c.NewHandler(http.HandlerFunc(
 			func(resp http.ResponseWriter, req *http.Request) {
+				utils.Logger.Info("Got request proto version: %s", req.Proto)
 				start := time.Now()
 				defer func() {
 					diff := time.Now().Sub(start).Seconds()
@@ -87,10 +90,10 @@ func RealMain() {
 					resp.Write([]byte("Invalid URL requested"))
 				}
 			},
-		),
+		), &http2.Server{}),
 	}
 
-	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
+	utils.Logger.Fatal(httpServer.ListenAndServe())
 }
 
 func main() {

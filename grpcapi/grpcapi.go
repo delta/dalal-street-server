@@ -9,7 +9,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
@@ -167,13 +166,8 @@ func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm 
 		"module": "grpcapi",
 	})
 
-	creds, err := credentials.NewServerTLSFromFile(config.TLSCert, config.TLSKey)
-	if err != nil {
-		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
-	}
 
 	grpcServer = grpc.NewServer(
-		grpc.Creds(creds),
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			streamAuthInterceptor, // all streams expect StockPrices, MarketEvents require authentication
 			grpc_recovery.StreamServerInterceptor(),
