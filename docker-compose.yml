@@ -9,8 +9,8 @@ services:
             - ./frontend/conf:/etc/nginx/conf.d
             - ./frontend:/var/www/dalalstreet
         ports:
-            - "80:80"
-            - "443:443"
+            - "7005:80"
+            - "7010:443"
     
     dalalserver:
         container_name: dalalstreet_server_1
@@ -18,8 +18,11 @@ services:
         volumes: 
             - $GOPATH:/go
             - ./:/go/src/github.com/delta/dalal-street-server
+            - /root/.ssh:/root/.ssh
         ports:
-            - "8000:8000"
+            - "7000:8000"
+        expose:
+            - "8000"
         depends_on:
             - db
         env_file:
@@ -36,7 +39,7 @@ services:
         env_file:
             - .env
         ports:
-            - "3306:3306"
+            - "7015:3306"
         environment:
             MYSQL_DATABASE: ${DB_NAME}
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
@@ -47,7 +50,7 @@ services:
         env_file:
             - .env
         ports:
-            - "9040:80"
+            - "7020:80"
         depends_on:
             - db
     bots:
@@ -57,6 +60,6 @@ services:
         volumes:
             -  ./bots/dalalstreetbots:/var/www/dalalstreet/bots
         ports:
-            -  "7050:5000"
+            -  "7025:5000"
         depends_on:
             - dalalserver
