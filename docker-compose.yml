@@ -20,7 +20,7 @@ services:
             - ./:/go/src/github.com/delta/dalal-street-server
             - /root/.ssh:/root/.ssh
         ports:
-            - "7000:8000"
+            - "8080:8000"
         expose:
             - "8000"
         depends_on:
