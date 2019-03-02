@@ -9,6 +9,7 @@ import (
 var (
 	VerificationKeyNotFoundError = errors.New("Verification key not found")
 	TransactionError             = errors.New("Transaction failed")
+	AlreadyVerifiedError         = errors.New("Account already verified")
 )
 
 type Registration struct {
@@ -45,6 +46,9 @@ func VerifyAccount(verificationKey string) error {
 	if err != nil {
 		l.Error("No verification key %s", verificationKey)
 		return VerificationKeyNotFoundError
+	} else if registeredUser.IsVerified == true {
+		l.Infof("Already Verified")
+		return AlreadyVerifiedError
 	} else {
 		registeredUser.IsVerified = true
 		if err := db.Save(registeredUser).Error; err != nil {
