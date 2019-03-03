@@ -43,8 +43,8 @@ func RealMain() {
 	models.Init(config, datastreamsManager)
 	go models.UpdateLeaderboardTicker()
 
-	matchingEngine := matchingengine.NewMatchingEngine(datastreamsManager)
-	grpcapi.Init(config, matchingEngine, datastreamsManager)
+	matchingengine.MainMatchingEngine = matchingengine.NewMatchingEngine(datastreamsManager)
+	grpcapi.Init(config, matchingengine.MainMatchingEngine, datastreamsManager)
 
 	if !utils.IsProdEnv() {
 		models.OpenMarket(false)

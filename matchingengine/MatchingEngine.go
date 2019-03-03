@@ -14,12 +14,15 @@ import (
 
 var logger *logrus.Entry
 
+var MainMatchingEngine MatchingEngine
+
 // MatchingEngine represents a collection of OrderBooks for all stocks in the exchange.
 type MatchingEngine interface {
 	AddAskOrder(*models.Ask)
 	AddBidOrder(*models.Bid)
 	CancelAskOrder(*models.Ask)
 	CancelBidOrder(*models.Bid)
+	ReloadMarketDepth()
 }
 
 // matchingEngine implements the MatchingEngine interface
@@ -142,4 +145,60 @@ func (m *matchingEngine) loadOldOrders() {
 	}
 
 	l.Info("Loaded!")
+}
+
+// ReloadMarketDepth is a hacky solution to fix incorrect market depth being sent to frontend
+// Sometimes, Market orders are not being cleared from the depth even though those orders no longer
+// exists in the DB. This function will be called by dwst to basically recreate the market depth from the database
+func (m *matchingEngine) ReloadMarketDepth() {
+	var l = m.logger.WithFields(logrus.Fields{
+		"method": "reloadMarketDepth",
+	})
+
+	db := utils.GetDB()
+
+	var (
+		openAskOrders []*models.Ask
+		openBidOrders []*models.Bid
+		stockIDs      []uint32
+		err           error
+	)
+
+	//Load stock ids from database
+	if err = db.Model(&models.Stock{}).Pluck("id", &stockIDs).Error; err != nil {
+		panic("Failed to load stock ids in matching engine: " + err.Error())
+	}
+
+	//Load open ask orders from database
+	openAskOrders, err = models.GetAllOpenAsks()
+	if err != nil {
+		panic("Error loading open ask orders in matching engine: " + err.Error())
+	}
+
+	//Load open bid orders from database
+	openBidOrders, err = models.GetAllOpenBids()
+	if err != nil {
+		panic("Error loading open bid orders in matching engine: " + err.Error())
+	}
+
+	for _, stockID := range stockIDs {
+		marketDepth := m.datastreamsManager.GetMarketDepthStreamWithNewMarketDepthMap(stockID)
+		m.orderBooks[stockID] = NewOrderBook(stockID, marketDepth)
+		tx, err := models.GetAskTransactionsForStock(stockID, 15)
+		if err != nil {
+			l.Errorf("Unable to load old transactions for stockid %d", stockID)
+		} else {
+			m.orderBooks[stockID].LoadOldTransactions(tx)
+		}
+	}
+
+	//Load open ask orders into priority queue
+	for _, openAskOrder := range openAskOrders {
+		m.orderBooks[openAskOrder.StockId].LoadOldAsk(openAskOrder)
+	}
+
+	//Load open bid orders into priority queue
+	for _, openBidOrder := range openBidOrders {
+		m.orderBooks[openBidOrder.StockId].LoadOldBid(openBidOrder)
+	}
 }

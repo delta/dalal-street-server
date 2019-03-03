@@ -27,6 +27,7 @@ func Init(config *utils.Config) {
 // Manager manages access to all data streams
 type Manager interface {
 	GetMarketDepthStream(stockId uint32) MarketDepthStream
+	GetMarketDepthStreamWithNewMarketDepthMap(stockId uint32) MarketDepthStream
 	GetMarketEventsStream() MarketEventsStream
 	GetMyOrdersStream() MyOrdersStream
 	GetNotificationsStream() NotificationsStream
@@ -92,6 +93,17 @@ func (dsm *dataStreamsManager) GetMarketDepthStream(stockId uint32) MarketDepthS
 	if !ok {
 		dsm.marketDepthsMap[stockId] = newMarketDepthStream(stockId)
 	}
+	return dsm.marketDepthsMap[stockId]
+}
+
+// GetMarketDepthStreamWithNewMarketDepthMap ensures it creates an empty marketDepthMap for the provided stockId, even if it
+// already exists. This is the only difference between GetMarketDepthStreamWithNewMarketDepthMap and GetMarketDepthStream
+func (dsm *dataStreamsManager) GetMarketDepthStreamWithNewMarketDepthMap(stockId uint32) MarketDepthStream {
+	dsm.marketDepthsLock.Lock()
+	defer dsm.marketDepthsLock.Unlock()
+
+	dsm.marketDepthsMap[stockId] = newMarketDepthStream(stockId)
+
 	return dsm.marketDepthsMap[stockId]
 }
 

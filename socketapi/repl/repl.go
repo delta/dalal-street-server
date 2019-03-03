@@ -5,6 +5,8 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"github.com/delta/dalal-street-server/matchingengine"
+
 	"github.com/Sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/models"
@@ -320,6 +322,20 @@ var replCmds = map[string]replCmdFn{
 			s.finish("Done")
 		}
 
+		s.finish("Not doing")
+	},
+	"reload_market_depth": func(userSess session.Session, s cmdSession) {
+		aun, _ := userSess.Get("repl_Username")
+
+		s.print("Are you sure you want to reload the market depth?")
+
+		c := 'N'
+		s.read("%c", &c)
+		if c == 'Y' {
+			matchingengine.MainMatchingEngine.ReloadMarketDepth()
+			models.AdminLog(aun, "Reloaded market depth")
+			s.finish("Done")
+		}
 		s.finish("Not doing")
 	},
 }
