@@ -201,4 +201,16 @@ func (m *matchingEngine) ReloadMarketDepth() {
 	for _, openBidOrder := range openBidOrders {
 		m.orderBooks[openBidOrder.StockId].LoadOldBid(openBidOrder)
 	}
+
+	var wg sync.WaitGroup
+
+	for _, ob := range m.orderBooks {
+		wg.Add(1)
+		go func(ob OrderBook) {
+			ob.StartStockMatching() // this will return when it's initialized
+			wg.Done()
+		}(ob)
+	}
+
+	wg.Wait() // Don't return till the orderbooks have been initialized
 }
