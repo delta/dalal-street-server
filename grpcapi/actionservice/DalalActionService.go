@@ -3,8 +3,11 @@ package actionservice
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 
 	"golang.org/x/net/context"
 
@@ -219,6 +222,35 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 	return resp, nil
 }
 
+func writeUserDetailsToLog(ctx context.Context) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "writeUserDetailsToLog",
+	})
+
+	userID := getUserId(ctx)
+
+	peerDetails, ok := peer.FromContext(ctx)
+	if ok {
+		err := models.AddToGeneralLog(userID, "IP", peerDetails.Addr.String())
+		if err != nil {
+			l.Infof("Error while writing to databaes. Error: %+v", err)
+		}
+	} else {
+		l.Infof("Failed to log peer details")
+	}
+
+	mD, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		userAgent := strings.Join(mD["user-agent"], " ")
+		err := models.AddToGeneralLog(userID, "User-Agent", userAgent)
+		if err != nil {
+			l.Infof("Error while writing to databaes. Error: %+v", err)
+		}
+	} else {
+		l.Infof("Failed to log user-agent")
+	}
+}
+
 func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.RegisterRequest) (*actions_pb.RegisterResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Register",
@@ -307,6 +339,8 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 			return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
 		}
 	}
+
+	writeUserDetailsToLog(ctx)
 
 	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetID())
 
