@@ -917,3 +917,11 @@ func (d *dalalActionService) GetLeaderboard(ctx context.Context, req *actions_pb
 
 	return resp, nil
 }
+
+func (d *dalalActionService) SendNews(ctx context.Context, req *actions_pb.SendNewsRequest) (*actions_pb.SendNewsResponse, error) {
+	resp := &actions_pb.SendNewsResponse{}
+	// now call functions from models
+	resp.StatusMessage = "Done"
+	resp.StatusCode = actions_pb.SendNewsResponse_OK
+	return resp, nil
+}
