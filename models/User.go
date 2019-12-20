@@ -30,6 +30,7 @@ var (
 	NotRegisteredError     = errors.New("Not registered")
 	AlreadyRegisteredError = errors.New("Already registered")
 	UnverifiedUserError    = errors.New("User has not verified account")
+	FingerprintExistsError = errors.New("Browser fingerprint already exists")
 
 	/*
 		Net worth <= 0 => tax percentage = 0%
@@ -197,7 +198,7 @@ func Login(email, password string) (User, error) {
 }
 
 // RegisterUser is called when a user tries to sign up in our site
-func RegisterUser(email, password, fullName string) error {
+func RegisterUser(email, password, fullName, fingerprint string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "Register",
 		"param_email":    email,
@@ -216,6 +217,17 @@ func RegisterUser(email, password, fullName string) error {
 	if err == nil {
 		return AlreadyRegisteredError
 	}
+
+	var fingerprintUser = Registration{
+		Fingerprint: fingerprint,
+	}
+
+	err = db.Where("fingerprint = ?", fingerprint).First(&fingerprintUser).Error
+
+	if err == nil && config.Stage == "docker" {
+		return FingerprintExistsError
+	}
+
 	l.Debugf("Trying to call Pragyan API for checking if email available with Pragyan")
 	_, err = postLoginToPragyan(email, password)
 
@@ -242,6 +254,7 @@ func RegisterUser(email, password, fullName string) error {
 		Name:            fullName,
 		UserId:          u.Id,
 		VerificationKey: verificationKey,
+		Fingerprint:     fingerprint,
 	}
 	err = db.Save(register).Error
 	if err != nil {

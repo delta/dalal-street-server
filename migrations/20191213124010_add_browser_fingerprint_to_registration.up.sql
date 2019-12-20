@@ -1,0 +1,1 @@
+ALTER TABLE Registrations ADD COLUMN fingerprint varchar(255);

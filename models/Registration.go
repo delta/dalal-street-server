@@ -23,6 +23,7 @@ type Registration struct {
 	Country         string `gorm:"not null" json:"country"`
 	IsVerified      bool   `gorm:"column:isVerified;not null" json:"is_verified"`
 	VerificationKey string `gorm:"column:verificationKey" json:"verification_key"`
+	Fingerprint     string `gorm:"column:fingerprint" json:"fingerprint"`
 }
 
 func (Registration) TableName() string {

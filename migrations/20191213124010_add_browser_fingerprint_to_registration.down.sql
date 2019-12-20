@@ -1,0 +1,1 @@
+ALTER TABLE Registrations DROP COLUMN fingerprint;

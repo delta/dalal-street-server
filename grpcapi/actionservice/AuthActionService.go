@@ -60,10 +60,15 @@ func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.Regis
 		return resp, nil
 	}
 
-	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetFullName())
+	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetFullName(), req.GetFingerprint())
 	if err == models.AlreadyRegisteredError {
 		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredError, "Already registered please Login")
 	}
+
+	if err == models.FingerprintExistsError {
+		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredError, "Another account registered using same system, please use the other account")
+	}
+
 	if err != nil {
 		l.Errorf("Request failed due to: %+v", err)
 		return makeError(actions_pb.RegisterResponse_InternalServerError, getInternalErrorMessage(err))
