@@ -2248,6 +2248,31 @@ func savePlaceOrderTransaction(orderID uint32, placeOrderTransaction *Transactio
 	return nil
 }
 
+// PerformDividendTransaction helps distribute dividends
+func PerformDividendTransaction() {
+	logger.Info("HEEEEEEEEEERRRRRRRRRRRRRR")
+	db := getDB()
+	tx := db.Begin()
+	sql := "UPDATE Users INNER JOIN (SELECT u.id, (t.stockQuantity * 100) / ((SELECT stocksInMarket FROM `Stocks` s WHERE s.id = 1) + 1) AS Dividend FROM `TransactionSummary` t INNER JOIN Users u on u.id = t.userId WHERE 1) test on test.id = Users.id SET Users.cash = Users.cash + test.Dividend"
+	tx.Exec(sql)
+	if err := tx.Commit().Error; err != nil {
+		logger.Error(err)
+	}
+	sql = "SELECT id, cash FROM Users"
+	rows, err := db.Raw(sql).Rows()
+	if err != nil {
+		logger.Error(err)
+	}
+	for rows.Next() {
+		var userID uint32
+		var cash uint64
+		rows.Scan(&userID, &cash)
+		logger.Info("ID %d cash %d", userID, cash)
+	}
+	defer rows.Close()
+
+}
+
 // Logout removes the user from RAM.
 func Logout(userID uint32) {
 	userLocks.Lock()
