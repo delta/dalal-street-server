@@ -570,6 +570,20 @@ func (e InvalidTransaction) Error() string {
 	return fmt.Sprintf("No such transaction found")
 }
 
+// InvalidDividendAmountError is given out when the dividend amount in negative.
+type InvalidDividendAmountError struct{}
+
+func (e InvalidDividendAmountError) Error() string {
+	return fmt.Sprintf("Invalid dividend amount")
+}
+
+// InvalidStockIdError is given out when the stock id is either more than the number of stocks or negative.
+type InvalidStockIdError struct{}
+
+func (e InvalidStockIdError) Error() string {
+	return fmt.Sprintf("Invalid stock id")
+}
+
 //
 // Methods
 //
