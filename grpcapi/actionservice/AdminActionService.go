@@ -1,11 +1,11 @@
 package actionservice
 
 import (
-	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
-	"golang.org/x/net/context"
+	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/delta/dalal-street-server/models"
-	"fmt"
+	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
+	"golang.org/x/net/context"
 )
 
 func (d *dalalActionService) SendNews(ctx context.Context, req *actions_pb.SendNewsRequest) (*actions_pb.SendNewsResponse, error) {
@@ -39,7 +39,7 @@ func (d *dalalActionService) SendDividends(ctx context.Context, req *actions_pb.
 	stockID := req.StockId
 	dividendAmount := req.DividendAmount
 
-	status,err := models.PerformDividendsTransaction(stockID, dividendAmount)
+	status, err := models.PerformDividendsTransaction(stockID, dividendAmount)
 
 	if status == "OK" {
 		resp.StatusCode = 0
