@@ -25,18 +25,18 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 
 	var transactions []*Transaction
 
+	var oldCashMap []*User
+
 	l.Infof("PerformDividendTransaction requested")
 
 	db := getDB()
-
-	l.Errorf("Came till here with stock id : %v",stockID)
 
 	maxStockId,err := GetMaxStockId()
 
 	l.Errorf("Max stock id : %v",maxStockId)
 
 	if err != nil {
-		l.Errorf("Error: %v+",err)
+		l.Errorf("Failure to get max stock id due to : %v+",err)
 		return "Failure",err
 	}
 
@@ -44,8 +44,6 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 		l.Errorf("Failure with stock id : %v",stockID)
 		return "Failure", InvalidStockIdError{}
 	}
-
-	l.Errorf("Stock Id is valid")
 
 /* Committing to database */
 	tx := db.Begin()
@@ -59,18 +57,14 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 
 	var benefittingUsers[]*UserDetails
 
-	db.Raw("SELECT userId As user_id ,stockQuantity AS stock_quantity FROM TransactionSummary WHERE stockId = ? AND stockQuantity > 0",stockID).Scan(&benefittingUsers)
+	db.Raw("SELECT userId As user_id ,SUM(stockQuantity) AS stock_quantity FROM Transactions WHERE stockId = ? GROUP BY userId HAVING SUM(stockQuantity) > 0 ",stockID).Scan(&benefittingUsers)
 
   l.Infof("Successfully fetched users who own stocks of stockID : %v", stockID)
 
 	for _,user := range benefittingUsers{
 
 		dividendTotal := dividendAmount * uint64(user.StockQuantity)
-		l.Errorf(" The user id is %v and stock quantity is : %v",user.UserID,user.StockQuantity)
-
-		var cash uint64
-
-		db.Raw("SELECT cash AS cash FROM Users WHERE id = ?",user.UserID).Scan(&cash)
+		l.Infof(" The user id is %v and stock quantity is : %v",user.UserID,user.StockQuantity)
 
 		transaction := &Transaction{
 			UserId:        user.UserID,
@@ -88,23 +82,50 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 
 		l.Debugf("Added transaction to Transactions table")
 
-		var oldCash int64
+		l.Debugf("Acquiring exclusive write on user")
+		ch, currentUser, err := getUserExclusively(user.UserID)
+		if err != nil {
+			l.Errorf("Errored : %+v ", err)
+			return "Failure", err
+		}
+		l.Debugf("Acquired")
+		defer func() {
+			close(ch)
+			l.Debugf("Released exclusive write on user")
+		}()
 
-		db.Raw("SELECT cash FROM Users WHERE id = ?",user.UserID).Scan(&oldCash)
+		// A lock on user and stock has been acquired.
+		// Safe to make changes to this user and this stock
 
-		newCash := oldCash + int64(dividendTotal)
+		oldCash := currentUser.Cash
+		oldCashMap = append(oldCashMap, currentUser)
+		currentUser.Cash = uint64(int64(currentUser.Cash) + int64(dividendTotal))
 
-		sql := "UPDATE Users SET cash = ? WHERE id = ? "
-
-		if err := tx.Exec(sql,newCash,user.UserID).Error; err != nil {
+		if err := tx.Save(currentUser).Error; err != nil {
+			currentUser.Cash = oldCash
 			return errorHelper("Error updating user's cash. Rolling back. Error: %+v", err)
 		}
 
 		transactions = append(transactions, transaction)
-		l.Infof("Updated user's cash. New balance: %d", newCash)
+		l.Infof("Updated user's cash. New balance: %d", currentUser.Cash)
 	}
 
 		if err := tx.Commit().Error; err != nil {
+			// restore oldCash for all benefittingUsers in User Map
+			for index,user := range benefittingUsers {
+        ch,currentUser,err := getUserExclusively(user.UserID)
+				if err != nil {
+					l.Errorf("Errored : %+v ", err)
+					return "Failure", err
+				}
+				l.Debugf("Acquired")
+				defer func() {
+					close(ch)
+					l.Debugf("Released exclusive write on user")
+				}()
+				currentUser.Cash = oldCashMap[index].Cash
+
+			}
 			return errorHelper("Error committing the transaction. Failing. %+v", err)
 		}
 
@@ -113,14 +134,14 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 		sql := "SELECT id, cash FROM Users"
 	  rows, err := db.Raw(sql).Rows()
 	  if err != nil {
-			logger.Error(err)
+			l.Error(err)
 	  }
 
 		for rows.Next() {
 			var userID uint32
 			var cash uint64
 			rows.Scan(&userID, &cash)
-			logger.Info("ID %d cash %d", userID, cash)
+			l.Info("ID : %d cash : %d", userID, cash)
 		}
 		defer rows.Close()
 
@@ -133,8 +154,10 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 
 	func SendDividendsTransactionsAndNotifications(transactions []*Transaction,benefittingUsers []*UserDetails, stockID uint32) {
 		var l = logger.WithFields(logrus.Fields{
-		"method":               "SendTransactionsAndNotifications",
-		"param_stockId":        stockID,
+		"method":                 "SendTransactionsAndNotifications",
+		"param_stockId":          stockID,
+		"param_transactions":     fmt.Sprintf("%+v", transactions),
+		"param_benefittingUsers": fmt.Sprintf("%+v", benefittingUsers),
 	})
 		for _,tr := range transactions {
 			go func(transaction Transaction) {
