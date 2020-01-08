@@ -53,6 +53,11 @@ migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./mi
 - Fill in the database credentials in the `Dev` section of **config.json**.
 - Run `go run main.go`
 
+## Create Migrations
+```
+migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./migrations create migration_file_xyz
+```
+
 ## Tests
 - Run the test script locally before pushing commits.
 ```
