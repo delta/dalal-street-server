@@ -912,6 +912,8 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		OrderFeeTransaction,
 		0,
 		0,
+		0,
+		0,
 		int64(-orderFee),
 	)
 
@@ -926,7 +928,9 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		userId,
 		ask.StockId,
 		PlaceOrderTransaction,
+		int64(ask.StockQuantity),
 		-1*int64(ask.StockQuantity),
+		0,
 		0,
 		0,
 	)
@@ -1081,6 +1085,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		OrderFeeTransaction,
 		0,
 		0,
+		0,
+		0,
 		int64(-orderFee),
 	)
 
@@ -1101,6 +1107,8 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		PlaceOrderTransaction,
 		0,
 		0,
+		0,
+		int64(bid.StockQuantity*orderPrice),
 		-1*int64(bid.StockQuantity*orderPrice),
 	)
 
@@ -1151,7 +1159,9 @@ func saveAskCancelOrderTransaction(askOrder *Ask, user *User, tx *gorm.DB) error
 		user.Id,
 		askOrder.StockId,
 		CancelOrderTransaction,
+		-1*int64(askOrder.StockQuantity-askOrder.StockQuantityFulfilled),
 		int64(askOrder.StockQuantity-askOrder.StockQuantityFulfilled),
+		0,
 		0,
 		0,
 	)
@@ -1193,6 +1203,8 @@ func saveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error
 		CancelOrderTransaction,
 		0,
 		0,
+		0,
+		-1*reservedCash,
 		reservedCash,
 	)
 
@@ -1421,15 +1433,7 @@ func getTaxForBiddingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, sto
 		l.Debugf("Effectively the first time user is buying these stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
 	}
 
-	taxTransaction := &Transaction{
-		UserId:        userId,
-		StockId:       stockId,
-		Type:          TaxTransaction,
-		StockQuantity: 0,
-		Price:         0,
-		Total:         -int64(tax),
-		CreatedAt:     utils.GetCurrentTimeISO8601(),
-	}
+	taxTransaction := GetTransactionRef(userId, stockId, TaxTransaction, 0, 0, 0, 0, -int64(tax))
 
 	if tax == 0 {
 		return transactionSummary, nil
@@ -1509,15 +1513,7 @@ func getTaxForAskingUser(tx *gorm.DB, stockId uint32, stockQuantity uint64, stoc
 		l.Debugf("Effectively the first time user is short selling these stocks. No tax is added, but database is going to be updated - %+v", transactionSummary)
 	}
 
-	taxTransaction := &Transaction{
-		UserId:        userId,
-		StockId:       stockId,
-		Type:          TaxTransaction,
-		StockQuantity: 0,
-		Price:         0,
-		Total:         -int64(tax),
-		CreatedAt:     utils.GetCurrentTimeISO8601(),
-	}
+	taxTransaction := GetTransactionRef(userId, stockId, TaxTransaction, 0, 0, 0, 0, -int64(tax))
 
 	if tax == 0 {
 		return transactionSummary, nil
@@ -1583,15 +1579,7 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 
 	l.Debugf("%d stocks will be removed at %d per stock", stockQuantityRemoved, price)
 
-	transaction := &Transaction{
-		UserId:        userId,
-		StockId:       stockId,
-		Type:          FromExchangeTransaction,
-		StockQuantity: int64(stockQuantityRemoved),
-		Price:         price,
-		Total:         -int64(price * stockQuantityRemoved),
-		CreatedAt:     utils.GetCurrentTimeISO8601(),
-	}
+	transaction := GetTransactionRef(userId, stockId, FromExchangeTransaction, 0, int64(stockQuantityRemoved), price, 0, -int64(price*stockQuantityRemoved))
 
 	oldCash := user.Cash
 	user.Cash = uint64(int64(user.Cash) + transaction.Total)
@@ -1777,7 +1765,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 
 	/* We're here, so both orders are open now */
 
-	var updateDataStreams = func(askTrans, bidTrans, askTaxTrans, bidTaxTrans, askReserveUpdateTrans, bidReserveUpdateTrans *Transaction) {
+	var updateDataStreams = func(askTrans, bidTrans, askTaxTrans, bidTaxTrans *Transaction) {
 		myOrdersStream := datastreamsManager.GetMyOrdersStream()
 		transactionsStream := datastreamsManager.GetTransactionsStream()
 
@@ -1813,13 +1801,6 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 			transactionsStream.SendTransaction(bidTaxTrans.ToProto())
 		}
 
-		if askReserveUpdateTrans != nil {
-			transactionsStream.SendTransaction(askReserveUpdateTrans.ToProto())
-		}
-		if bidReserveUpdateTrans != nil {
-			transactionsStream.SendTransaction(bidReserveUpdateTrans.ToProto())
-		}
-
 		l.Infof("Sent through the datastreams")
 	}
 
@@ -1838,13 +1819,8 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	cashLeft := int64(biddingUser.Cash) - total + reservedCashForTrade
 
 	//User has enough stocks reserved. Use that to make transaction
-
-	askTransaction := GetTransactionRef(ask.UserId, ask.StockId, OrderFillTransaction, 0, stockTradePrice, total)
-	bidTransaction := GetTransactionRef(bid.UserId, bid.StockId, OrderFillTransaction, int64(stockTradeQty), stockTradePrice, -total+reservedCashForTrade)
-
-	//Transaction to update cash used for Bid Order and Stocks reserved for Ask Order
-	askReserveUpdateTransaction := GetTransactionRef(ask.UserId, ask.StockId, ReserveUpdateTransaction, int64(stockTradeQty), stockTradePrice, 0)
-	bidReserveUpdateTransaction := GetTransactionRef(bid.UserId, bid.StockId, ReserveUpdateTransaction, 0, 0, reservedCashForTrade)
+	askTransaction := GetTransactionRef(ask.UserId, ask.StockId, OrderFillTransaction, -int64(stockTradeQty), 0, stockTradePrice, 0, total)
+	bidTransaction := GetTransactionRef(bid.UserId, bid.StockId, OrderFillTransaction, 0, int64(stockTradeQty), stockTradePrice, -reservedCashForTrade, -total+reservedCashForTrade)
 
 	// save old cash for rolling back
 	askingUserOldCash := askingUser.Cash
@@ -1901,7 +1877,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 			revertToOldState("Error while commiting. Rolling back. Error: %+v", true, err)
 			return AskUndone, BidUndone, nil
 		}
-		go updateDataStreams(nil, nil, nil, nil, nil, nil)
+		go updateDataStreams(nil, nil, nil, nil)
 		go SendNotification(biddingUser.Id, fmt.Sprintf("Your Buy order#%d has been closed due to insufficient cash", bid.Id), false)
 		return AskUndone, BidDone, nil
 	}
@@ -2000,7 +1976,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 		return AskUndone, BidUndone, nil
 	}
 
-	go updateDataStreams(askTransaction, bidTransaction, askTaxTransaction, bidTaxTransaction, askReserveUpdateTransaction, bidReserveUpdateTransaction)
+	go updateDataStreams(askTransaction, bidTransaction, askTaxTransaction, bidTaxTransaction)
 
 	UpdateStockVolume(ask.StockId, stockTradeQty)
 	l.Infof("Transaction committed successfully. Traded %d at %d per stock. Total %d.", stockTradeQty, stockTradePrice, total)
@@ -2092,15 +2068,7 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 		return nil, err
 	}
 
-	transaction := &Transaction{
-		UserId:        userId,
-		StockId:       stockId,
-		Type:          MortgageTransaction,
-		StockQuantity: stockQuantity,
-		Price:         mortgagePrice,
-		Total:         trTotal,
-		CreatedAt:     utils.GetCurrentTimeISO8601(),
-	}
+	transaction := GetTransactionRef(userId, stockId, MortgageTransaction, 0, stockQuantity, mortgagePrice, 0, trTotal)
 
 	// A lock on user and stock has been acquired.
 	// Safe to make changes to this user and this stock

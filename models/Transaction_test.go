@@ -3,21 +3,22 @@ package models
 import (
 	"testing"
 
+	testutils "github.com/delta/dalal-street-server/utils/test"
 	//	"github.com/delta/dalal-street-server/utils"
-
-	"github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestTransactionToProto(t *testing.T) {
 	tr := &Transaction{
-		Id:            2,
-		UserId:        20,
-		StockId:       12,
-		Type:          OrderFillTransaction,
-		StockQuantity: -20,
-		Price:         300,
-		Total:         -300,
-		CreatedAt:     "2017-02-09T00:00:00",
+		Id:      2,
+		UserId:  20,
+		StockId: 12,
+		Type:    OrderFillTransaction,
+		ReservedStockQuantity: 10,
+		StockQuantity:         -20,
+		Price:                 300,
+		ReservedCashTotal:     10000,
+		Total:                 -300,
+		CreatedAt:             "2017-02-09T00:00:00",
 	}
 
 	trProto := tr.ToProto()
