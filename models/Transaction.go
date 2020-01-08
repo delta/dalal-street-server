@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
 )
 
@@ -68,14 +68,16 @@ func (trType TransactionType) String() string {
 }
 
 type Transaction struct {
-	Id            uint32          `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	UserId        uint32          `gorm:"column:userId;not null" json:"user_id"`
-	StockId       uint32          `gorm:"column:stockId;not null" json:"stock_id"`
-	Type          TransactionType `gorm:"column:type;not null" json:"type"`
-	StockQuantity int64           `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
-	Price         uint64          `gorm:"not null" json:"price"`
-	Total         int64           `gorm:"not null" json:"total"`
-	CreatedAt     string          `gorm:"column:createdAt;not null" json:"created_at"`
+	Id                    uint32          `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	UserId                uint32          `gorm:"column:userId;not null" json:"user_id"`
+	StockId               uint32          `gorm:"column:stockId;not null" json:"stock_id"`
+	Type                  TransactionType `gorm:"column:type;not null" json:"type"`
+	ReservedStockQuantity int64           `gorm:"column:reservedStockQuantity;not null" json:"reserved_stock_quantity"`
+	StockQuantity         int64           `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
+	Price                 uint64          `gorm:"not null" json:"price"`
+	ReservedCashTotal     int64           `gorm:"column:reservedCashTotal;not null" json:"reserved_cash_total"`
+	Total                 int64           `gorm:"not null" json:"total"`
+	CreatedAt             string          `gorm:"column:createdAt;not null" json:"created_at"`
 }
 
 func (Transaction) TableName() string {
@@ -88,10 +90,12 @@ func (t *Transaction) ToProto() *models_pb.Transaction {
 		UserId:  t.UserId,
 		StockId: t.StockId,
 		// Type: t.Type,
-		StockQuantity: t.StockQuantity,
-		Price:         t.Price,
-		Total:         t.Total,
-		CreatedAt:     t.CreatedAt,
+		ReservedStockQuantity: t.ReservedStockQuantity,
+		StockQuantity:         t.StockQuantity,
+		Price:                 t.Price,
+		ReservedCashTotal:     t.ReservedCashTotal,
+		Total:                 t.Total,
+		CreatedAt:             t.CreatedAt,
 	}
 
 	if t.Type == FromExchangeTransaction {
@@ -174,14 +178,16 @@ func GetAskTransactionsForStock(stockID, count uint32) ([]*Transaction, error) {
 }
 
 // GetTransactionRef creates and returns a reference of a Transaction
-func GetTransactionRef(userID, stockID uint32, ttype TransactionType, qty int64, price uint64, total int64) *Transaction {
+func GetTransactionRef(userID, stockID uint32, ttype TransactionType, reservedStockQuantity int64, stockQuantity int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
 	return &Transaction{
-		UserId:        userID,
-		StockId:       stockID,
-		Type:          ttype,
-		StockQuantity: qty,
-		Price:         price,
-		Total:         total,
-		CreatedAt:     utils.GetCurrentTimeISO8601(),
+		UserId:  userID,
+		StockId: stockID,
+		Type:    ttype,
+		ReservedStockQuantity: reservedStockQuantity,
+		StockQuantity:         stockQuantity,
+		Price:                 price,
+		ReservedCashTotal:     reservedCashTotal,
+		Total:                 total,
+		CreatedAt:             utils.GetCurrentTimeISO8601(),
 	}
 }
