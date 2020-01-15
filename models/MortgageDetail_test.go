@@ -28,15 +28,8 @@ func Test_GetMortgageDetails(t *testing.T) {
 		"method": "Test_GetMortgageDetails",
 	})
 
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
-		return &Transaction{
-			UserId:        userId,
-			StockId:       stockId,
-			Type:          transType,
-			StockQuantity: stockQty,
-			Price:         price,
-			Total:         total,
-		}
+	var makeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
+		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
 	}
 
 	var makeUser = func(id uint32, email string, name string, cash uint64, total int64) *User {
@@ -78,14 +71,14 @@ func Test_GetMortgageDetails(t *testing.T) {
 	}
 
 	transactions := []*Transaction{
-		makeTrans(2, 1, MortgageTransaction, -10, 200, 2000),
-		makeTrans(2, 1, MortgageTransaction, -40, 200, 8000),
-		makeTrans(2, 1, MortgageTransaction, 10, 200, -2000),
-		makeTrans(2, 1, MortgageTransaction, -40, 200, 8000),
-		makeTrans(2, 2, MortgageTransaction, -15, 300, 4500),
-		makeTrans(2, 2, MortgageTransaction, -30, 300, 9000),
-		makeTrans(2, 2, MortgageTransaction, -15, 300, 4500),
-		makeTrans(2, 2, MortgageTransaction, 30, 300, -9000),
+		makeTrans(2, 1, MortgageTransaction, 0, -10, 200, 0, 2000),
+		makeTrans(2, 1, MortgageTransaction, 0, -40, 200, 0, 8000),
+		makeTrans(2, 1, MortgageTransaction, 0, 10, 200, 0, -2000),
+		makeTrans(2, 1, MortgageTransaction, 0, -40, 200, 0, 8000),
+		makeTrans(2, 2, MortgageTransaction, 0, -15, 300, 0, 4500),
+		makeTrans(2, 2, MortgageTransaction, 0, -30, 300, 0, 9000),
+		makeTrans(2, 2, MortgageTransaction, 0, -15, 300, 0, 4500),
+		makeTrans(2, 2, MortgageTransaction, 0, 30, 300, 0, -9000),
 	}
 
 	db := getDB()

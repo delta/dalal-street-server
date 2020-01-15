@@ -138,15 +138,8 @@ func TestUserToProto(t *testing.T) {
 }
 
 func Test_PlaceAskOrder(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
-		return &Transaction{
-			UserId:        userId,
-			StockId:       stockId,
-			Type:          transType,
-			StockQuantity: stockQty,
-			Price:         price,
-			Total:         total,
-		}
+	var makeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
+		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
 	}
 
 	var makeAsk = func(userId uint32, stockId uint32, ot OrderType, stockQty uint64, price uint64) *Ask {
@@ -163,9 +156,9 @@ func Test_PlaceAskOrder(t *testing.T) {
 	var stock = &Stock{Id: 1, CurrentPrice: 200}
 
 	transactions := []*Transaction{
-		makeTrans(2, 1, FromExchangeTransaction, 10, 200, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, -10, 200, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, -10, 200, 0, 2000),
 	}
 
 	testcases := []struct {
@@ -254,15 +247,8 @@ func Test_PlaceAskOrder(t *testing.T) {
 }
 
 func Test_PlaceBidOrder(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
-		return &Transaction{
-			UserId:        userId,
-			StockId:       stockId,
-			Type:          transType,
-			StockQuantity: stockQty,
-			Price:         price,
-			Total:         total,
-		}
+	var makeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
+		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
 	}
 
 	var makeBid = func(userId uint32, stockId uint32, ot OrderType, stockQty uint64, price uint64) *Bid {
@@ -284,9 +270,9 @@ func Test_PlaceBidOrder(t *testing.T) {
 	var stock = &Stock{Id: 1, CurrentPrice: 200}
 
 	transactions := []*Transaction{
-		makeTrans(2, 1, FromExchangeTransaction, 10, 200, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, -10, 200, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, -10, 200, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, -10, 200, 0, 2000),
 	}
 
 	testcases := []struct {
@@ -499,15 +485,8 @@ func Test_CancelOrder(t *testing.T) {
 }
 
 func Test_GetStocksOwned(t *testing.T) {
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
-		return &Transaction{
-			UserId:        userId,
-			StockId:       stockId,
-			Type:          transType,
-			StockQuantity: stockQty,
-			Price:         price,
-			Total:         total,
-		}
+	var makeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
+		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
 	}
 
 	users := []*User{
@@ -523,17 +502,15 @@ func Test_GetStocksOwned(t *testing.T) {
 	}
 
 	transactions := []*Transaction{
-		makeTrans(2, 1, FromExchangeTransaction, 10, 1, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, 10, 2, 2000),
-		makeTrans(2, 2, FromExchangeTransaction, -10, 1, 2000),
-
-		makeTrans(3, 1, FromExchangeTransaction, 10, 1, 2000),
-		makeTrans(3, 3, FromExchangeTransaction, -10, 2, 2000),
-
-		makeTrans(4, 2, FromExchangeTransaction, -10, 2, 2000),
-		makeTrans(4, 2, FromExchangeTransaction, 10, 1, 2000),
-		makeTrans(4, 2, FromExchangeTransaction, -10, 1, 2000),
-		makeTrans(4, 3, FromExchangeTransaction, 10, 1, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 2, 0, 2000),
+		makeTrans(2, 2, FromExchangeTransaction, 0, -10, 1, 0, 2000),
+		makeTrans(3, 1, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(3, 3, FromExchangeTransaction, 0, -10, 2, 0, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 0, -10, 2, 0, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 0, -10, 1, 0, 2000),
+		makeTrans(4, 3, FromExchangeTransaction, 0, 10, 1, 0, 2000),
 	}
 
 	testcases := []struct {

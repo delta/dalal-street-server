@@ -5,7 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils"
-	"github.com/delta/dalal-street-server/utils/test"
+	testutils "github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestLeaderboardRowToProto(t *testing.T) {
@@ -32,15 +32,8 @@ func Test_UpdateLeaderboard(t *testing.T) {
 		"method": "Test_UpdateLeaderboard",
 	})
 
-	var makeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
-		return &Transaction{
-			UserId:        userId,
-			StockId:       stockId,
-			Type:          transType,
-			StockQuantity: stockQty,
-			Price:         price,
-			Total:         total,
-		}
+	var makeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
+		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
 	}
 
 	var makeUser = func(id uint32, email string, name string, cash uint64, total int64) *User {
@@ -85,14 +78,14 @@ func Test_UpdateLeaderboard(t *testing.T) {
 	}
 
 	transactions := []*Transaction{
-		makeTrans(2, 1, OrderFillTransaction, 10, 200, -2000),
-		makeTrans(2, 2, OrderFillTransaction, -15, 300, 4500),
-		makeTrans(3, 1, OrderFillTransaction, 40, 200, -8000),
-		makeTrans(3, 2, OrderFillTransaction, -30, 300, 9000),
-		makeTrans(4, 1, OrderFillTransaction, -10, 200, 2000),
-		makeTrans(4, 2, OrderFillTransaction, 15, 300, -4500),
-		makeTrans(5, 1, OrderFillTransaction, 40, 200, -8000),
-		makeTrans(5, 2, OrderFillTransaction, -30, 300, 9000),
+		makeTrans(2, 1, OrderFillTransaction, 0, 10, 200, 0, -2000),
+		makeTrans(2, 2, OrderFillTransaction, 0, -15, 300, 0, 4500),
+		makeTrans(3, 1, OrderFillTransaction, 0, 40, 200, 0, -8000),
+		makeTrans(3, 2, OrderFillTransaction, 0, -30, 300, 0, 9000),
+		makeTrans(4, 1, OrderFillTransaction, 0, -10, 200, 0, 2000),
+		makeTrans(4, 2, OrderFillTransaction, 0, 15, 300, 0, -4500),
+		makeTrans(5, 1, OrderFillTransaction, 0, 40, 200, 0, -8000),
+		makeTrans(5, 2, OrderFillTransaction, 0, -30, 300, 0, 9000),
 	}
 
 	var results []leaderboardQueryData

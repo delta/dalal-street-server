@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/delta/dalal-street-server/utils/test"
+	testutils "github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestStockHistoryToProto(t *testing.T) {
@@ -104,15 +104,8 @@ func Test_RecordNMinuteOHLCs(t *testing.T) {
 }
 
 func Test_VolumeRecording(t *testing.T) {
-	var fakeTrans = func(userId uint32, stockId uint32, transType TransactionType, stockQty int64, price uint64, total int64) *Transaction {
-		return &Transaction{
-			UserId:        userId,
-			StockId:       stockId,
-			Type:          transType,
-			StockQuantity: stockQty,
-			Price:         price,
-			Total:         total,
-		}
+	var fakeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
+		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
 	}
 	db := getDB()
 
@@ -129,7 +122,7 @@ func Test_VolumeRecording(t *testing.T) {
 	userAsk := &User{Id: 1, Email: "saihemanth@gmail.com", Cash: 3000, IsHuman: true}
 	userBuy := &User{Id: 2, Email: "ajish@gmail.com", Cash: 3000, IsHuman: true}
 	transactions := []*Transaction{
-		fakeTrans(2, 1, FromExchangeTransaction, 10, 1, 2000),
+		fakeTrans(2, 1, FromExchangeTransaction, 0, 10, 1, 0, 2000),
 	}
 	db.Save(userAsk)
 	defer db.Delete(userAsk)
