@@ -101,8 +101,9 @@ func UpdateLeaderboard() {
 	tx := db.Begin()
 
 	tx.Raw(`
-		SELECT U.id as user_id, U.name as user_name, U.cash as cash,
-			ifNull(SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)),0) AS stock_worth,
+		SELECT U.id as user_id, U.name as user_name, 
+		     U.cash + U.reservedCash as cash,
+			ifNull((SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed)) ),0) AS stock_worth,
 			ifnull((U.cash + U.reservedCash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed))),U.cash) AS total
 		FROM
 			Users U LEFT JOIN Transactions T ON U.id = T.userId
