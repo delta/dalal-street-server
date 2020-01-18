@@ -39,9 +39,9 @@ func (d *dalalActionService) SendDividends(ctx context.Context, req *actions_pb.
 	stockID := req.StockId
 	dividendAmount := req.DividendAmount
 
-	status, err := models.PerformDividendsTransaction(stockID, dividendAmount)
+	err := models.PerformDividendsTransaction(stockID, dividendAmount)
 
-	if status == "OK" {
+	if err == nil {
 		resp.StatusCode = 0
 		resp.StatusMessage = "OK"
 

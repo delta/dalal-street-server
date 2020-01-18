@@ -2,12 +2,12 @@ package models
 
 import (
 	"fmt"
+
 	"github.com/Sirupsen/logrus"
-	"github.com/delta/dalal-street-server/utils"
 )
 
-//UserDetails stores users who own stocks of a given stockid
-type UserDetails struct {
+//userDetails stores users who own stocks of a given stockid
+type userDetails struct {
 	UserID        uint32
 	StockQuantity uint64
 }
@@ -16,7 +16,7 @@ type UserDetails struct {
 //                            performs dividendTransaction for each of these users,
 //                            updates cash of each of these Users,
 //                            sends the DividendTransactions through datastreams and a notification.
-func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string, error) {
+func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":               "PerformDividendTransaction",
 		"param_stockId":        stockID,
@@ -25,38 +25,38 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 
 	var transactions []*Transaction
 
-	var oldCashMap []*User
+	dividendsMap := make(map[uint32]uint64)
 
 	l.Infof("PerformDividendTransaction requested")
 
 	db := getDB()
 
-	maxStockId, err := GetMaxStockId()
+	maxStockID, err := GetmaxStockID()
 
-	l.Errorf("Max stock id : %v", maxStockId)
+	l.Infof("Max stock id : %v", maxStockID)
 
 	if err != nil {
 		l.Errorf("Failure to get max stock id due to : %v+", err)
-		return "Failure", err
+		return  err
 	}
 
-	if stockID < 0 || stockID > maxStockId {
+	if stockID < 0 || stockID > maxStockID {
 		l.Errorf("Failure with stock id : %v", stockID)
-		return "Failure", InvalidStockIdError{}
+		return InvalidStockIdError{}
 	}
 
 	/* Committing to database */
 	tx := db.Begin()
 
-	errorHelper := func(format string, args ...interface{}) (string, error) {
+	errorHelper := func(format string, args ...interface{}) (error) {
 		l.Errorf(format, args...)
 		tx.Rollback()
-		return "failure", fmt.Errorf(format, args...)
+		return fmt.Errorf(format, args...)
 	}
 
-	var benefittingUsers []*UserDetails
+	var benefittingUsers []*userDetails
 
-	db.Raw("SELECT userId As user_id ,SUM(stockQuantity) AS stock_quantity FROM Transactions WHERE stockId = ? GROUP BY userId HAVING SUM(stockQuantity) > 0 ", stockID).Scan(&benefittingUsers)
+	db.Raw("SELECT userId As user_id ,(SUM(stockQuantity)+SUM(reservedStockQuantity)) AS stock_quantity FROM Transactions WHERE stockId = ? GROUP BY userId HAVING stock_quantity > 0 ", stockID).Scan(&benefittingUsers)
 
 	l.Infof("Successfully fetched users who own stocks of stockID : %v", stockID)
 
@@ -65,17 +65,13 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 		dividendTotal := dividendAmount * uint64(user.StockQuantity)
 		l.Infof(" The user id is %v and stock quantity is : %v", user.UserID, user.StockQuantity)
 
-		transaction := &Transaction{
-			UserId:        user.UserID,
-			StockId:       stockID,
-			Type:          DividendTransaction,
-			StockQuantity: int64(user.StockQuantity),
-			Price:         uint64(dividendAmount),
-			Total:         int64(dividendTotal),
-			CreatedAt:     utils.GetCurrentTimeISO8601(),
-		}
+		transaction := GetTransactionRef(user.UserID, stockID, DividendTransaction, 0,0 ,uint64(dividendAmount) ,0 ,int64(dividendTotal))
 
 		if err := tx.Save(transaction).Error; err != nil {
+			errRevert := RevertToOldState(dividendsMap)
+			if errRevert != nil{
+				return errRevert
+			}
 			return errorHelper("Error creating the transaction. Rolling back. Error: %+v", err)
 		}
 
@@ -85,7 +81,11 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 		ch, currentUser, err := getUserExclusively(user.UserID)
 		if err != nil {
 			l.Errorf("Errored : %+v ", err)
-			return "Failure", err
+			errRevert := RevertToOldState(dividendsMap)
+			if errRevert != nil{
+				return errRevert
+			}
+			return errorHelper("Error acquring exclusive write on user. Rolling back. Error: %+v", err)
 		}
 		l.Debugf("Acquired")
 		defer func() {
@@ -95,13 +95,14 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 
 		// A lock on user and stock has been acquired.
 		// Safe to make changes to this user and this stock
-
-		oldCash := currentUser.Cash
-		oldCashMap = append(oldCashMap, currentUser)
+		dividendsMap[currentUser.Id] = dividendTotal
 		currentUser.Cash = uint64(int64(currentUser.Cash) + int64(dividendTotal))
 
 		if err := tx.Save(currentUser).Error; err != nil {
-			currentUser.Cash = oldCash
+		errRevert := RevertToOldState(dividendsMap)
+		if errRevert != nil{
+			return errRevert
+			}
 			return errorHelper("Error updating user's cash. Rolling back. Error: %+v", err)
 		}
 
@@ -110,47 +111,49 @@ func PerformDividendsTransaction(stockID uint32, dividendAmount uint64) (string,
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		// restore oldCash for all benefittingUsers in User Map
-		for index, user := range benefittingUsers {
-			ch, currentUser, err := getUserExclusively(user.UserID)
-			if err != nil {
-				l.Errorf("Errored : %+v ", err)
-				return "Failure", err
-			}
-			l.Debugf("Acquired")
-			defer func() {
-				close(ch)
-				l.Debugf("Released exclusive write on user")
-			}()
-			currentUser.Cash = oldCashMap[index].Cash
-
+	  errRevert := RevertToOldState(dividendsMap)
+		if errRevert != nil{
+			return errRevert
 		}
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
 
 	l.Debugf("Committed transaction. Success.")
 
-	sql := "SELECT id, cash FROM Users"
-	rows, err := db.Raw(sql).Rows()
-	if err != nil {
-		l.Error(err)
+  errNotif := SendDividendsTransactionsAndNotifications(transactions, benefittingUsers, stockID)
+	if errNotif != nil {
+		return errNotif
 	}
 
-	for rows.Next() {
-		var userID uint32
-		var cash uint64
-		rows.Scan(&userID, &cash)
-		l.Info("ID : %d cash : %d", userID, cash)
-	}
-	defer rows.Close()
-
-	go SendDividendsTransactionsAndNotifications(transactions, benefittingUsers, stockID)
-
-	return "OK", nil
+	return nil
 
 }
 
-func SendDividendsTransactionsAndNotifications(transactions []*Transaction, benefittingUsers []*UserDetails, stockID uint32) {
+//RevertToOldState restores oldCash for all benefittingUsers in User Map
+func RevertToOldState(dividendsMap map[uint32]uint64) (error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":                     "RevertToOldState",
+		"param_dividendsMap":           fmt.Sprintf("%+v", dividendsMap),
+	})
+
+	for userID,dividend := range dividendsMap {
+		ch, currentUser, err := getUserExclusively(userID)
+		if err != nil {
+			l.Errorf("Errored : %+v ", err)
+			return err
+		}
+		l.Debugf("Acquired")
+		defer func() {
+			close(ch)
+			l.Debugf("Released exclusive write on user")
+		}()
+		currentUser.Cash = currentUser.Cash - dividend
+	}
+	return nil
+}
+
+// SendDividendsTransactionsAndNotifications sends Transactions through Transactions stream and a Notification about Dividends to all users.
+func SendDividendsTransactionsAndNotifications(transactions []*Transaction, benefittingUsers []*userDetails, stockID uint32) (error){
 	var l = logger.WithFields(logrus.Fields{
 		"method":                 "SendTransactionsAndNotifications",
 		"param_stockId":          stockID,
@@ -168,24 +171,26 @@ func SendDividendsTransactionsAndNotifications(transactions []*Transaction, bene
 	stockDetails, err := GetCompanyDetails(stockID)
 	if err != nil {
 		l.Errorf("Getting Company name failed due to %+v: ", err)
+		return err
 	}
 
-	for _, user := range benefittingUsers {
-		go SendNotification(user.UserID, fmt.Sprintf("Company %+v has sent out dividends.", stockDetails.FullName), true)
-	}
+	SendNotification(0, fmt.Sprintf("Company %+v has sent out dividends.", stockDetails.FullName), true)
+  return nil
 }
 
-func GetMaxStockId() (uint32, error) {
+//GetmaxStockID returns the maximum StockID from the stocks.
+func GetmaxStockID() (uint32, error) {
 	db := getDB()
 	sql := "SELECT MAX(id) as max_stockId FROM Stocks"
 	rows, err := db.Raw(sql).Rows()
+	defer rows.Close()
 	if err != nil {
 		return 0, err
 	} else {
-		var max_stockId uint32
+		var maxStockID uint32
 		for rows.Next() {
-			rows.Scan(&max_stockId)
+			rows.Scan(&maxStockID)
 		}
-		return max_stockId, nil
+		return maxStockID, nil
 	}
 }
