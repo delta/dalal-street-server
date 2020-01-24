@@ -13,15 +13,15 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 
 	"github.com/delta/dalal-street-server/datastreams"
 	"github.com/delta/dalal-street-server/grpcapi/actionservice"
 	"github.com/delta/dalal-street-server/grpcapi/streamservice"
 	"github.com/delta/dalal-street-server/matchingengine"
-	"github.com/delta/dalal-street-server/proto_build"
-	"github.com/delta/dalal-street-server/proto_build/actions"
+	pb "github.com/delta/dalal-street-server/proto_build"
+	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
 	"github.com/delta/dalal-street-server/session"
 	"github.com/delta/dalal-street-server/utils"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -133,7 +133,29 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		}
 		ctx = context.WithValue(ctx, "session", newSess)
 		return handler(ctx, req)
+	case *actions_pb.ForgotPasswordRequest:
+		newSess, err := session.Fake()
+		if err != nil {
+			if config.Stage == "Dev" || config.Stage == "Test" || config.Stage == "Docker" {
+				return nil, status.Errorf(codes.Internal, "Internal error occurred: %+v", err)
+			}
+			return nil, status.Errorf(codes.Internal, "Internal error occurred")
+		}
+		ctx = context.WithValue(ctx, "session", newSess)
+		return handler(ctx, req)
+	case *actions_pb.ChangePasswordRequest:
+		newSess, err := session.Fake()
+		if err != nil {
+			if config.Stage == "Dev" || config.Stage == "Test" || config.Stage == "Docker" {
+				return nil, status.Errorf(codes.Internal, "Internal error occurred: %+v", err)
+			}
+			return nil, status.Errorf(codes.Internal, "Internal error occurred")
+		}
+		ctx = context.WithValue(ctx, "session", newSess)
+		return handler(ctx, req)
+
 	}
+
 	newCtx, err := authFunc(ctx)
 	if err != nil {
 		return nil, err
