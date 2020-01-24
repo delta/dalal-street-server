@@ -21,16 +21,20 @@ import (
 	"github.com/jinzhu/gorm"
 
 	"github.com/Sirupsen/logrus"
+	//"github.com/satori/go.uuid"
 
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 )
 
 var (
-	UnauthorizedError      = errors.New("Invalid credentials")
-	NotRegisteredError     = errors.New("Not registered")
-	AlreadyRegisteredError = errors.New("Already registered")
-	UnverifiedUserError    = errors.New("User has not verified account")
-
+	UnauthorizedError             = errors.New("Invalid credentials")
+	NotRegisteredError            = errors.New("Not registered")
+	AlreadyRegisteredError        = errors.New("Already registered")
+	UnverifiedUserError           = errors.New("User has not verified account")
+	TemporaryPasswordExpiredError = errors.New("Temporary password has expired")
+	PasswordMismatchError         = errors.New("Passwords mismatch error")
+	PragyanUserError              = errors.New("Pragyan user error")
+	InvalidTemporaryPasswordError = errors.New("Invalid temporary password")
 	/*
 		Net worth <= 0 => tax percentage = 0%
 		0 < Net worth <= 100000 => tax percentage = 2%
@@ -106,7 +110,7 @@ func Login(email, password string) (User, error) {
 		Email: email,
 	}
 
-	err := db.Where("email = ?", email).First(&registeredUser).Error
+	err := db.Table("Registrations").Where("email = ?", email).First(&registeredUser).Error
 	l.Debugf("Got %v while searching for registeredUser", err)
 
 	// User was not found in our local db

@@ -188,3 +188,76 @@ func (d *dalalActionService) GetLeaderboard(ctx context.Context, req *actions_pb
 
 	return resp, nil
 }
+
+func (d *dalalActionService) ForgotPassword(ctx context.Context, req *actions_pb.ForgotPasswordRequest) (*actions_pb.ForgotPasswordResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "ForgotPassword",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("Forgot Password requested")
+
+	resp := &actions_pb.ForgotPasswordResponse{}
+
+	makeError := func(st actions_pb.ForgotPasswordResponse_StatusCode, msg string) (*actions_pb.ForgotPasswordResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	email := req.Email
+
+	message, err := models.PasswordReset(email)
+
+	switch {
+	case err == models.UnauthorizedError:
+		return makeError(actions_pb.ForgotPasswordResponse_InvalidCredentialsError, "E-Mail not registered, Try registering first")
+	case err == models.PragyanUserError:
+		return makeError(actions_pb.ForgotPasswordResponse_PragyanUserError, "You have registered using Pragyan Account. Try changing Password on Pragyan Website")
+	case err != nil:
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.ForgotPasswordResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+	resp.StatusMessage = message
+
+	return resp, nil
+}
+
+func (d *dalalActionService) ChangePassword(ctx context.Context, req *actions_pb.ChangePasswordRequest) (*actions_pb.ChangePasswordResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "Change Password",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("Change Password requested")
+
+	resp := &actions_pb.ChangePasswordResponse{}
+
+	makeError := func(st actions_pb.ChangePasswordResponse_StatusCode, msg string) (*actions_pb.ChangePasswordResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	tempPassword := req.TempPassword
+	newPassword := req.NewPassword
+	confirmPassword := req.ConfirmPassword
+
+	message, err := models.ChangePassword(tempPassword, newPassword, confirmPassword)
+
+	switch {
+	case err == models.InvalidTemporaryPasswordError:
+		return makeError(actions_pb.ChangePasswordResponse_InvalidTemporaryPasswordError, "Incorrect temporary password")
+	case err == models.TemporaryPasswordExpiredError:
+		return makeError(actions_pb.ChangePasswordResponse_TemporaryPasswordExpiredError, "Temporary Password Expired")
+	case err == models.PasswordMismatchError:
+		return makeError(actions_pb.ChangePasswordResponse_PasswordMismatchError, "Passwords don't match")
+	case err != nil:
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.ChangePasswordResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	resp.StatusMessage = message
+
+	return resp, nil
+}
