@@ -22,16 +22,23 @@ type OtpVerifiedState struct {
 	IsVerified bool
 }
 
+type StockBankruptState struct {
+	StockId    uint32
+	IsBankrupt bool
+}
+
 var gameStateTypes = [...]string{
 	"MarketStateUpdate",
 	"StockDividendStateUpdate",
 	"OtpVerifiedStateUpdate",
+	"StockBankruptStateUdpate",
 }
 
 const (
 	MarketStateUpdate GameStateType = iota
 	StockDividendStateUpdate
 	OtpVerifiedStateUpdate
+	StockBankruptStateUpdate
 )
 
 func (gsType GameStateType) String() string {
@@ -45,6 +52,7 @@ type GameState struct {
 	Ms     *MarketState
 	Sd     *StockDividendState
 	Ov     *OtpVerifiedState
+	Sb     *StockBankruptState
 }
 
 func (g *GameState) ToProto() *models_pb.GameState {
@@ -67,6 +75,12 @@ func (g *GameState) ToProto() *models_pb.GameState {
 		pGameState.Type = models_pb.GameStateUpdateType_OtpVerifiedStateUpdate
 		pGameState.OtpVerifiedState = &models_pb.OtpVerifiedState{
 			IsVerified: g.Ov.IsVerified,
+		}
+	} else if g.GsType == StockBankruptStateUpdate {
+		pGameState.Type = models_pb.GameStateUpdateType_StockBankruptStateUpdate
+		pGameState.StockBankruptState = &models_pb.StockBankruptState{
+			StockId:    g.Sb.StockId,
+			IsBankrupt: g.Sb.IsBankrupt,
 		}
 	}
 

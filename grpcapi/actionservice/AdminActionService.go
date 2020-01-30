@@ -296,37 +296,3 @@ func (d *dalalActionService) SendDividends(ctx context.Context, req *actions_pb.
 
 	return resp, nil
 }
-
-func (d *dalalActionService) CloseMarket(ctx context.Context, req *actions_pb.CloseMarketRequest) (*actions_pb.CloseMarketResponse, error) {
-
-	var l = logger.WithFields(logrus.Fields{
-		"method":        "CloseMarket",
-		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
-		"param_req":     fmt.Sprintf("%+v", req),
-	})
-	l.Infof("HALA HU")
-	err := models.CloseMarket(true)
-
-	g := &models.GameState{
-		UserID: 0,
-		Ms: &models.MarketState{
-			OpenOrClose: false,
-		},
-		GsType: models.MarketStateUpdate,
-	}
-
-	models.SendGameStateUpadate(g.ToProto())
-
-	resp := &actions_pb.CloseMarketResponse{
-		StatusCode:    0,
-		StatusMessage: "OK",
-	}
-
-	if err != nil {
-		l.Errorf("Error setting previous day close")
-		return nil, err
-	}
-
-	return resp, nil
-
-}
