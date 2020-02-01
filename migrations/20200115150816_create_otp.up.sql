@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS OTP (
+    id int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+	phoneNo varchar(255) NOT NULL,
+    otp int(11) UNSIGNED NOT NULL,
+    updatedAt varchar(255) NOT NULL DEFAULT "0000-00-00T00:00:00+05:30",
+    isVerified BOOL NOT NULL,
+	PRIMARY KEY (id)
+    )AUTO_INCREMENT = 1
+;

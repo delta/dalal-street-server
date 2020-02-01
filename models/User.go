@@ -57,26 +57,28 @@ var TotalUserCount uint32
 
 // User models the User object.
 type User struct {
-	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	Email        string `gorm:"unique;not null" json:"email"`
-	Name         string `gorm:"not null" json:"name"`
-	Cash         uint64 `gorm:"not null" json:"cash"`
-	Total        int64  `gorm:"not null" json:"total"`
-	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
-	IsHuman      bool   `gorm:"column:isHuman;not null" json:"is_human"`
-	ReservedCash uint64 `gorm:"column:reservedCash;not null" json:"reserved_cash"`
+	Id              uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Email           string `gorm:"unique;not null" json:"email"`
+	Name            string `gorm:"not null" json:"name"`
+	Cash            uint64 `gorm:"not null" json:"cash"`
+	Total           int64  `gorm:"not null" json:"total"`
+	CreatedAt       string `gorm:"column:createdAt;not null" json:"created_at"`
+	IsHuman         bool   `gorm:"column:isHuman;not null" json:"is_human"`
+	ReservedCash    uint64 `gorm:"column:reservedCash;not null" json:"reserved_cash"`
+	IsPhoneVerified bool   `gorm:"column:isPhoneVerified;not null" json:"is_phone_verified"`
 }
 
 func (u *User) ToProto() *models_pb.User {
 	return &models_pb.User{
-		Id:           u.Id,
-		Email:        u.Email,
-		Name:         u.Name,
-		Cash:         u.Cash,
-		Total:        u.Total,
-		CreatedAt:    u.CreatedAt,
-		IsHuman:      u.IsHuman,
-		ReservedCash: u.ReservedCash,
+		Id:              u.Id,
+		Email:           u.Email,
+		Name:            u.Name,
+		Cash:            u.Cash,
+		Total:           u.Total,
+		CreatedAt:       u.CreatedAt,
+		IsHuman:         u.IsHuman,
+		ReservedCash:    u.ReservedCash,
+		IsPhoneVerified: u.IsPhoneVerified,
 	}
 }
 
@@ -324,13 +326,14 @@ func createUser(name string, email string) (*User, error) {
 	db := getDB()
 
 	u := &User{
-		Email:        email,
-		Name:         name,
-		Cash:         STARTING_CASH,
-		Total:        STARTING_CASH,
-		CreatedAt:    utils.GetCurrentTimeISO8601(),
-		IsHuman:      true,
-		ReservedCash: 0,
+		Email:           email,
+		Name:            name,
+		Cash:            STARTING_CASH,
+		Total:           STARTING_CASH,
+		CreatedAt:       utils.GetCurrentTimeISO8601(),
+		IsHuman:         true,
+		ReservedCash:    0,
+		IsPhoneVerified: false,
 	}
 
 	err := db.Save(u).Error
@@ -2239,4 +2242,8 @@ func Logout(userID uint32) {
 	userLocks.Lock()
 	delete(userLocks.m, userID)
 	userLocks.Unlock()
+}
+
+func IsUserPhoneVerified(userId uint32) bool {
+	return userLocks.m[userId].user.IsPhoneVerified
 }

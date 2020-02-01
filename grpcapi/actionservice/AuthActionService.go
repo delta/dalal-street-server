@@ -210,3 +210,66 @@ func (d *dalalActionService) Logout(ctx context.Context, req *actions_pb.LogoutR
 
 	return &actions_pb.LogoutResponse{}, nil
 }
+
+func (d *dalalActionService) AddPhone(ctx context.Context, req *actions_pb.AddPhoneRequest) (*actions_pb.AddPhoneResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "AddPhone",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Add Phone Requested")
+
+	phoneNo := req.GetPhoneNumber()
+	userId := getUserId(ctx)
+
+	err := models.SendOTP(userId, phoneNo)
+
+	resp := &actions_pb.AddPhoneResponse{}
+	makeError := func(st actions_pb.AddPhoneResponse_StatusCode, msg string) (*actions_pb.AddPhoneResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	if err == models.PhoneNoAlreadyTakenError {
+		return makeError(actions_pb.AddPhoneResponse_PhoneNoAlreadyTakenError, "Phone number already in use.")
+	} else if err == models.SendSMSError || err == models.InternalServerError {
+		return makeError(actions_pb.AddPhoneResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	return makeError(actions_pb.AddPhoneResponse_OK, "OTP sent successfully")
+}
+
+func (d *dalalActionService) VerifyPhone(ctx context.Context, req *actions_pb.VerifyOTPRequest) (*actions_pb.VerifyOTPResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "VerifyPhone",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Verify OTP Requested")
+
+	otpNo := req.GetOtp()
+	phone := req.GetPhone()
+	userId := getUserId(ctx)
+
+	err := models.VerifyOTP(userId, otpNo, phone)
+
+	resp := &actions_pb.VerifyOTPResponse{}
+	makeError := func(st actions_pb.VerifyOTPResponse_StatusCode, msg string) (*actions_pb.VerifyOTPResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	if err == models.OTPExpiredError {
+		return makeError(actions_pb.VerifyOTPResponse_OTPExpiredError, "OTP expired, please verify with new OTP.")
+	} else if err == models.OTPMismatchError {
+		return makeError(actions_pb.VerifyOTPResponse_OTPMismatchError, "Invalid OTP entered")
+	} else if err == models.InvalidPhoneNumberError || err == models.InternalServerError {
+		return makeError(actions_pb.VerifyOTPResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	return makeError(actions_pb.VerifyOTPResponse_OK, "OTP verification successful.")
+}
