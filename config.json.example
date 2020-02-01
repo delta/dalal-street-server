@@ -19,7 +19,9 @@
       "TLSCert": "./tls_keys/dev/server.crt",
       "TLSKey": "./tls_keys/dev/server.key",
       "CacheSize": 1000,
-      "BotSecret":"hellobots"
+      "BotSecret":"hellobots",
+      "PlivoAuthId": "",
+      "PlivoAuthToken": ""
    },
 
    "Docker": {
@@ -42,7 +44,9 @@
       "TLSCert": "./tls_keys/docker/server.crt",
       "TLSKey": "./tls_keys/docker/server.key",
       "CacheSize": 1000,
-      "BotSecret":"hellobots"
+      "BotSecret":"hellobots",
+      "PlivoAuthId": "",
+      "PlivoAuthToken": ""
    },
 
    "Prod": {
@@ -65,7 +69,9 @@
       "TLSCert": "./tls_keys/prod/server.crt",
       "TLSKey": "./tls_keys/prod/server.key",
       "CacheSize": 1000,
-      "BotSecret":"hellobots"
+      "BotSecret":"hellobots",
+      "PlivoAuthId": "",
+      "PlivoAuthToken": ""
  },
 
    "Test": {
@@ -88,6 +94,8 @@
       "TLSCert": "./tls_keys/test/server.crt",
       "TLSKey": "./tls_keys/test/server.key",
       "CacheSize": 1000, 
-      "BotSecret":"hellobots"
+      "BotSecret":"hellobots",
+      "PlivoAuthId": "",
+      "PlivoAuthToken": ""
  }
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/delta/plivo-go"
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
@@ -106,6 +107,14 @@ func SendEmail(fromAddr, subject, toAddr, plainTextContent, htmlContent string) 
 }
 
 func SendSMS(toPhoneNumber, content string) error {
-	// to be implemented
+	client, err := plivo.NewClient(config.PlivoAuthId, config.PlivoAuthToken, &plivo.ClientOptions{})
+	if err != nil {
+		return err
+	}
+	client.Messages.Create(plivo.MessageCreateParams{
+		Src:  "DALAL",
+		Dst:  toPhoneNumber,
+		Text: content,
+	})
 	return nil
 }
