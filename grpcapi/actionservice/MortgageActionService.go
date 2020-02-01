@@ -30,6 +30,10 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 	}
 
 	userId := getUserId(ctx)
+	if !models.IsUserPhoneVerified(userId) {
+		return makeError(actions_pb.MortgageStocksResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
 	stockId := req.StockId
 	stockQty := -int64(req.StockQuantity)
 
@@ -74,6 +78,10 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 	}
 
 	userID := getUserId(ctx)
+	if !models.IsUserPhoneVerified(userID) {
+		return makeError(actions_pb.RetrieveMortgageStocksResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
 	stockID := req.StockId
 	stockQty := int64(req.StockQuantity)
 	retrievePrice := req.RetrievePrice

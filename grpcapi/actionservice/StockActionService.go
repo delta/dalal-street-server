@@ -30,6 +30,10 @@ func (d *dalalActionService) BuyStocksFromExchange(ctx context.Context, req *act
 	}
 
 	userId := getUserId(ctx)
+	if !models.IsUserPhoneVerified(userId) {
+		return makeError(actions_pb.BuyStocksFromExchangeResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
 	stockId := req.StockId
 	stockQty := req.StockQuantity
 
