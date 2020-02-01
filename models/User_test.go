@@ -119,14 +119,15 @@ func Test_Regsiter(t *testing.T) {
 
 func TestUserToProto(t *testing.T) {
 	o := &User{
-		Id:           2,
-		Email:        "test@testmail.com",
-		Name:         "test user",
-		Cash:         10000,
-		Total:        -200,
-		CreatedAt:    "2017-06-08T00:00:00",
-		IsHuman:      true,
-		ReservedCash: 10,
+		Id:              2,
+		Email:           "test@testmail.com",
+		Name:            "test user",
+		Cash:            10000,
+		Total:           -200,
+		CreatedAt:       "2017-06-08T00:00:00",
+		IsHuman:         true,
+		ReservedCash:    10,
+		IsPhoneVerified: true,
 	}
 
 	oProto := o.ToProto()
