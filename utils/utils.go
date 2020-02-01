@@ -104,3 +104,8 @@ func SendEmail(fromAddr, subject, toAddr, plainTextContent, htmlContent string) 
 	}
 	return nil
 }
+
+func SendSMS(toPhoneNumber, content string) error {
+	// to be implemented
+	return nil
+}
