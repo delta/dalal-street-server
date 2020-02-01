@@ -29,6 +29,10 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 	}
 
 	userId := getUserId(ctx)
+	if !models.IsUserPhoneVerified(userId) {
+		return makeError(actions_pb.CancelOrderResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
 	orderId := req.OrderId
 	isAsk := req.IsAsk
 
@@ -79,6 +83,10 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 	}
 
 	userId := getUserId(ctx)
+	if !models.IsUserPhoneVerified(userId) {
+		return makeError(actions_pb.PlaceOrderResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
 	var orderId uint32
 	var err error
 
