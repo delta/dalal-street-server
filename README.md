@@ -34,6 +34,7 @@ go get -v gopkg.in/jarcoal/httpmock.v1
 go get -v github.com/golang/protobuf/proto
 go get -v github.com/golang/protobuf/protoc-gen-go
 go get -v github.com/sendgrid/sendgrid-go
+go get -v github.com/delta/plivo-go
 ```
 - Setup submodules
 ```
