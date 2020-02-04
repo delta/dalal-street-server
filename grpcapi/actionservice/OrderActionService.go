@@ -43,6 +43,8 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId, "Invalid Order ID. Cannot cancel this order.")
 	case models.AlreadyClosedError:
 		return makeError(actions_pb.CancelOrderResponse_InvalidOrderId, err.Error())
+	case models.StockBankruptError:
+		return makeError(actions_pb.CancelOrderResponse_StockBankruptError, err.Error())
 	}
 
 	if err != nil {
@@ -125,6 +127,8 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 		return makeError(actions_pb.PlaceOrderResponse_NotEnoughStocksError, e.Error())
 	case models.NotEnoughCashError:
 		return makeError(actions_pb.PlaceOrderResponse_NotEnoughCashError, e.Error())
+	case models.StockBankruptError:
+		return makeError(actions_pb.PlaceOrderResponse_StockBankruptError, err.Error())
 	}
 
 	if err != nil {
