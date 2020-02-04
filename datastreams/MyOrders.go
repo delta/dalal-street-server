@@ -3,9 +3,12 @@ package datastreams
 import (
 	"github.com/Sirupsen/logrus"
 
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
 )
+
+//DONOT delete this comment generate mocks
+//go:generate mockgen -source MyOrders.go -destination ../mocks/mock_MyOrders.go -package mocks
 
 // MyOrdersStream defines the interface for interacting with the MyOrders datastream
 type MyOrdersStream interface {

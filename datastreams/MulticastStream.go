@@ -7,6 +7,9 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
+//DONOT delete this comment it generates mocks for MulticastStream
+//go:generate mockgen -source MulticastStream.go -destination ../mocks/mock_MulticastStream.go -package mocks
+
 // MulticastStream represents an object that provides methods for handling multiple groups in
 // a stream. It allows you to broadcast updates to individual groups and manage the groups.
 type MulticastStream interface {

@@ -7,6 +7,9 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
+//DONOT delete this comment generates mocks
+//go:generate mockgen -source StockHistory.go -destination ../mocks/mock_StockHistory.go -package mocks
+
 // StockHistoryStream interface defines the interface to interact with StockHistory stream
 type StockHistoryStream interface {
 	SendStockHistoryUpdate(stockId uint32, history *models_pb.StockHistory)

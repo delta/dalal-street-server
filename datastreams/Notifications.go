@@ -5,10 +5,13 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
 )
+
+//DONOT delete this comment generates mocks
+//go:generate mockgen -source Notifications.go -destination ../mocks/mock_Notifications.go -package mocks
 
 // NotificationsStream represents the interface for handling a notifications data stream
 type NotificationsStream interface {

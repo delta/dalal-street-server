@@ -3,10 +3,13 @@ package datastreams
 import (
 	"github.com/Sirupsen/logrus"
 
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
 )
+
+//DONOT delete this comment  generates mocks MarketEvents
+//go:generate mockgen -source MarketEvents.go -destination ../mocks/mock_MarketEvents.go -package mocks
 
 // MarketEventsStream defines the interface for interacting with the MyOrders datastream
 type MarketEventsStream interface {

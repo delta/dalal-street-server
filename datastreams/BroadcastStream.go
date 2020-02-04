@@ -7,6 +7,9 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
+//DONOT delete this comment generates mocks
+//go:generate mockgen -source BroadcastStream.go -destination ../mocks/mock_BroadcastStream.go -package mocks
+
 // BroadcastStream represents an object that provides methods for handling a single stream
 // All updates are broadcast to *all* listeners.
 type BroadcastStream interface {

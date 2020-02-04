@@ -6,9 +6,12 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
 )
+
+//DONOT delete this comment generates mocks
+//go:generate mockgen -source StockPrices.go -destination ../mocks/mock_StockPrices.go -package mocks
 
 // StockPricesStream interface defines the interface to interact with StockPrices stream
 type StockPricesStream interface {
