@@ -35,12 +35,6 @@ func (d *dalalActionService) OpenMarket(ctx context.Context, req *actions_pb.Ope
 		return resp, nil
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "OK"
-
-	}
-
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
 		return makeError(actions_pb.OpenMarketResponse_InternalServerError, getInternalErrorMessage(err))
@@ -69,12 +63,6 @@ func (d *dalalActionService) CloseMarket(ctx context.Context, req *actions_pb.Cl
 		return resp, nil
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "OK"
-
-	}
-
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
 		return makeError(actions_pb.CloseMarketResponse_InternalServerError, getInternalErrorMessage(err))
@@ -93,8 +81,6 @@ func (d *dalalActionService) SendNotifications(ctx context.Context, req *actions
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
-	err := models.SendNotification(req.UserId, req.Text, req.IsGlobal)
-
 	resp := &actions_pb.SendNotificationsResponse{}
 
 	makeError := func(st actions_pb.SendNotificationsResponse_StatusCode, msg string) (*actions_pb.SendNotificationsResponse, error) {
@@ -103,11 +89,12 @@ func (d *dalalActionService) SendNotifications(ctx context.Context, req *actions
 		return resp, nil
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "OK"
-
+	if req.IsGlobal && req.UserId != 0 {
+		l.Errorf("Cannot send Global Notification to Non Zero Id")
+		return makeError(actions_pb.SendNotificationsResponse_InternalServerError, "Cannot send Global Notification to Non Zero Id")
 	}
+
+	err := models.SendNotification(req.UserId, req.Text, req.IsGlobal)
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
@@ -137,12 +124,6 @@ func (d *dalalActionService) LoadStocks(ctx context.Context, req *actions_pb.Loa
 		return resp, nil
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "OK"
-
-	}
-
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
 		return makeError(actions_pb.LoadStocksResponse_InternalServerError, getInternalErrorMessage(err))
@@ -161,8 +142,6 @@ func (d *dalalActionService) AddStocksToExchange(ctx context.Context, req *actio
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
-	err := models.AddStocksToExchange(req.StockId, req.NewStocks)
-
 	resp := &actions_pb.AddStocksToExchangeResponse{}
 
 	makeError := func(st actions_pb.AddStocksToExchangeResponse_StatusCode, msg string) (*actions_pb.AddStocksToExchangeResponse, error) {
@@ -171,11 +150,17 @@ func (d *dalalActionService) AddStocksToExchange(ctx context.Context, req *actio
 		return resp, nil
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "OK"
+	stock, err := models.GetStockCopy(req.StockId)
+
+	l.Debugf("Adding new stocks to Exchange for %s", stock.FullName)
+
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.AddStocksToExchangeResponse_InternalServerError, getInternalErrorMessage(err))
 
 	}
+
+	err = models.AddStocksToExchange(req.StockId, req.NewStocks)
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
@@ -195,8 +180,6 @@ func (d *dalalActionService) UpdateStockPrice(ctx context.Context, req *actions_
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
-	err := models.UpdateStockPrice(req.StockId, req.NewPrice, 10000)
-
 	resp := &actions_pb.UpdateStockPriceResponse{}
 
 	makeError := func(st actions_pb.UpdateStockPriceResponse_StatusCode, msg string) (*actions_pb.UpdateStockPriceResponse, error) {
@@ -205,11 +188,17 @@ func (d *dalalActionService) UpdateStockPrice(ctx context.Context, req *actions_
 		return resp, nil
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "OK"
+	stock, err := models.GetStockCopy(req.StockId)
+
+	l.Debugf("Adding new stocks to Exchange for %s", stock.FullName)
+
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.UpdateStockPriceResponse_InternalServerError, getInternalErrorMessage(err))
 
 	}
+
+	err = models.UpdateStockPrice(req.StockId, req.NewPrice, 10000)
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
@@ -229,8 +218,6 @@ func (d *dalalActionService) AddMarketEvent(ctx context.Context, req *actions_pb
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
-	err := models.AddMarketEvent(req.StockId, req.Headline, req.Text, req.IsGlobal, req.ImageUrl)
-
 	resp := &actions_pb.AddMarketEventResponse{}
 
 	makeError := func(st actions_pb.AddMarketEventResponse_StatusCode, msg string) (*actions_pb.AddMarketEventResponse, error) {
@@ -239,11 +226,21 @@ func (d *dalalActionService) AddMarketEvent(ctx context.Context, req *actions_pb
 		return resp, nil
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "OK"
+	stock, err := models.GetStockCopy(req.StockId)
 
+	l.Debugf("Adding Market Event for %s", stock.FullName)
+
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.AddMarketEventResponse_InternalServerError, getInternalErrorMessage(err))
 	}
+
+	if req.IsGlobal && req.StockId != 0 {
+		l.Errorf("Cannot send Global Notification to Non Zero Stock Id")
+		return makeError(actions_pb.AddMarketEventResponse_InternalServerError, "Cannot send Global Notification to Non Zero Stock Id")
+	}
+
+	err = models.AddMarketEvent(req.StockId, req.Headline, req.Text, req.IsGlobal, req.ImageUrl)
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
