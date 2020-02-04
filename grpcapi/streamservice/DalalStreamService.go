@@ -61,6 +61,7 @@ func NewDalalStreamService(dsm datastreams.Manager) pb.DalalStreamServiceServer 
 		datastreams_pb.DataStreamType_STOCK_PRICES,
 		datastreams_pb.DataStreamType_TRANSACTIONS,
 		datastreams_pb.DataStreamType_STOCK_HISTORY,
+		datastreams_pb.DataStreamType_GAME_STATE,
 	}
 
 	for _, t := range types {
