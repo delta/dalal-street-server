@@ -298,3 +298,44 @@ func (d *dalalActionService) SendDividends(ctx context.Context, req *actions_pb.
 
 	return resp, nil
 }
+
+func (d *dalalActionService) SetGivesDividends(ctx context.Context, req *actions_pb.SetGivesDividendsRequest) (*actions_pb.SetGivesDividendsResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "SetGivesDividends",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Request for setting givesDividends")
+
+	resp := &actions_pb.SetGivesDividendsResponse{}
+	makeError := func(st actions_pb.SetGivesDividendsResponse_StatusCode, msg string) (*actions_pb.SetGivesDividendsResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	if !models.IsMarketOpen() {
+		return makeError(actions_pb.SetGivesDividendsResponse_MarketClosedError, "Market Is closed. You cannot set GivesDividends for stocks now.")
+	}
+
+	stockID := req.GetStockId()
+	givesDividends := req.GetGivesDividends()
+
+	err := models.SetGivesDividends(stockID, givesDividends)
+
+	if err == models.InvalidStockError {
+		return makeError(actions_pb.SetGivesDividendsResponse_InvalidStockIdError, "Invalid stock id provided.")
+	}
+
+	if err != nil {
+		return makeError(actions_pb.SetGivesDividendsResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	if err == nil {
+		resp.StatusCode = 0
+		resp.StatusMessage = "GivesDividends set succesfully."
+	}
+
+	return resp, nil
+}

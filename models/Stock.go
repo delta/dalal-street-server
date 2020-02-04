@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -12,6 +13,10 @@ import (
 )
 
 const TIMES_RESOLUTION = 60
+
+var (
+	InvalidStockError = errors.New("Invalid stock id")
+)
 
 type Stock struct {
 	Id               uint32  `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
@@ -31,6 +36,7 @@ type Stock struct {
 	RealAvgPrice     float64 `gorm:"column:realAvgPrice;not null" json:"real_avg_price"`
 	CreatedAt        string  `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt        string  `gorm:"column:updatedAt;not null" json:"updated_at"`
+	GivesDividends   bool    `gorm:"column:givesDividends;not null" json:"gives_dividends"`
 
 	// HACK: Getting last minute's hl from transactions used by stock history
 	open   uint64 // Used to store Open for the last minute
@@ -62,6 +68,7 @@ func (gStock *Stock) ToProto() *models_pb.Stock {
 		RealAvgPrice:     gStock.RealAvgPrice,
 		CreatedAt:        gStock.CreatedAt,
 		UpdatedAt:        gStock.UpdatedAt,
+		GivesDividends:   gStock.GivesDividends,
 	}
 }
 
@@ -382,4 +389,49 @@ func SetDayHighAndLow() (err error) {
 	}
 
 	return err
+}
+
+func SetGivesDividends(stockId uint32, givesDividends bool) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":               "SetGivesDividends",
+		"param_stockId":        stockId,
+		"param_givesDividends": givesDividends,
+	})
+
+	l.Infof("Attempting to setGivesDividends")
+
+	allStocks.Lock()
+	stockNLock, ok := allStocks.m[stockId]
+	if !ok {
+		return InvalidStockError
+	}
+	allStocks.Unlock()
+
+	stockNLock.Lock()
+	defer stockNLock.Unlock()
+
+	stock := stockNLock.stock
+	oldStockCopy := *stock
+
+	stock.GivesDividends = givesDividends
+
+	db := getDB()
+
+	if err := db.Save(stock).Error; err != nil {
+		*stock = oldStockCopy
+		return err
+	}
+
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: 0,
+		Sd: &StockDividendState{
+			StockID:       stockId,
+			GivesDividend: givesDividends,
+		},
+		GsType: StockDividendStateUpdate,
+	}
+	gameStateStream.SendGameStateUpdate(g.ToProto())
+
+	return nil
 }
