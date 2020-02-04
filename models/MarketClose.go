@@ -33,12 +33,15 @@ func CloseMarket(updatePreviousDayClose bool) error {
 
 	db.Exec("Update Config set isMarketOpen = false")
 
-	notif := &Notification{
-		Text: MARKET_IS_CLOSED_HACKY_NOTIF,
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: 0,
+		Ms: &MarketState{
+			IsMarketOpen: false,
+		},
+		GsType: MarketStateUpdate,
 	}
-
-	notificationsStream := datastreamsManager.GetNotificationsStream()
-	notificationsStream.SendNotification(notif.ToProto())
+	gameStateStream.SendGameStateUpdate(g.ToProto())
 
 	if updatePreviousDayClose {
 		return SetPreviousDayClose()
