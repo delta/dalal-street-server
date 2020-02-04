@@ -11,11 +11,15 @@ func OpenMarket(updateDayHighAndLow bool) error {
 
 	db.Exec("Update Config set isMarketOpen = true")
 
-	notif := &Notification{
-		Text: MARKET_IS_OPEN_HACKY_NOTIF,
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: 0,
+		Ms: &MarketState{
+			IsMarketOpen: true,
+		},
+		GsType: MarketStateUpdate,
 	}
-	notificationsStream := datastreamsManager.GetNotificationsStream()
-	notificationsStream.SendNotification(notif.ToProto())
+	gameStateStream.SendGameStateUpdate(g.ToProto())
 
 	if updateDayHighAndLow {
 		return SetDayHighAndLow()

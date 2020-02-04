@@ -64,7 +64,7 @@ func (d *dalalActionService) CloseMarket(ctx context.Context, req *actions_pb.Cl
 	err := models.CloseMarket(req.UpdatePrevDayClose)
 
 	if err != nil {
-		l.Errorf("Error closing the market due to %v: ", err)
+		l.Errorf("Error closing the market due to %+v: ", err)
 		return makeError(actions_pb.CloseMarketResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
