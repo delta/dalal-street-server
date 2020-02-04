@@ -34,6 +34,7 @@ type Manager interface {
 	GetStockPricesStream() StockPricesStream
 	GetTransactionsStream() TransactionsStream
 	GetStockHistoryStream(stockId uint32) StockHistoryStream
+	GetGameStateStream() GameStateStream
 }
 
 // dataStreamsManager implements the Manager interface
@@ -60,6 +61,8 @@ type dataStreamsManager struct {
 	stockPricesStreamInstance StockPricesStream
 	// transactions stream
 	transactionsStreamInstance TransactionsStream
+	// game state stream
+	gameStateStreamInstance GameStateStream
 }
 
 // dataStreamsManagerInstance holds the singleton instance of dataStreamsManager
@@ -80,6 +83,7 @@ func GetManager() Manager {
 		stockExchangeStreamInstance: newStockExchangeStream(),
 		stockPricesStreamInstance:   newStockPricesStream(),
 		transactionsStreamInstance:  newTransactionsStream(),
+		gameStateStreamInstance:     newGameStateStream(),
 	}
 }
 
@@ -135,4 +139,8 @@ func (dsm *dataStreamsManager) GetStockPricesStream() StockPricesStream {
 // GetTransactionsStream returns a singleton instance of Transactions stream
 func (dsm *dataStreamsManager) GetTransactionsStream() TransactionsStream {
 	return dsm.transactionsStreamInstance
+}
+
+func (dsm *dataStreamsManager) GetGameStateStream() GameStateStream {
+	return dsm.gameStateStreamInstance
 }
