@@ -37,6 +37,7 @@ type Stock struct {
 	CreatedAt        string  `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt        string  `gorm:"column:updatedAt;not null" json:"updated_at"`
 	GivesDividends   bool    `gorm:"column:givesDividends;not null" json:"gives_dividends"`
+	IsBankrupt       bool    `gorm:"column:isBankrupt;not null" json:"is_bankrupt"`
 
 	// HACK: Getting last minute's hl from transactions used by stock history
 	open   uint64 // Used to store Open for the last minute
@@ -69,6 +70,7 @@ func (gStock *Stock) ToProto() *models_pb.Stock {
 		CreatedAt:        gStock.CreatedAt,
 		UpdatedAt:        gStock.UpdatedAt,
 		GivesDividends:   gStock.GivesDividends,
+		IsBankrupt:       gStock.IsBankrupt,
 	}
 }
 
@@ -405,7 +407,7 @@ func SetGivesDividends(stockId uint32, givesDividends bool) error {
 	if !ok {
 		return InvalidStockError
 	}
-	allStocks.Unlock()
+	defer allStocks.Unlock()
 
 	stockNLock.Lock()
 	defer stockNLock.Unlock()
@@ -434,4 +436,60 @@ func SetGivesDividends(stockId uint32, givesDividends bool) error {
 	gameStateStream.SendGameStateUpdate(g.ToProto())
 
 	return nil
+}
+
+func SetBankruptcy(stockId uint32, isBankrupt bool) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":           "SetBankruptcy",
+		"param_stockId":    stockId,
+		"param_isBankrupt": isBankrupt,
+	})
+
+	l.Infof("Attempting to setBankruptcy")
+
+	allStocks.Lock()
+	stockNLock, ok := allStocks.m[stockId]
+	if !ok {
+		return InvalidStockError
+	}
+	defer allStocks.Unlock()
+
+	stockNLock.Lock()
+	defer stockNLock.Unlock()
+
+	stock := stockNLock.stock
+	oldStockCopy := *stock
+
+	stock.IsBankrupt = isBankrupt
+	stock.CurrentPrice = 0
+
+	db := getDB()
+
+	if err := db.Save(stock).Error; err != nil {
+		*stock = oldStockCopy
+		return err
+	}
+
+	stockPriceStream := datastreamsManager.GetStockPricesStream()
+	stockPriceStream.SendStockPriceUpdate(stockId, stock.CurrentPrice)
+
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: 0,
+		Sb: &StockBankruptState{
+			StockId:    stockId,
+			IsBankrupt: isBankrupt,
+		},
+		GsType: StockBankruptStateUpdate,
+	}
+	gameStateStream.SendGameStateUpdate(g.ToProto())
+
+	return nil
+}
+
+func IsStockBankrupt(stockId uint32) bool {
+	allStocks.m[stockId].RLock()
+	isBankrupt := allStocks.m[stockId].stock.IsBankrupt
+	allStocks.m[stockId].RUnlock()
+	return isBankrupt
 }

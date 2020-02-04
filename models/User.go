@@ -593,6 +593,14 @@ func (e InvalidStockIdError) Error() string {
 	return fmt.Sprintf("Invalid stock id")
 }
 
+// StockBankruptError is given out when the stock is already bankrupt.
+type StockBankruptError struct {
+}
+
+func (e StockBankruptError) Error() string {
+	return fmt.Sprintf("This stock is already bankrupt you are not allowed to perform any action on this stock.")
+}
+
 //
 // Methods
 //
@@ -836,6 +844,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 		l.Debugf("Acquiring lock for ask order threshold check with stock id : %v ", ask.StockId)
 
+		if isBankrupt := IsStockBankrupt(ask.StockId); isBankrupt {
+			l.Infof("Stock already bankrupt. Returning function.")
+			return 0, StockBankruptError{}
+		}
 		allStocks.m[ask.StockId].RLock()
 		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
 		allStocks.m[ask.StockId].RUnlock()
@@ -1015,6 +1027,11 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		if bid.Price <= MINIMUM_ORDER_PRICE {
 			l.Debugf("Minimum price check failed for ask order")
 			return 0, MinimumPriceThresholdError{}
+		}
+
+		if isBankrupt := IsStockBankrupt(bid.StockId); isBankrupt {
+			l.Infof("Stock already bankrupt. Returning function.")
+			return 0, StockBankruptError{}
 		}
 
 		l.Debugf("Acquiring lock for bid order threshold check with stock id : %v ", bid.StockId)
@@ -1295,6 +1312,10 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 			return nil, nil, err
 		}
 
+		if isBankrupt := IsStockBankrupt(askOrder.StockId); isBankrupt {
+			l.Infof("Stock already bankrupt. Returning function.")
+			return nil, nil, StockBankruptError{}
+		}
 		err = askOrder.Close(tx)
 		// don't log if order is already closed
 		if _, ok := err.(AlreadyClosedError); !ok {
@@ -1554,6 +1575,11 @@ func PerformBuyFromExchangeTransaction(userId uint32, stockId uint32, stockQuant
 	})
 
 	l.Infof("PerformBuyFromExchangeTransaction requested")
+
+	if isBankrupt := IsStockBankrupt(stockId); isBankrupt {
+		l.Infof("Stock already bankrupt. Returning function.")
+		return nil, StockBankruptError{}
+	}
 
 	if stockQuantity > BUY_LIMIT {
 		l.Debugf("Exceeded buy limit. PerformBuyFromExchange failing")
@@ -2073,6 +2099,10 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 	mortgagePrice := allStocks.m[stockId].stock.CurrentPrice
 	allStocks.m[stockId].RUnlock()
 
+	if isBankrupt := IsStockBankrupt(stockId); isBankrupt {
+		l.Infof("Stock already bankrupt. Returning function.")
+		return nil, StockBankruptError{}
+	}
 	l.Infof("Taking current price of stock as %d", mortgagePrice)
 
 	var trTotal int64

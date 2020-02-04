@@ -332,10 +332,47 @@ func (d *dalalActionService) SetGivesDividends(ctx context.Context, req *actions
 		return makeError(actions_pb.SetGivesDividendsResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
-	if err == nil {
-		resp.StatusCode = 0
-		resp.StatusMessage = "GivesDividends set succesfully."
+	resp.StatusCode = 0
+	resp.StatusMessage = "GivesDividends set succesfully."
+
+	return resp, nil
+}
+
+func (d *dalalActionService) SetBankruptcy(ctx context.Context, req *actions_pb.SetBankruptcyRequest) (*actions_pb.SetBankruptcyResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "SetBankruptcy",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Request for setting bankruptcy")
+
+	resp := &actions_pb.SetBankruptcyResponse{}
+	makeError := func(st actions_pb.SetBankruptcyResponse_StatusCode, msg string) (*actions_pb.SetBankruptcyResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
 	}
+
+	if !models.IsMarketOpen() {
+		return makeError(actions_pb.SetBankruptcyResponse_MarketClosedError, "Market Is closed. You cannot set bankruptcy for stocks now.")
+	}
+
+	stockID := req.GetStockId()
+	isBankrupt := req.GetIsBankrupt()
+
+	err := models.SetBankruptcy(stockID, isBankrupt)
+
+	if err == models.InvalidStockError {
+		return makeError(actions_pb.SetBankruptcyResponse_InvalidStockIdError, "Invalid stock id provided.")
+	}
+
+	if err != nil {
+		return makeError(actions_pb.SetBankruptcyResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	resp.StatusCode = 0
+	resp.StatusMessage = "Bankruptcy set succesfully."
 
 	return resp, nil
 }

@@ -46,6 +46,8 @@ func (d *dalalActionService) BuyStocksFromExchange(ctx context.Context, req *act
 		return makeError(actions_pb.BuyStocksFromExchangeResponse_NotEnoughCashError, e.Error())
 	case models.NotEnoughStocksError:
 		return makeError(actions_pb.BuyStocksFromExchangeResponse_NotEnoughStocksError, e.Error())
+	case models.StockBankruptError:
+		return makeError(actions_pb.BuyStocksFromExchangeResponse_StockBankruptError, e.Error())
 	}
 
 	if err != nil {

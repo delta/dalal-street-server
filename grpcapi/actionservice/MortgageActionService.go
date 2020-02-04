@@ -44,6 +44,8 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 		return makeError(actions_pb.MortgageStocksResponse_NotEnoughStocksError, e.Error())
 	case models.WayTooMuchCashError:
 		return makeError(actions_pb.MortgageStocksResponse_NotEnoughStocksError, e.Error())
+	case models.StockBankruptError:
+		return makeError(actions_pb.MortgageStocksResponse_StockBankruptError, e.Error())
 	}
 	if err != nil {
 		l.Errorf("Request failed due to: %+v", err)
@@ -95,6 +97,8 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 		return makeError(actions_pb.RetrieveMortgageStocksResponse_NotEnoughCashError, e.Error())
 	case models.InvalidRetrievePriceError:
 		return makeError(actions_pb.RetrieveMortgageStocksResponse_InvalidRetrievePriceError, e.Error())
+	case models.StockBankruptError:
+		return makeError(actions_pb.RetrieveMortgageStocksResponse_StockBankruptError, e.Error())
 	}
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
