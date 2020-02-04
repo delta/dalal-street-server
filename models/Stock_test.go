@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/delta/dalal-street-server/utils"
-	"github.com/delta/dalal-street-server/utils/test"
+	testutils "github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestStockToProto(t *testing.T) {
@@ -26,6 +26,7 @@ func TestStockToProto(t *testing.T) {
 		RealAvgPrice:     200,
 		CreatedAt:        "2017-02-09T00:00:00",
 		UpdatedAt:        "2017-02-09T00:00:00",
+		GivesDividends:   true,
 	}
 
 	oProto := o.ToProto()
