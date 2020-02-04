@@ -55,22 +55,24 @@ func (d *dalalActionService) CloseMarket(ctx context.Context, req *actions_pb.Cl
 
 	resp := &actions_pb.CloseMarketResponse{}
 
-	err := models.CloseMarket(req.UpdatePrevDayClose)
-
 	makeError := func(st actions_pb.CloseMarketResponse_StatusCode, msg string) (*actions_pb.CloseMarketResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
 	}
 
+	err := models.CloseMarket(req.UpdatePrevDayClose)
+
 	if err != nil {
-		l.Errorf("Request failed due to %+v: ", err)
+		l.Errorf("Error closing the market due to %v: ", err)
 		return makeError(actions_pb.CloseMarketResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
-	resp.StatusMessage = "Done"
 	resp.StatusCode = actions_pb.CloseMarketResponse_OK
+	resp.StatusMessage = "OK"
+
 	return resp, nil
+
 }
 
 func (d *dalalActionService) SendNotifications(ctx context.Context, req *actions_pb.SendNotificationsRequest) (*actions_pb.SendNotificationsResponse, error) {

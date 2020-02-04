@@ -9,7 +9,7 @@ import (
 type GameStateType uint8
 
 type MarketState struct {
-	OpenOrClose bool
+	IsMarketOpen bool
 }
 
 // StockDividendState determines if a company gives dividend
@@ -63,7 +63,7 @@ func (g *GameState) ToProto() *models_pb.GameState {
 	if g.GsType == MarketStateUpdate {
 		pGameState.Type = models_pb.GameStateUpdateType_MarketStateUpdate
 		pGameState.MarketState = &models_pb.MarketState{
-			OpenOrClose: g.Ms.OpenOrClose,
+			IsMarketOpen: g.Ms.IsMarketOpen,
 		}
 	} else if g.GsType == StockDividendStateUpdate {
 		pGameState.Type = models_pb.GameStateUpdateType_StockDividendStateUpdate
