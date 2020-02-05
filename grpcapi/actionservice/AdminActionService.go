@@ -298,3 +298,48 @@ func (d *dalalActionService) SendDividends(ctx context.Context, req *actions_pb.
 
 	return resp, nil
 }
+
+func (d *dalalActionService) SetBankruptcy(ctx context.Context, req *actions_pb.SetBankruptcyRequest) (*actions_pb.SetBankruptcyResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "SetBankruptcy",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Request for bankrupting company sent")
+
+	resp := &actions_pb.SetBankruptcyResponse{}
+	makeError := func(st actions_pb.SetBankruptcyResponse_StatusCode, msg string) (*actions_pb.SetBankruptcyResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	stockID := req.StockId
+	isBankrupt := req.IsBankrupt
+
+	err := models.BankruptStock(stockID, isBankrupt)
+
+	if isBankrupt {
+		err = models.UpdateStockPrice(stockID, 0, 0)
+	}
+
+	if err == nil {
+		resp.StatusCode = 0
+		resp.StatusMessage = "OK"
+
+	}
+
+	switch e := err.(type) {
+	case models.InvalidStockIdError:
+		return makeError(actions_pb.SetBankruptcyResponse_InvalidStockIdError, e.Error())
+	}
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.SetBankruptcyResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}
