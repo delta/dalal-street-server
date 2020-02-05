@@ -228,13 +228,13 @@ func (d *dalalActionService) AddMarketEvent(ctx context.Context, req *actions_pb
 		return resp, nil
 	}
 
-	stock, err := models.GetStockCopy(req.StockId)
-
-	l.Debugf("Adding Market Event for %s", stock.FullName)
-
-	if err != nil {
-		l.Errorf("Request failed due to %+v: ", err)
-		return makeError(actions_pb.AddMarketEventResponse_InternalServerError, getInternalErrorMessage(err))
+	if req.StockId != 0 {
+		stock, err := models.GetStockCopy(req.StockId)
+		l.Debugf("Adding Market Event for %s", stock.FullName)
+		if err != nil {
+			l.Errorf("Request failed due to %+v: ", err)
+			return makeError(actions_pb.AddMarketEventResponse_InternalServerError, getInternalErrorMessage(err))
+		}
 	}
 
 	if req.IsGlobal && req.StockId != 0 {
@@ -242,7 +242,7 @@ func (d *dalalActionService) AddMarketEvent(ctx context.Context, req *actions_pb
 		return makeError(actions_pb.AddMarketEventResponse_InternalServerError, "Cannot send Global Notification to Non Zero Stock Id")
 	}
 
-	err = models.AddMarketEvent(req.StockId, req.Headline, req.Text, req.IsGlobal, req.ImageUrl)
+	err := models.AddMarketEvent(req.StockId, req.Headline, req.Text, req.IsGlobal, req.ImageUrl)
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
