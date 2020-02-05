@@ -158,7 +158,7 @@ func SendOTP(userId uint32, phoneNo string) error {
 	}
 
 	otpString := fmt.Sprint(otp.Otp)
-	smsContent := fmt.Sprintf("Greetings from Pragyan and Dalal Street. Your One Time Password is %s", otpString)
+	smsContent := fmt.Sprintf("[#] Greetings from Pragyan and Dalal Street. Your One Time Password is %s.\nhSG7XAtjOfM", otpString)
 	if err := utils.SendSMS(otp.PhoneNo, smsContent); err != nil {
 		l.Errorf("Error sending sms. Failing. %+v", err)
 		return SendSMSError
