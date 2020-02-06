@@ -20,6 +20,7 @@
       "TLSKey": "./tls_keys/dev/server.key",
       "CacheSize": 1000,
       "BotSecret":"hellobots",
+      "SendgridKey":"",
       "PlivoAuthId": "",
       "PlivoAuthToken": ""
    },
@@ -45,6 +46,7 @@
       "TLSKey": "./tls_keys/docker/server.key",
       "CacheSize": 1000,
       "BotSecret":"hellobots",
+      "SendgridKey":"",
       "PlivoAuthId": "",
       "PlivoAuthToken": ""
    },
@@ -70,6 +72,7 @@
       "TLSKey": "./tls_keys/prod/server.key",
       "CacheSize": 1000,
       "BotSecret":"hellobots",
+      "SendgridKey":"",
       "PlivoAuthId": "",
       "PlivoAuthToken": ""
  },
@@ -95,6 +98,7 @@
       "TLSKey": "./tls_keys/test/server.key",
       "CacheSize": 1000, 
       "BotSecret":"hellobots",
+      "SendgridKey":"",
       "PlivoAuthId": "",
       "PlivoAuthToken": ""
  }

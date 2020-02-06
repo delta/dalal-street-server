@@ -96,7 +96,7 @@ func SendEmail(fromAddr, subject, toAddr, plainTextContent, htmlContent string) 
 	from := mail.NewEmail("DalalStreet", fromAddr)
 	to := mail.NewEmail("Example User", toAddr)
 	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
-	client := sendgrid.NewSendClient(os.Getenv("SENDGRID_API_KEY"))
+	client := sendgrid.NewSendClient(config.SendgridKey)
 	response, err := client.Send(message)
 	if err != nil {
 		return err

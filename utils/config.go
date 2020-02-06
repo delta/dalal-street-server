@@ -58,6 +58,9 @@ type Config struct {
 	//SMS API Related options
 	PlivoAuthId    string
 	PlivoAuthToken string
+
+	//Sendgrid API Key
+	SendgridKey string
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
@@ -98,6 +101,7 @@ var config = &Config{
 	BotSecret:      "hellobots",
 	PlivoAuthId:    "",
 	PlivoAuthToken: "",
+	SendgridKey:    "",
 }
 
 var configFileName *string
