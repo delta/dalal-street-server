@@ -26,14 +26,17 @@ func (d *dalalActionService) OpenMarket(ctx context.Context, req *actions_pb.Ope
 	})
 
 	resp := &actions_pb.OpenMarketResponse{}
-
-	err := models.OpenMarket(req.UpdateDayHighAndLow)
-
 	makeError := func(st actions_pb.OpenMarketResponse_StatusCode, msg string) (*actions_pb.OpenMarketResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
 	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.OpenMarketResponse_NotAdminUserError, "User is not admin")
+	}
+
+	err := models.OpenMarket(req.UpdateDayHighAndLow)
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
@@ -54,11 +57,14 @@ func (d *dalalActionService) CloseMarket(ctx context.Context, req *actions_pb.Cl
 	})
 
 	resp := &actions_pb.CloseMarketResponse{}
-
 	makeError := func(st actions_pb.CloseMarketResponse_StatusCode, msg string) (*actions_pb.CloseMarketResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
+	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.CloseMarketResponse_NotAdminUserError, "User is not admin")
 	}
 
 	err := models.CloseMarket(req.UpdatePrevDayClose)
@@ -90,6 +96,10 @@ func (d *dalalActionService) SendNotifications(ctx context.Context, req *actions
 		resp.StatusMessage = msg
 		return resp, nil
 	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.SendNotificationsResponse_NotAdminUserError, "User is not admin")
+	}
 
 	if req.IsGlobal && req.UserId != 0 {
 		l.Errorf("Cannot send Global Notification to Non Zero Id")
@@ -115,16 +125,18 @@ func (d *dalalActionService) LoadStocks(ctx context.Context, req *actions_pb.Loa
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
-
-	err := models.LoadStocks()
-
 	resp := &actions_pb.LoadStocksResponse{}
 
+	userId := getUserId(ctx)
 	makeError := func(st actions_pb.LoadStocksResponse_StatusCode, msg string) (*actions_pb.LoadStocksResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
 	}
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.LoadStocksResponse_NotAdminUserError, "User is not admin")
+	}
+	err := models.LoadStocks()
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
@@ -143,13 +155,16 @@ func (d *dalalActionService) AddStocksToExchange(ctx context.Context, req *actio
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
-
 	resp := &actions_pb.AddStocksToExchangeResponse{}
 
 	makeError := func(st actions_pb.AddStocksToExchangeResponse_StatusCode, msg string) (*actions_pb.AddStocksToExchangeResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
+	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.AddStocksToExchangeResponse_NotAdminUserError, "User is not admin")
 	}
 
 	stock, err := models.GetStockCopy(req.StockId)
@@ -182,12 +197,16 @@ func (d *dalalActionService) UpdateStockPrice(ctx context.Context, req *actions_
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
+	userId := getUserId(ctx)
 	resp := &actions_pb.UpdateStockPriceResponse{}
 
 	makeError := func(st actions_pb.UpdateStockPriceResponse_StatusCode, msg string) (*actions_pb.UpdateStockPriceResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
+	}
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.UpdateStockPriceResponse_NotAdminUserError, "User is not admin")
 	}
 
 	stock, err := models.GetStockCopy(req.StockId)
@@ -227,6 +246,10 @@ func (d *dalalActionService) AddMarketEvent(ctx context.Context, req *actions_pb
 		resp.StatusMessage = msg
 		return resp, nil
 	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.AddMarketEventResponse_NotAdminUserError, "User is not admin")
+	}
 
 	if req.StockId != 0 {
 		stock, err := models.GetStockCopy(req.StockId)
@@ -262,12 +285,15 @@ func (d *dalalActionService) SendDividends(ctx context.Context, req *actions_pb.
 	})
 
 	l.Infof("Request for dividends sent")
-
 	resp := &actions_pb.SendDividendsResponse{}
 	makeError := func(st actions_pb.SendDividendsResponse_StatusCode, msg string) (*actions_pb.SendDividendsResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
+	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.SendDividendsResponse_NotAdminUserError, "User is not admin")
 	}
 
 	if !models.IsMarketOpen() {

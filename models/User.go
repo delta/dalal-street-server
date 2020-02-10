@@ -2277,5 +2277,13 @@ func Logout(userID uint32) {
 }
 
 func IsUserPhoneVerified(userId uint32) bool {
+	userLocks.m[userId].RLock()
+	defer userLocks.m[userId].RUnlock()
 	return userLocks.m[userId].user.IsPhoneVerified
+}
+
+func IsAdminAuth(userId uint32) bool {
+	userLocks.m[userId].RLock()
+	defer userLocks.m[userId].RUnlock()
+	return userLocks.m[userId].user.IsAdmin
 }
