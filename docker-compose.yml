@@ -1,17 +1,5 @@
 version: '2'
 services:
-    web:
-        container_name: dalalstreet_web_1
-        image: nginx:latest
-        build: 
-            context: ./frontend
-        volumes: 
-            - ./frontend/conf:/etc/nginx/conf.d
-            - ./frontend:/var/www/dalalstreet
-        ports:
-            - "80:80"
-            - "443:443"
-    
     dalalserver:
         container_name: dalalstreet_server_1
         build: .
@@ -36,7 +24,7 @@ services:
         env_file:
             - .env
         ports:
-            - "3306:3306"
+            - "3307:3306"
         environment:
             MYSQL_DATABASE: ${DB_NAME}
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
@@ -50,13 +38,3 @@ services:
             - "9040:80"
         depends_on:
             - db
-    bots:
-        container_name: dalalstreet_bots_1
-        build: 
-            context: ./bots
-        volumes:
-            -  ./bots/dalalstreetbots:/var/www/dalalstreet/bots
-        ports:
-            -  "7050:5000"
-        depends_on:
-            - dalalserver
