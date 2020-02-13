@@ -20,6 +20,7 @@ var (
 	OTPMismatchError         = errors.New("OTP Mismatch")
 	InternalServerError      = errors.New("Internal Server Error")
 	SendSMSError             = errors.New("Error in sending sms")
+	UserOTPBlockedError      = errors.New("User is attacker and has been blocked")
 )
 
 type OTP struct {
@@ -53,9 +54,31 @@ func VerifyOTP(userId, otpNo uint32, phoneNo string) error {
 
 	db := getDB()
 
+	ch, user, err := getUserExclusively(userId)
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	if err != nil {
+		l.Errorf("Error acquiring user. Failing. %+v", err)
+		return InternalServerError
+	}
+
+	user.OTPRequestCount = user.OTPRequestCount + 1
+	if user.OTPRequestCount >= 100 {
+		user.IsOTPBlocked = true
+	}
+
+	if err := db.Save(&user).Error; err != nil {
+		l.Errorf("Error saving user. Failing. %+v", err)
+		return InternalServerError
+	}
+
 	var otp = OTP{}
 
-	err := db.Where("phoneNo = ?", phoneNo).First(&otp).Error
+	err = db.Where("phoneNo = ?", phoneNo).First(&otp).Error
 
 	if err != nil {
 		return InvalidPhoneNumberError
@@ -93,17 +116,6 @@ func VerifyOTP(userId, otpNo uint32, phoneNo string) error {
 		return InternalServerError
 	}
 
-	ch, user, err := getUserExclusively(userId)
-	l.Debugf("Acquired")
-	defer func() {
-		close(ch)
-		l.Debugf("Released exclusive write on user")
-	}()
-
-	if err != nil {
-		l.Errorf("Error updating otp. Failing. %+v", err)
-		return InternalServerError
-	}
 	user.IsPhoneVerified = true
 	if err := tx.Save(user).Error; err != nil {
 		l.Errorf("Error saving user data. Rolling back. Error: %+v", err)

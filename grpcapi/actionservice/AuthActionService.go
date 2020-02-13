@@ -223,14 +223,18 @@ func (d *dalalActionService) AddPhone(ctx context.Context, req *actions_pb.AddPh
 	phoneNo := req.GetPhoneNumber()
 	userId := getUserId(ctx)
 
-	err := models.SendOTP(userId, phoneNo)
-
 	resp := &actions_pb.AddPhoneResponse{}
 	makeError := func(st actions_pb.AddPhoneResponse_StatusCode, msg string) (*actions_pb.AddPhoneResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
 	}
+
+	if models.IsUserOTPBlocked(userId) {
+		return makeError(actions_pb.AddPhoneResponse_UserOTPBlockedError, "We have detected an attempt to bruteforce OTP from your account, and has thus been permanently blocked.")
+	}
+
+	err := models.SendOTP(userId, phoneNo)
 
 	if err == models.PhoneNoAlreadyTakenError {
 		return makeError(actions_pb.AddPhoneResponse_PhoneNoAlreadyTakenError, "Phone number already in use.")
@@ -254,14 +258,18 @@ func (d *dalalActionService) VerifyPhone(ctx context.Context, req *actions_pb.Ve
 	phone := req.GetPhone()
 	userId := getUserId(ctx)
 
-	err := models.VerifyOTP(userId, otpNo, phone)
-
 	resp := &actions_pb.VerifyOTPResponse{}
 	makeError := func(st actions_pb.VerifyOTPResponse_StatusCode, msg string) (*actions_pb.VerifyOTPResponse, error) {
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
 	}
+
+	if models.IsUserOTPBlocked(userId) {
+		return makeError(actions_pb.VerifyOTPResponse_UserOTPBlockedError, "We have detected an attempt to bruteforce OTP from your account, and has thus been permanently blocked.")
+	}
+
+	err := models.VerifyOTP(userId, otpNo, phone)
 
 	if err == models.OTPExpiredError {
 		return makeError(actions_pb.VerifyOTPResponse_OTPExpiredError, "OTP expired, please verify with new OTP.")

@@ -129,6 +129,8 @@ func TestUserToProto(t *testing.T) {
 		ReservedCash:    10,
 		IsPhoneVerified: true,
 		IsAdmin:         true,
+		IsOTPBlocked:    true,
+		OTPRequestCount: 10,
 	}
 
 	oProto := o.ToProto()

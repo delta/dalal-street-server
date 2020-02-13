@@ -67,6 +67,8 @@ type User struct {
 	ReservedCash    uint64 `gorm:"column:reservedCash;not null" json:"reserved_cash"`
 	IsPhoneVerified bool   `gorm:"column:isPhoneVerified;not null" json:"is_phone_verified"`
 	IsAdmin         bool   `gorm:"column:isAdmin;not null" json:"is_admin"`
+	IsOTPBlocked    bool   `gorm:"column:isOtpBlocked;not null" json:"is_otp_blocked"`
+	OTPRequestCount int64  `gorm:"column:otpRequestCount;not null" json:"otp_request_count"`
 }
 
 func (u *User) ToProto() *models_pb.User {
@@ -81,6 +83,8 @@ func (u *User) ToProto() *models_pb.User {
 		ReservedCash:    u.ReservedCash,
 		IsPhoneVerified: u.IsPhoneVerified,
 		IsAdmin:         u.IsAdmin,
+		IsOtpBlocked:    u.IsOTPBlocked,
+		OtpRequestCount: u.OTPRequestCount,
 	}
 }
 
@@ -336,6 +340,8 @@ func createUser(name string, email string) (*User, error) {
 		IsHuman:         true,
 		ReservedCash:    0,
 		IsPhoneVerified: false,
+		IsOTPBlocked:    false,
+		OTPRequestCount: 0,
 	}
 
 	err := db.Save(u).Error
@@ -2290,4 +2296,16 @@ func IsAdminAuth(userId uint32) bool {
 	userLocks.m[userId].RLock()
 	defer userLocks.m[userId].RUnlock()
 	return userLocks.m[userId].user.IsAdmin
+}
+
+func IsUserOTPBlocked(userId uint32) bool {
+	userLocks.m[userId].RLock()
+	defer userLocks.m[userId].RUnlock()
+	return userLocks.m[userId].user.IsOTPBlocked
+}
+
+func GetUserOTPRequestCount(userId uint32) int64 {
+	userLocks.m[userId].RLock()
+	defer userLocks.m[userId].RUnlock()
+	return userLocks.m[userId].user.OTPRequestCount
 }
