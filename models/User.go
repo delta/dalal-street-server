@@ -66,6 +66,7 @@ type User struct {
 	IsHuman         bool   `gorm:"column:isHuman;not null" json:"is_human"`
 	ReservedCash    uint64 `gorm:"column:reservedCash;not null" json:"reserved_cash"`
 	IsPhoneVerified bool   `gorm:"column:isPhoneVerified;not null" json:"is_phone_verified"`
+	IsAdmin         bool   `gorm:"column:isAdmin;not null" json:"is_admin"`
 }
 
 func (u *User) ToProto() *models_pb.User {
@@ -79,6 +80,7 @@ func (u *User) ToProto() *models_pb.User {
 		IsHuman:         u.IsHuman,
 		ReservedCash:    u.ReservedCash,
 		IsPhoneVerified: u.IsPhoneVerified,
+		IsAdmin:         u.IsAdmin,
 	}
 }
 

@@ -128,6 +128,7 @@ func TestUserToProto(t *testing.T) {
 		IsHuman:         true,
 		ReservedCash:    10,
 		IsPhoneVerified: true,
+		IsAdmin:         true,
 	}
 
 	oProto := o.ToProto()
