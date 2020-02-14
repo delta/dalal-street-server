@@ -412,3 +412,37 @@ func (d *dalalActionService) SetBankruptcy(ctx context.Context, req *actions_pb.
 
 	return resp, nil
 }
+
+func (d *dalalActionService) InspectUser(ctx context.Context, req *actions_pb.InspectUserRequest) (*actions_pb.InspectUserResponse, error) {
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "InspectUser",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	resp := &actions_pb.InspectUserResponse{}
+
+	makeError := func(st actions_pb.InspectUserResponse_StatusCode, msg string) (*actions_pb.InspectUserResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.InspectUserResponse_NotAdminUserError, "User is not admin")
+	}
+
+	results, err := models.GetInspectUserDetails(req.UserId, req.TransactionType)
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.InspectUserResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	for _, result := range results {
+		resp.List = append(resp.List, result.ToProto())
+	}
+	resp.StatusMessage = "Done"
+	resp.StatusCode = actions_pb.InspectUserResponse_OK
+	return resp, nil
+}
