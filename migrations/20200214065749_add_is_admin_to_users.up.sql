@@ -1,0 +1,1 @@
+ALTER TABLE `Users` ADD `isAdmin` BOOL NOT NULL DEFAULT false;
