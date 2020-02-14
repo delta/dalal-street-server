@@ -11,6 +11,4 @@ RUN apt-get update && \
 WORKDIR  /go/src/github.com/delta/dalal-street-server 
 COPY . .
 
-RUN ["./build-server-img.sh"]
-
 CMD ["./docker-entry.sh"]
