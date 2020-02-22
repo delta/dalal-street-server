@@ -34,6 +34,10 @@ func (d *dalalActionService) MortgageStocks(ctx context.Context, req *actions_pb
 		return makeError(actions_pb.MortgageStocksResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
 	}
 
+	if models.IsUserBlocked(userId) {
+		return makeError(actions_pb.MortgageStocksResponse_UserBlockedError, "Your account has been blocked due to malpractice.")
+	}
+
 	stockId := req.StockId
 	stockQty := -int64(req.StockQuantity)
 
@@ -82,6 +86,9 @@ func (d *dalalActionService) RetrieveMortgageStocks(ctx context.Context, req *ac
 	userID := getUserId(ctx)
 	if !models.IsUserPhoneVerified(userID) {
 		return makeError(actions_pb.RetrieveMortgageStocksResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+	if models.IsUserBlocked(userID) {
+		return makeError(actions_pb.RetrieveMortgageStocksResponse_UserBlockedError, "Your account has been blocked due to malpractice.")
 	}
 
 	stockID := req.StockId

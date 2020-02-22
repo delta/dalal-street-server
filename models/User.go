@@ -35,6 +35,7 @@ var (
 	PasswordMismatchError         = errors.New("Passwords mismatch error")
 	PragyanUserError              = errors.New("Pragyan user error")
 	InvalidTemporaryPasswordError = errors.New("Invalid temporary password")
+	UserNotFoundError             = errors.New("Invalid userId.")
 	/*
 		Net worth <= 0 => tax percentage = 0%
 		0 < Net worth <= 100000 => tax percentage = 2%
@@ -69,6 +70,8 @@ type User struct {
 	IsAdmin         bool   `gorm:"column:isAdmin;not null" json:"is_admin"`
 	IsOTPBlocked    bool   `gorm:"column:isOtpBlocked;not null" json:"is_otp_blocked"`
 	OTPRequestCount int64  `gorm:"column:otpRequestCount;not null" json:"otp_request_count"`
+	IsBlocked       bool   `gorm:"column:isBlocked;not null" json:"is_blocked"`
+	BlockCount      int64  `gorm:"column:blockCount;not null" json:"block_count"`
 }
 
 func (u *User) ToProto() *models_pb.User {
@@ -85,6 +88,8 @@ func (u *User) ToProto() *models_pb.User {
 		IsAdmin:         u.IsAdmin,
 		IsOtpBlocked:    u.IsOTPBlocked,
 		OtpRequestCount: u.OTPRequestCount,
+		IsBlocked:       u.IsBlocked,
+		BlockCount:      u.BlockCount,
 	}
 }
 
@@ -342,6 +347,8 @@ func createUser(name string, email string) (*User, error) {
 		IsPhoneVerified: false,
 		IsOTPBlocked:    false,
 		OTPRequestCount: 0,
+		IsBlocked:       false,
+		BlockCount:      0,
 	}
 
 	err := db.Save(u).Error
@@ -660,7 +667,7 @@ func getUserExclusively(id uint32) (chan struct{}, *User, error) {
 	if db.Error != nil {
 		if db.RecordNotFound() {
 			l.Errorf("Attempted to get non-existing user")
-			return nil, nil, fmt.Errorf("User with Id %d does not exist", id)
+			return nil, nil, UserNotFoundError
 		}
 		return nil, nil, db.Error
 	}
@@ -2308,4 +2315,67 @@ func GetUserOTPRequestCount(userId uint32) int64 {
 	userLocks.m[userId].RLock()
 	defer userLocks.m[userId].RUnlock()
 	return userLocks.m[userId].user.OTPRequestCount
+}
+
+func IsUserBlocked(userId uint32) bool {
+	userLocks.m[userId].RLock()
+	defer userLocks.m[userId].RUnlock()
+	return userLocks.m[userId].user.IsBlocked
+}
+
+func GetUserBlockCount(userId uint32) int64 {
+	userLocks.m[userId].RLock()
+	defer userLocks.m[userId].RUnlock()
+	return userLocks.m[userId].user.BlockCount
+}
+
+func SetBlockUser(userId uint32, isBlocked bool) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":          "SetBlockUser",
+		"param_userId":    userId,
+		"param_isBlocked": isBlocked,
+	})
+	l.Debugf("Attempting to verify otp")
+
+	db := getDB()
+
+	ch, user, err := getUserExclusively(userId)
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	if err == UserNotFoundError {
+		return UserNotFoundError
+	} else if err != nil {
+		return InternalServerError
+	}
+
+	if user.IsBlocked == isBlocked {
+		return nil
+	}
+	oldIsBlocked := user.IsBlocked
+	oldBlockCount := user.BlockCount
+	user.IsBlocked = isBlocked
+
+	if isBlocked {
+		user.BlockCount = user.BlockCount + 1
+	} else {
+		if user.BlockCount > 0 {
+			user.BlockCount = user.BlockCount - 1
+		} else {
+			user.BlockCount = 0
+		}
+	}
+
+	if err := db.Save(&user).Error; err != nil {
+		l.Errorf("Error saving user. Failing. %+v", err)
+		user.IsBlocked = oldIsBlocked
+		user.BlockCount = oldBlockCount
+		return InternalServerError
+	}
+
+	return nil
+
 }

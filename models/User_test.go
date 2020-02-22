@@ -131,6 +131,8 @@ func TestUserToProto(t *testing.T) {
 		IsAdmin:         true,
 		IsOTPBlocked:    true,
 		OTPRequestCount: 10,
+		IsBlocked:       true,
+		BlockCount:      1,
 	}
 
 	oProto := o.ToProto()
