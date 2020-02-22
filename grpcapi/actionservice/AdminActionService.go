@@ -341,6 +341,11 @@ func (d *dalalActionService) SetGivesDividends(ctx context.Context, req *actions
 		return resp, nil
 	}
 
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.SetGivesDividendsResponse_NotAdminUserError, "User is not admin")
+	}
+
 	if !models.IsMarketOpen() {
 		return makeError(actions_pb.SetGivesDividendsResponse_MarketClosedError, "Market Is closed. You cannot set GivesDividends for stocks now.")
 	}
@@ -378,6 +383,11 @@ func (d *dalalActionService) SetBankruptcy(ctx context.Context, req *actions_pb.
 		resp.StatusCode = st
 		resp.StatusMessage = msg
 		return resp, nil
+	}
+
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.SetBankruptcyResponse_NotAdminUserError, "User is not admin")
 	}
 
 	if !models.IsMarketOpen() {
