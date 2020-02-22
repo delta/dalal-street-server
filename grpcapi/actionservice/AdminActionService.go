@@ -514,3 +514,33 @@ func (d *dalalActionService) UnBlockUser(ctx context.Context, req *actions_pb.Un
 
 	return makeError(actions_pb.UnblockUserResponse_OK, "User unblocked successfully.")
 }
+
+func (d *dalalActionService) UnBlockAllUsers(ctx context.Context, req *actions_pb.UnblockAllUsersRequest) (*actions_pb.UnblockAllUsersResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "UnblockAllUsers",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("UnBlockAllUsers Requested")
+
+	resp := &actions_pb.UnblockAllUsersResponse{}
+	makeError := func(st actions_pb.UnblockAllUsersResponse_StatusCode, msg string) (*actions_pb.UnblockAllUsersResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	requesterId := getUserId(ctx)
+	if !models.IsAdminAuth(requesterId) {
+		return makeError(actions_pb.UnblockAllUsersResponse_NotAdminUserError, "User is not admin")
+	}
+
+	err := models.UnBlockAllUsers()
+
+	if err == models.InternalServerError {
+		return makeError(actions_pb.UnblockAllUsersResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	return makeError(actions_pb.UnblockAllUsersResponse_OK, "All users unblocked successfully.")
+}
