@@ -2335,7 +2335,7 @@ func SetBlockUser(userId uint32, isBlocked bool) error {
 		"param_userId":    userId,
 		"param_isBlocked": isBlocked,
 	})
-	l.Debugf("Attempting to verify otp")
+	l.Debugf("Attempting to setBlock for users")
 
 	db := getDB()
 
@@ -2388,4 +2388,50 @@ func SetBlockUser(userId uint32, isBlocked bool) error {
 
 	return nil
 
+}
+
+func UnBlockAllUsers() error {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "UnBlockAllUsers",
+	})
+	l.Debugf("Attempting to unblock all users")
+
+	db := getDB()
+	allUserIds := []uint32{}
+	db.Table("Users").Pluck("id", &allUserIds)
+
+	for _, userId := range allUserIds {
+		ch, user, err := getUserExclusively(userId)
+		l.Debugf("Acquired %v", userId)
+
+		if err != nil {
+			close(ch)
+			return InternalServerError
+		}
+
+		gameStateStream := datastreamsManager.GetGameStateStream()
+		if user.IsBlocked && user.BlockCount <= int64(config.MaxBlockCount) {
+			user.IsBlocked = false
+			if err := db.Save(&user).Error; err != nil {
+				l.Errorf("Error saving user. Failing. %+v", err)
+				user.IsBlocked = true
+				close(ch)
+				return InternalServerError
+			}
+
+			g := &GameState{
+				UserID: userId,
+				Ub: &UserBlockState{
+					IsBlocked: false,
+				},
+				GsType: UserBlockStateUpdate,
+			}
+			gameStateStream.SendGameStateUpdate(g.ToProto())
+			l.Debugf("Unblocked %v", userId)
+		}
+		close(ch)
+		l.Debugf("Released exclusive write on userId %v", userId)
+	}
+
+	return nil
 }
