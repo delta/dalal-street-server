@@ -22,7 +22,9 @@
       "BotSecret":"hellobots",
       "SendgridKey":"",
       "PlivoAuthId": "",
-      "PlivoAuthToken": ""
+      "PlivoAuthToken": "",
+      "MaxOTPRequestCount":100,
+	   "OTPExpiryTime":5
    },
 
    "Docker": {
@@ -48,7 +50,9 @@
       "BotSecret":"hellobots",
       "SendgridKey":"",
       "PlivoAuthId": "",
-      "PlivoAuthToken": ""
+      "PlivoAuthToken": "",
+      "MaxOTPRequestCount":100,
+	   "OTPExpiryTime":5
    },
 
    "Prod": {
@@ -74,7 +78,9 @@
       "BotSecret":"hellobots",
       "SendgridKey":"",
       "PlivoAuthId": "",
-      "PlivoAuthToken": ""
+      "PlivoAuthToken": "",
+      "MaxOTPRequestCount":100,
+	   "OTPExpiryTime":5
  },
 
    "Test": {
@@ -100,6 +106,8 @@
       "BotSecret":"hellobots",
       "SendgridKey":"",
       "PlivoAuthId": "",
-      "PlivoAuthToken": ""
+      "PlivoAuthToken": "",
+      "MaxOTPRequestCount":100,
+	   "OTPExpiryTime":5
  }
 }
