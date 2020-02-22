@@ -446,3 +446,71 @@ func (d *dalalActionService) InspectUser(ctx context.Context, req *actions_pb.In
 	resp.StatusCode = actions_pb.InspectUserResponse_OK
 	return resp, nil
 }
+
+func (d *dalalActionService) BlockUser(ctx context.Context, req *actions_pb.BlockUserRequest) (*actions_pb.BlockUserResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "BlockUser",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Block User Requested")
+
+	userId := req.GetUserId()
+
+	resp := &actions_pb.BlockUserResponse{}
+	makeError := func(st actions_pb.BlockUserResponse_StatusCode, msg string) (*actions_pb.BlockUserResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	requesterId := getUserId(ctx)
+	if !models.IsAdminAuth(requesterId) {
+		return makeError(actions_pb.BlockUserResponse_NotAdminUserError, "User is not admin")
+	}
+
+	err := models.SetBlockUser(userId, true)
+
+	if err == models.InternalServerError {
+		return makeError(actions_pb.BlockUserResponse_InternalServerError, getInternalErrorMessage(err))
+	} else if err == models.UserNotFoundError {
+		return makeError(actions_pb.BlockUserResponse_InvalidUserIDError, "Invalid userId requested.")
+	}
+
+	return makeError(actions_pb.BlockUserResponse_OK, "User blocked successfully.")
+}
+
+func (d *dalalActionService) UnBlockUser(ctx context.Context, req *actions_pb.UnblockUserRequest) (*actions_pb.UnblockUserResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "UnblockUser",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("UnBlock User Requested")
+
+	userId := req.GetUserId()
+
+	resp := &actions_pb.UnblockUserResponse{}
+	makeError := func(st actions_pb.UnblockUserResponse_StatusCode, msg string) (*actions_pb.UnblockUserResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	requesterId := getUserId(ctx)
+	if !models.IsAdminAuth(requesterId) {
+		return makeError(actions_pb.UnblockUserResponse_NotAdminUserError, "User is not admin")
+	}
+
+	err := models.SetBlockUser(userId, false)
+
+	if err == models.InternalServerError {
+		return makeError(actions_pb.UnblockUserResponse_InternalServerError, getInternalErrorMessage(err))
+	} else if err == models.UserNotFoundError {
+		return makeError(actions_pb.UnblockUserResponse_InvalidUserIDError, "Invalid userId requested.")
+	}
+
+	return makeError(actions_pb.UnblockUserResponse_OK, "User unblocked successfully.")
+}

@@ -33,6 +33,10 @@ func (d *dalalActionService) CancelOrder(ctx context.Context, req *actions_pb.Ca
 		return makeError(actions_pb.CancelOrderResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
 	}
 
+	if models.IsUserBlocked(userId) {
+		return makeError(actions_pb.CancelOrderResponse_UserBlockedError, "Your account has been blocked due to malpractice.")
+	}
+
 	orderId := req.OrderId
 	isAsk := req.IsAsk
 
@@ -87,6 +91,10 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 	userId := getUserId(ctx)
 	if !models.IsUserPhoneVerified(userId) {
 		return makeError(actions_pb.PlaceOrderResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
+	if models.IsUserBlocked(userId) {
+		return makeError(actions_pb.PlaceOrderResponse_UserBlockedError, "Your account has been blocked due to malpractice.")
 	}
 
 	var orderId uint32
