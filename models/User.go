@@ -2376,6 +2376,16 @@ func SetBlockUser(userId uint32, isBlocked bool) error {
 		return InternalServerError
 	}
 
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: userId,
+		Ub: &UserBlockState{
+			IsBlocked: isBlocked,
+		},
+		GsType: UserBlockStateUpdate,
+	}
+	gameStateStream.SendGameStateUpdate(g.ToProto())
+
 	return nil
 
 }
