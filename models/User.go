@@ -833,7 +833,11 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		"param_ask":    fmt.Sprintf("%+v", ask),
 	})
 
-	l.Infof("Attempting")
+	l.Infof("PlaceAskOrder requested")
+	if isBankrupt := IsStockBankrupt(ask.StockId); isBankrupt {
+		l.Infof("Stock already bankrupt. Returning function.")
+		return 0, StockBankruptError{}
+	}
 
 	// Place cap on order price only for limit orders
 	if ask.OrderType == Limit {
@@ -844,10 +848,6 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 		l.Debugf("Acquiring lock for ask order threshold check with stock id : %v ", ask.StockId)
 
-		if isBankrupt := IsStockBankrupt(ask.StockId); isBankrupt {
-			l.Infof("Stock already bankrupt. Returning function.")
-			return 0, StockBankruptError{}
-		}
 		allStocks.m[ask.StockId].RLock()
 		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
 		allStocks.m[ask.StockId].RUnlock()
@@ -1021,17 +1021,16 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 	})
 
 	l.Infof("PlaceBidOrder requested")
+	if isBankrupt := IsStockBankrupt(bid.StockId); isBankrupt {
+		l.Infof("Stock already bankrupt. Returning function.")
+		return 0, StockBankruptError{}
+	}
 
 	// Place cap on order price only for limit orders
 	if bid.OrderType == Limit {
 		if bid.Price <= MINIMUM_ORDER_PRICE {
 			l.Debugf("Minimum price check failed for ask order")
 			return 0, MinimumPriceThresholdError{}
-		}
-
-		if isBankrupt := IsStockBankrupt(bid.StockId); isBankrupt {
-			l.Infof("Stock already bankrupt. Returning function.")
-			return 0, StockBankruptError{}
 		}
 
 		l.Debugf("Acquiring lock for bid order threshold check with stock id : %v ", bid.StockId)
@@ -1351,6 +1350,11 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		} else if err != nil {
 			l.Errorf("Unknown error in getBid")
 			return nil, nil, err
+		}
+
+		if isBankrupt := IsStockBankrupt(bidOrder.StockId); isBankrupt {
+			l.Infof("Stock already bankrupt. Returning function.")
+			return nil, nil, StockBankruptError{}
 		}
 
 		err = bidOrder.Close(tx)
@@ -2078,6 +2082,10 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 	})
 
 	l.Infof("PerformMortgageTransaction requested")
+	if isBankrupt := IsStockBankrupt(stockId); isBankrupt {
+		l.Infof("Stock already bankrupt. Returning function.")
+		return nil, StockBankruptError{}
+	}
 
 	l.Debugf("Acquiring exclusive write on user")
 	ch, user, err := getUserExclusively(userId)
@@ -2099,10 +2107,6 @@ func PerformMortgageTransaction(userId, stockId uint32, stockQuantity int64, ret
 	mortgagePrice := allStocks.m[stockId].stock.CurrentPrice
 	allStocks.m[stockId].RUnlock()
 
-	if isBankrupt := IsStockBankrupt(stockId); isBankrupt {
-		l.Infof("Stock already bankrupt. Returning function.")
-		return nil, StockBankruptError{}
-	}
 	l.Infof("Taking current price of stock as %d", mortgagePrice)
 
 	var trTotal int64
