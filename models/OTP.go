@@ -67,7 +67,7 @@ func VerifyOTP(userId, otpNo uint32, phoneNo string) error {
 	}
 
 	user.OTPRequestCount = user.OTPRequestCount + 1
-	if user.OTPRequestCount >= 100 {
+	if user.OTPRequestCount >= int64(config.MaxOTPRequestCount) {
 		user.IsOTPBlocked = true
 	}
 
@@ -93,7 +93,7 @@ func VerifyOTP(userId, otpNo uint32, phoneNo string) error {
 	lastTime, _ := time.Parse(time.RFC3339, otp.UpdatedAt)
 	currTime := time.Now()
 	diff := int64(currTime.Sub(lastTime).Seconds())
-	timeLimit := int64(60 * 10)
+	timeLimit := int64(60 * config.OTPExpiryTime)
 
 	if diff > timeLimit {
 		return OTPExpiredError
