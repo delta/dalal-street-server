@@ -27,11 +27,16 @@ type StockBankruptState struct {
 	IsBankrupt bool
 }
 
+type UserBlockState struct {
+	IsBlocked bool
+}
+
 var gameStateTypes = [...]string{
 	"MarketStateUpdate",
 	"StockDividendStateUpdate",
 	"OtpVerifiedStateUpdate",
 	"StockBankruptStateUdpate",
+	"UserBlockStateUpdate",
 }
 
 const (
@@ -39,6 +44,7 @@ const (
 	StockDividendStateUpdate
 	OtpVerifiedStateUpdate
 	StockBankruptStateUpdate
+	UserBlockStateUpdate
 )
 
 func (gsType GameStateType) String() string {
@@ -53,6 +59,7 @@ type GameState struct {
 	Sd     *StockDividendState
 	Ov     *OtpVerifiedState
 	Sb     *StockBankruptState
+	Ub     *UserBlockState
 }
 
 func (g *GameState) ToProto() *models_pb.GameState {
@@ -81,6 +88,11 @@ func (g *GameState) ToProto() *models_pb.GameState {
 		pGameState.StockBankruptState = &models_pb.StockBankruptState{
 			StockId:    g.Sb.StockId,
 			IsBankrupt: g.Sb.IsBankrupt,
+		}
+	} else if g.GsType == UserBlockStateUpdate {
+		pGameState.Type = models_pb.GameStateUpdateType_UserBlockStateUpdate
+		pGameState.UserBlockState = &models_pb.UserBlockState{
+			IsBlocked: g.Ub.IsBlocked,
 		}
 	}
 
