@@ -68,6 +68,8 @@ type Config struct {
 	MaxOTPRequestCount int
 	// Expiry time for a generated OTP in minutes
 	OTPExpiryTime int
+	// Maximum number of times the user can get blocked for a day in the game. After he hits maximum he will be blocked permanently
+	MaxBlockCount int
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
@@ -111,6 +113,7 @@ var config = &Config{
 	SendgridKey:        "",
 	MaxOTPRequestCount: 100,
 	OTPExpiryTime:      5,
+	MaxBlockCount:      3,
 }
 
 var configFileName *string
