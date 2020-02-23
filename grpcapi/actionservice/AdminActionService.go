@@ -412,3 +412,41 @@ func (d *dalalActionService) SetBankruptcy(ctx context.Context, req *actions_pb.
 
 	return resp, nil
 }
+
+func (d *dalalActionService) UpdateUserIdentity(ctx context.Context, req *actions_pb.UpdateUserIdentityRequest) (*actions_pb.UpdateUserIdentityResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "UpdateUserIdentity",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Request for Updating user identity logs")
+
+	resp := &actions_pb.UpdateUserIdentityResponse{}
+	makeError := func(st actions_pb.UpdateUserIdentityResponse_StatusCode, msg string) (*actions_pb.UpdateUserIdentityResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.UpdateUserIdentityResponse_NotAdminUserError, "User is not admin")
+	}
+
+	// stockID := req.GetStockId()
+	// err := models.SetBankruptcy(stockID, isBankrupt)
+
+	// if err == models.InvalidStockError {
+	// 	return makeError(actions_pb.SetBankruptcyResponse_InvalidStockIdError, "Invalid stock id provided.")
+	// }
+
+	// if err != nil {
+	// 	return makeError(actions_pb.SetBankruptcyResponse_InternalServerError, getInternalErrorMessage(err))
+	// }
+
+	resp.StatusCode = 0
+	resp.StatusMessage = "Bankruptcy set succesfully."
+
+	return resp, nil
+}
