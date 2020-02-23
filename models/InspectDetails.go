@@ -12,17 +12,15 @@ func (l *InspectDetails) ToProto() *models_pb.InspectDetails {
 		TransactionCount: l.Count,
 		Position:         l.Position,
 		StockSum:         l.StockSum,
-		ReservedstockSum: l.ReservedstockSum,
 	}
 }
 
 type InspectDetails struct {
-	UserId           uint32
-	Email            string
-	Count            uint64
-	Position         uint32
-	StockSum         int64
-	ReservedstockSum int64
+	UserId   uint32
+	Email    string
+	Count    uint64
+	Position uint32
+	StockSum int64
 }
 
 type Lrank struct {
@@ -42,9 +40,9 @@ func GetInspectUserDetails(userID uint32, transType bool) ([]InspectDetails, err
 	db := getDB()
 	var err error
 	if transType == false {
-		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, sum(t.stockQuantity) as stock_sum, sum(t.reservedStockQuantity) as reservedstock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND a.userId = ? AND a.id = o.askId AND b.userID = u.id AND o.transactionId = t.id) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID).Scan(&inspectUserEntries).Error
+		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, -sum(t.reservedStockQuantity) as stock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND a.userId = ? AND a.id = o.askId AND b.userID = u.id AND o.transactionId = t.id) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID).Scan(&inspectUserEntries).Error
 	} else {
-		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, sum(t.stockQuantity) as stock_sum, sum(t.reservedStockQuantity) as reservedstock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND b.userId = ? AND a.id = o.askId AND a.userID = u.id AND o.transactionId = t.id) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID).Scan(&inspectUserEntries).Error
+		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, -sum(t.reservedStockQuantity) as stock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND b.userId = ? AND a.id = o.askId AND a.userID = u.id AND o.transactionId = t.id) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID).Scan(&inspectUserEntries).Error
 	}
 
 	for i := 0; i < len(inspectUserEntries); i++ {
