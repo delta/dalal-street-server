@@ -146,8 +146,12 @@ func (sess *session) Set(k string, v string) error {
 
 	l.Debugf("Set key in database")
 	sess.mutex.Lock()
+	defer sess.mutex.Unlock()
+	if sess.m == nil {
+		l.Errorf("Unable to set session, already destroyed")
+		return fmt.Errorf("Map in session does not exist")
+	}
 	sess.m[k] = v
-	sess.mutex.Unlock()
 	return nil
 }
 
