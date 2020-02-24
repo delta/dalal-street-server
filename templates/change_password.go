@@ -5,7 +5,7 @@ var HtmlPasswordResetTemplateHead = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.
 <head>
 </head>
 <body>
-Click on the given link to reset your password <a> https://dalal.pragyan.org/changepassword </a> 
+Click on the given link to reset your password <a href="https://dalal.pragyan.org/changepassword"> https://dalal.pragyan.org/changepassword </a> .
 Your temporary password is
 `
 
@@ -13,4 +13,4 @@ var HtmlPasswordResetTemplateTail = `</body>
 </html>
 `
 
-var PlainPasswordResetTemplate = `Please reset your password at https://dalal.pragyan.org/changepassword. Your temporary password is `
+var PlainPasswordResetTemplate = `Please reset your password at https://dalal.pragyan.org/changepassword. Your temporary password is %s`
