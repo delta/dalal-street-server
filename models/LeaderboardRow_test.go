@@ -18,6 +18,7 @@ func TestLeaderboardRowToProto(t *testing.T) {
 		Debt:       10,
 		StockWorth: -50,
 		TotalWorth: -300,
+		IsBlocked:  true,
 	}
 
 	lrProto := lr.ToProto()
