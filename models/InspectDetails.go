@@ -39,11 +39,10 @@ func GetInspectUserDetails(userID uint32, transType bool, day uint32) ([]Inspect
 
 	db := getDB()
 	var err error
-	timeInms := day * 86400000
 	if transType == false {
-		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, -sum(t.reservedStockQuantity) as stock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND a.userId = ? AND a.id = o.askId AND b.userID = u.id AND o.transactionId = t.id AND UNIX_TIMESTAMP(t.createdAt) >= UNIX_TIMESTAMP()-?) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID, timeInms).Scan(&inspectUserEntries).Error
+		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, -sum(t.reservedStockQuantity) as stock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND a.userId = ? AND a.id = o.askId AND b.userID = u.id AND o.transactionId = t.id AND datediff(current_timestamp(), t.createdAt) <= ?) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID, day).Scan(&inspectUserEntries).Error
 	} else {
-		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, -sum(t.reservedStockQuantity) as stock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND b.userId = ? AND a.id = o.askId AND a.userID = u.id AND o.transactionId = t.id AND UNIX_TIMESTAMP(t.createdAt) >= UNIX_TIMESTAMP()-?) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID, timeInms).Scan(&inspectUserEntries).Error
+		err = db.Raw("SELECT u.id as user_id, u.email as email,COUNT(u.id) as count, -sum(t.reservedStockQuantity) as stock_sum FROM `OrderFills` o, `Bids` b, `Users` u, `Asks` a, `Transactions` t WHERE (o.bidId = b.id AND b.userId = ? AND a.id = o.askId AND a.userID = u.id AND o.transactionId = t.id AND datediff(current_timestamp(), t.createdAt) <= ?) GROUP BY u.id ORDER BY COUNT(u.id) DESC LIMIT 10", userID, day).Scan(&inspectUserEntries).Error
 	}
 
 	for i := 0; i < len(inspectUserEntries); i++ {
