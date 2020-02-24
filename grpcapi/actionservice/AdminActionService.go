@@ -433,7 +433,7 @@ func (d *dalalActionService) InspectUser(ctx context.Context, req *actions_pb.In
 		return makeError(actions_pb.InspectUserResponse_NotAdminUserError, "User is not admin")
 	}
 
-	results, err := models.GetInspectUserDetails(req.UserId, req.TransactionType)
+	results, err := models.GetInspectUserDetails(req.UserId, req.TransactionType, req.Day)
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)
 		return makeError(actions_pb.InspectUserResponse_InternalServerError, getInternalErrorMessage(err))
