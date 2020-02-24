@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -17,6 +18,7 @@ type LeaderboardRow struct {
 	Debt       uint64 `gorm:"column:debt;not null" json:"debt"`
 	StockWorth int64  `gorm:"column:stockWorth;not null" json:"stock_worth"`
 	TotalWorth int64  `gorm:"column:totalWorth;not null" json:"total_worth"`
+	IsBlocked  bool   `gorm:"column:isBlocked;not null" json:"is_blocked"`
 }
 
 func (LeaderboardRow) TableName() string {
@@ -33,6 +35,7 @@ func (l *LeaderboardRow) ToProto() *models_pb.LeaderboardRow {
 		Debt:       l.Debt,
 		StockWorth: l.StockWorth,
 		TotalWorth: l.TotalWorth,
+		IsBlocked:  l.IsBlocked,
 	}
 }
 
@@ -83,6 +86,7 @@ type leaderboardQueryData struct {
 	Cash       uint64
 	StockWorth int64
 	Total      int64
+	IsBlocked  bool
 }
 
 //function to update leaderboard. Must be called periodically
@@ -100,17 +104,19 @@ func UpdateLeaderboard() {
 	//begin transaction
 	tx := db.Begin()
 
-	tx.Raw(`
-		SELECT U.id as user_id, U.name as user_name, 
-		     U.cash + U.reservedCash as cash,
+	query := fmt.Sprintf(`
+		SELECT U.id as user_id, U.name as user_name, U.isBlocked as is_blocked,
+			U.cash + U.reservedCash as cash,
 			ifNull((SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed)) ),0) AS stock_worth,
 			ifnull((U.cash + U.reservedCash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed))),U.cash) AS total
 		FROM
 			Users U LEFT JOIN Transactions T ON U.id = T.userId
 					LEFT JOIN Stocks S ON T.stockId = S.id
+		WHERE U.blockCount < %d
 		GROUP BY U.id
 		ORDER BY Total DESC;
-	`).Scan(&results)
+	`, config.MaxBlockCount)
+	tx.Raw(query).Scan(&results)
 
 	var rank = 1
 	var counter = 1
@@ -125,6 +131,7 @@ func UpdateLeaderboard() {
 			Debt:       0,
 			StockWorth: result.StockWorth,
 			TotalWorth: result.Total,
+			IsBlocked:  result.IsBlocked,
 		})
 
 		ch, user, err := getUserExclusively(result.UserId)

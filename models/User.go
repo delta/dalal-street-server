@@ -2410,7 +2410,7 @@ func UnBlockAllUsers() error {
 		}
 
 		gameStateStream := datastreamsManager.GetGameStateStream()
-		if user.IsBlocked && user.BlockCount <= int64(config.MaxBlockCount) {
+		if user.IsBlocked && user.BlockCount < int64(config.MaxBlockCount) {
 			user.IsBlocked = false
 			if err := db.Save(&user).Error; err != nil {
 				l.Errorf("Error saving user. Failing. %+v", err)
