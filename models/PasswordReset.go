@@ -77,7 +77,7 @@ func PasswordReset(email string) (string, error) {
 
 	}
 
-	return "OK", nil
+	return "Please check your email for password reset link and temporary password", nil
 
 }
 
