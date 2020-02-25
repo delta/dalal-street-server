@@ -24,6 +24,7 @@ func TestLeaderboardRowToProto(t *testing.T) {
 	lrProto := lr.ToProto()
 
 	if !testutils.AssertEqual(t, lr, lrProto) {
+		t.Logf("%v === %v", lr, lrProto)
 		t.Fatal("Converted values not equal!")
 	}
 }
