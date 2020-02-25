@@ -1324,10 +1324,6 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 			return nil, nil, err
 		}
 
-		if isBankrupt := IsStockBankrupt(askOrder.StockId); isBankrupt {
-			l.Infof("Stock already bankrupt. Returning function.")
-			return nil, nil, StockBankruptError{}
-		}
 		err = askOrder.Close(tx)
 		// don't log if order is already closed
 		if _, ok := err.(AlreadyClosedError); !ok {
@@ -1363,11 +1359,6 @@ func CancelOrder(userId uint32, orderId uint32, isAsk bool) (*Ask, *Bid, error) 
 		} else if err != nil {
 			l.Errorf("Unknown error in getBid")
 			return nil, nil, err
-		}
-
-		if isBankrupt := IsStockBankrupt(bidOrder.StockId); isBankrupt {
-			l.Infof("Stock already bankrupt. Returning function.")
-			return nil, nil, StockBankruptError{}
 		}
 
 		err = bidOrder.Close(tx)
