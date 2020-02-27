@@ -7,14 +7,13 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/delta/dalal-street-server/templates"
 	"github.com/delta/dalal-street-server/utils"
-	uuid "github.com/satori/go.uuid"
 )
 
 //PasswordChangeRequests -> Defines struct
 type PasswordChangeRequests struct {
-	ID        uuid.UUID `gorm:"primary_key" json:"id"`
-	CreatedAt string    `gorm:"column:createdAt;not null" json:"created_at"`
-	UserID    uint32    `gorm:"column:userId;not null" json:"user_id"`
+	ID        string `gorm:"primary_key" json:"id"`
+	CreatedAt string `gorm:"column:createdAt;not null" json:"created_at"`
+	UserID    uint32 `gorm:"column:userId;not null" json:"user_id"`
 }
 
 //PasswordReset -> Takes in email of user ,validates it and sends password change email to user
@@ -44,7 +43,7 @@ func PasswordReset(email string) (string, error) {
 		return "You have registered using Pragyan Account. Try changing Password on Pragyan Website", PragyanUserError
 	}
 
-	tempPass, _ := uuid.NewV4()
+	tempPass := utils.RandString(16)
 
 	currReset := &PasswordChangeRequests{
 		ID:        tempPass,
@@ -111,7 +110,7 @@ func ChangePassword(tempPass, newPass, confirmPass string) (string, error) {
 	comp := int64(8.64e+13)
 	timeInt := int64(diff)
 
-	stringId := requests.ID.String()
+	stringId := requests.ID
 
 	if timeInt < comp && tempPass == stringId {
 
