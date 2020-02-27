@@ -36,6 +36,7 @@ var (
 	PragyanUserError              = errors.New("Pragyan user error")
 	InvalidTemporaryPasswordError = errors.New("Invalid temporary password")
 	UserNotFoundError             = errors.New("Invalid userId.")
+	AlreadyRegisteredPragyanError = errors.New("User already registered with pragyan")
 	/*
 		Net worth <= 0 => tax percentage = 0%
 		0 < Net worth <= 100000 => tax percentage = 2%
@@ -238,7 +239,7 @@ func RegisterUser(email, password, fullName string) error {
 
 	if err == UnauthorizedError || err == nil {
 		l.Error("User registered with pragyan ask to login with Pragyan")
-		return AlreadyRegisteredError
+		return AlreadyRegisteredPragyanError
 	}
 	if err != NotRegisteredError {
 		l.Errorf("Unexpected error: %+v", err)

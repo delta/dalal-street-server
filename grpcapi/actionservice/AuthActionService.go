@@ -63,6 +63,8 @@ func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.Regis
 	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetFullName())
 	if err == models.AlreadyRegisteredError {
 		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredError, "Already registered please Login")
+	} else if err == models.AlreadyRegisteredPragyanError {
+		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredPragyanError, "Already registered with pragyan please Login")
 	}
 	if err != nil {
 		l.Errorf("Request failed due to: %+v", err)
