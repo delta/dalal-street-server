@@ -211,7 +211,7 @@ func (d *dalalActionService) ForgotPassword(ctx context.Context, req *actions_pb
 
 	switch {
 	case err == models.UnauthorizedError:
-		return makeError(actions_pb.ForgotPasswordResponse_InvalidCredentialsError, "E-Mail not registered, Try registering first")
+		return makeError(actions_pb.ForgotPasswordResponse_InvalidCredentialsError, "E-Mail not registered or registered through Pragyan.If registered through pragyan visit pragyan website to change password")
 	case err == models.PragyanUserError:
 		return makeError(actions_pb.ForgotPasswordResponse_PragyanUserError, "You have registered using Pragyan Account. Try changing Password on Pragyan Website")
 	case err != nil:
