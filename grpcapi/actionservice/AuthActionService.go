@@ -223,6 +223,10 @@ func (d *dalalActionService) AddPhone(ctx context.Context, req *actions_pb.AddPh
 	phoneNo := req.GetPhoneNumber()
 	userId := getUserId(ctx)
 
+	if phoneNo[0] != '+' {
+		phoneNo = "+" + phoneNo
+	}
+
 	resp := &actions_pb.AddPhoneResponse{}
 	makeError := func(st actions_pb.AddPhoneResponse_StatusCode, msg string) (*actions_pb.AddPhoneResponse, error) {
 		resp.StatusCode = st
@@ -258,8 +262,8 @@ func (d *dalalActionService) VerifyPhone(ctx context.Context, req *actions_pb.Ve
 	phone := req.GetPhone()
 	userId := getUserId(ctx)
 
-	if phone[0] == '+' {
-		phone = phone[1:]
+	if phone[0] != '+' {
+		phone = "+" + phone
 	}
 
 	resp := &actions_pb.VerifyOTPResponse{}
