@@ -92,6 +92,10 @@ func IsProdEnv() bool {
 	return strings.Contains(strings.ToLower(config.Stage), "prod")
 }
 
+func IsDockerEnv() bool {
+	return strings.Contains(strings.ToLower(config.Stage), "docker")
+}
+
 func SendEmail(fromAddr, subject, toAddr, plainTextContent, htmlContent string) error {
 	from := mail.NewEmail("DalalStreet", fromAddr)
 	to := mail.NewEmail("Example User", toAddr)
