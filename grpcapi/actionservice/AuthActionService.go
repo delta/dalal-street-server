@@ -258,6 +258,10 @@ func (d *dalalActionService) VerifyPhone(ctx context.Context, req *actions_pb.Ve
 	phone := req.GetPhone()
 	userId := getUserId(ctx)
 
+	if phone[0] == '+' {
+		phone = phone[1:]
+	}
+
 	resp := &actions_pb.VerifyOTPResponse{}
 	makeError := func(st actions_pb.VerifyOTPResponse_StatusCode, msg string) (*actions_pb.VerifyOTPResponse, error) {
 		resp.StatusCode = st
