@@ -2237,7 +2237,7 @@ func GetReservedStocksOwned(userId uint32) (map[uint32]int64, error) {
 
 	db := getDB()
 
-	sql := "SELECT SUM(stockQuantity), SUM(stockQuantityFulFilled), stockId FROM `Asks` WHERE `userId` = ? AND isClosed = 0 GROUP BY `stockId`"
+	sql := "Select stockId, sum(reservedStockQuantity) as reservedStockQuantity from Transactions where userId=? group by stockId"
 	rows, err := db.Raw(sql, userId).Rows()
 	if err != nil {
 		l.Error(err)
@@ -2248,11 +2248,10 @@ func GetReservedStocksOwned(userId uint32) (map[uint32]int64, error) {
 	reservedStocksOwned := make(map[uint32]int64)
 	for rows.Next() {
 		var stockId uint32
-		var stockQty int64
-		var stockQuantityFulFilled int64
-		rows.Scan(&stockQty, &stockQuantityFulFilled, &stockId)
+		var reservedStockQty int64
+		rows.Scan(&stockId, &reservedStockQty)
 
-		reservedStocksOwned[stockId] = (stockQty - stockQuantityFulFilled)
+		reservedStocksOwned[stockId] = reservedStockQty
 	}
 
 	return reservedStocksOwned, nil
