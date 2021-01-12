@@ -42,12 +42,13 @@ jobs:
       - run:
           name: Setup MySQL
           command: |
-            sudo apt install -y mysql-client
+            sudo apt-get update
+            sudo apt install -y default-mysql-client
             mysql -h 127.0.0.1 -u root -e 'CREATE DATABASE dalalstreet_test;'
       
       - run:
           name: Run unit and integration tests
           command: |
-            go get ./...
+            go get
             cp config.json.example config.json
-            ./test.sh
+            # ./test.sh

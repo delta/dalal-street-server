@@ -3,9 +3,9 @@ package socketapi
 import (
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	uuid "github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/session"
 	// socketapi_proto "github.com/delta/dalal-street-server/socketapi/proto_build"
@@ -37,7 +37,7 @@ type Client interface {
 }
 
 func NewClient(done chan struct{}, send chan interface{}, conn *websocket.Conn, sess session.Session) Client {
-	uuid, _ := uuid.NewV4()
+	uuid := uuid.New()
 	return &client{
 		conn: conn,
 		sess: sess,

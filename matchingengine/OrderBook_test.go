@@ -6,7 +6,7 @@ import (
 
 	"github.com/delta/dalal-street-server/datastreams"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/mocks"
 	"github.com/delta/dalal-street-server/models"
 	"github.com/delta/dalal-street-server/utils"

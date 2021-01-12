@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/jinzhu/gorm"
 

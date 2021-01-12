@@ -20,7 +20,7 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 	"github.com/jinzhu/gorm"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	//"github.com/satori/go.uuid"
 
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"

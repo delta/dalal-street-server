@@ -3,7 +3,7 @@ package models
 import (
 	"errors"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (

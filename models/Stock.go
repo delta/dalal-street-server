@@ -6,7 +6,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
