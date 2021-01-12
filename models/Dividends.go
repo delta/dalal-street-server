@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 //userDetails stores users who own stocks of a given stockid

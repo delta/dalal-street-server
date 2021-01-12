@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 func IsAdmin(username, password string) (bool, error) {

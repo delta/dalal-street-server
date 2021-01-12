@@ -10,7 +10,7 @@ import (
 
 	"github.com/delta/dalal-street-server/utils"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (

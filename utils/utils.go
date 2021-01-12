@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/delta/plivo-go"
+	"github.com/plivo/plivo-go"
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )

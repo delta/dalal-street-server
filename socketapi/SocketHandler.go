@@ -3,8 +3,8 @@ package socketapi
 import (
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/session"
 	"github.com/delta/dalal-street-server/socketapi/repl"

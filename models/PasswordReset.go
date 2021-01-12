@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/templates"
 	"github.com/delta/dalal-street-server/utils"
 )
