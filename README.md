@@ -4,7 +4,7 @@
 # Server for Dalal Street
 
 ## Prerequisites
-- Go 1.10 [Download link](https://golang.org/dl/#go1.10)
+- Go 1.13 [Download link](https://golang.org/dl/#go1.13)
 - Protocol buffers [Download link](https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip)
 - MySQL
 
@@ -28,13 +28,14 @@ cd $GOPATH/src/github.com/delta/dalal-street-server
 ```
 - Install dependencies
 ```
-go get -v ./...
+cd ../
 go get -v github.com/gemnasium/migrate
-go get -v gopkg.in/jarcoal/httpmock.v1
-go get -v github.com/golang/protobuf/proto
-go get -v github.com/golang/protobuf/protoc-gen-go
-go get -v github.com/sendgrid/sendgrid-go
-go get -v github.com/delta/plivo-go
+go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+cd $GOPATH/src/github.com/golang/protobuf/protoc-gen-go/
+git reset --hard ed6926b37a637426117ccab59282c3839528a700
+go install github.com/golang/protobuf/protoc-gen-go
+cd dalal-street-server/
+go get
 ```
 - Setup submodules
 ```

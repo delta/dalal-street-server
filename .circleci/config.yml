@@ -50,4 +50,4 @@ jobs:
           command: |
             go get
             cp config.json.example config.json
-            # ./test.sh
+            ./test.sh
