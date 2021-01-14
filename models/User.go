@@ -948,7 +948,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return errorHelper("Error while creating Ask. Rolling back. Error: %+v", err)
 	}
 
-	l.Infof("Created Ask order. AskId: ", ask.Id)
+	l.Infof("Created Ask order. AskId: %d", ask.Id)
 
 	if err := SubtractUserCash(user, orderFee, tx); err != nil {
 		return errorHelper("Error while subtracting order fee from user. Rolling back. Error: %+v", err)
@@ -969,7 +969,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
 	}
 
-	l.Info("Saved OrderFeeTransaction for bid %d", ask.Id)
+	l.Infof("Saved OrderFeeTransaction for bid %d", ask.Id)
 
 	// Going to reserve stocks for this order
 	placeOrderTransaction := GetTransactionRef(
@@ -983,7 +983,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		0,
 	)
 
-	l.Info("Reserving stocks for ask %d", ask.Id)
+	l.Infof("Reserving stocks for ask %d", ask.Id)
 
 	if err := savePlaceOrderTransaction(ask.Id, placeOrderTransaction, true, tx); err != nil {
 		return errorHelper("Error reserving stocks. Rolling back. Error: %+v", err)
@@ -993,7 +993,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
 
-	l.Info("Commited successfully for bid %d", ask.Id)
+	l.Infof("Commited successfully for bid %d", ask.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(ask *Ask, orderFeeTransaction, placeOrderTransaction *Transaction) {
@@ -1146,7 +1146,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		return errorHelper("Error saving OrderFeeTransaction. Rolling back. Error: %+v", err)
 	}
 
-	l.Info("Saved OrderFeeTransaction for bid. Now subtracting user cash for bid %d", bid.Id)
+	l.Infof("Saved OrderFeeTransaction for bid. Now subtracting user cash for bid %d", bid.Id)
 
 	if err := SubtractUserCash(user, bid.StockQuantity*orderPrice, tx); err != nil {
 		return errorHelper("Error subtracting cash. Rolling back. Error: %+v", err)
@@ -1164,7 +1164,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		-1*int64(bid.StockQuantity*orderPrice),
 	)
 
-	l.Info("Reserving cash for bid %d", bid.Id)
+	l.Infof("Reserving cash for bid %d", bid.Id)
 
 	if err := savePlaceOrderTransaction(bid.Id, placeOrderTransaction, false, tx); err != nil {
 		return errorHelper("Error reserving cash. Rolling back. Error: %+v", err)
@@ -1174,7 +1174,7 @@ func PlaceBidOrder(userId uint32, bid *Bid) (uint32, error) {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
 
-	l.Info("Commited successfully for bid %d", bid.Id)
+	l.Infof("Commited successfully for bid %d", bid.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(bid *Bid, orderFeeTransaction, placeOrderTransaction *Transaction) {
@@ -1243,7 +1243,7 @@ func saveBidCancelOrderTransaction(bidOrder *Bid, user *User, tx *gorm.DB) error
 
 	reservedCash, _, err := getPlaceOrderTransactionDetails(bidOrder.Id, false)
 	if err != nil {
-		l.Errorf("Could not retrieve reserved cash. Error: %+v")
+		l.Errorf("Could not retrieve reserved cash. Error: %+v", err)
 		return err
 	}
 
@@ -1816,7 +1816,7 @@ func PerformOrderFillTransaction(ask *Ask, bid *Bid, stockTradePrice uint64, sto
 	}
 
 	if askStatus == AskAlreadyClosed || bidStatus == BidAlreadyClosed {
-		l.Infof("Done. One of the orders already closed. %+s and %+s", askStatus, bidStatus)
+		l.Infof("Done. One of the orders already closed. %d and %d", askStatus, bidStatus)
 		return askStatus, bidStatus, nil
 	}
 

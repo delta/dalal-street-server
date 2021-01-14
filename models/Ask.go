@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -76,7 +76,7 @@ type Ask struct {
 	UpdatedAt              string    `gorm:"column:updatedAt;not null" json:"updated_at"`
 }
 
-func (Ask) TableName() string {
+func (*Ask) TableName() string {
 	return "Asks"
 }
 

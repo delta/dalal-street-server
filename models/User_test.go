@@ -6,9 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	httpmock "gopkg.in/jarcoal/httpmock.v1"
-
 	testutils "github.com/delta/dalal-street-server/utils/test"
+	httpmock "github.com/jarcoal/httpmock"
 	"github.com/jinzhu/gorm"
 )
 

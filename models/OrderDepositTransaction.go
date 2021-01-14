@@ -1,8 +1,8 @@
 package models
 
 import (
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type OrderDepositTransaction struct {
@@ -52,7 +52,7 @@ func getPlaceOrderTransactionDetails(orderID uint32, isAsk bool) (int64, int64, 
 
 	rows.Scan(&totalPrice, &stocksInBank)
 
-	l.Infof("Retrieved reserved asset. Cash reserved %d and Stock Reserved %d for order %d %d", totalPrice, stocksInBank, orderID, isAsk)
+	l.Infof("Retrieved reserved asset. Cash reserved %d and Stock Reserved %d for order %d %t", totalPrice, stocksInBank, orderID, isAsk)
 
 	return -totalPrice, stocksInBank, nil
 }

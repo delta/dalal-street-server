@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/datastreams"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 func TestMain(m *testing.M) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/templates"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 //PasswordChangeRequests -> Defines struct
@@ -34,12 +34,12 @@ func PasswordReset(email string) (string, error) {
 	err := db.Table("Registrations").Where("email = ?", email).First(&currRegis).Error
 
 	if err != nil {
-		l.Errorf("Error while finding user email", err)
+		l.Errorf("Error %+v while finding user email", err)
 		return "Error while finding user", UnauthorizedError
 	}
 
 	if currRegis.IsPragyan == true {
-		l.Errorf("Error as pragyan user requesting password change email", err)
+		l.Errorf("Error %+v as pragyan user requesting password change email", err)
 		return "You have registered using Pragyan Account. Try changing Password on Pragyan Website", PragyanUserError
 	}
 
