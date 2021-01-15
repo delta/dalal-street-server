@@ -34,7 +34,7 @@ go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
 cd $GOPATH/src/github.com/golang/protobuf/protoc-gen-go/
 git reset --hard ed6926b37a637426117ccab59282c3839528a700
 go install github.com/golang/protobuf/protoc-gen-go
-cd dalal-street-server/
+cd $GOPATH/src/github.com/delta/dalal-street-server/
 go get
 ```
 - Setup submodules
