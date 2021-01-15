@@ -247,7 +247,7 @@ func LoadStocks() error {
 	avgLastPrice.Unlock()
 	allStocks.Unlock()
 
-	l.Infof("Loaded %+v", allStocks)
+	l.Infof("Loaded %+v", &allStocks)
 
 	return nil
 }
