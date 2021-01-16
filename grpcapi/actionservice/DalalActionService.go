@@ -3,7 +3,7 @@ package actionservice
 import (
 	"strconv"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"golang.org/x/net/context"
 

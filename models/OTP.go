@@ -10,7 +10,7 @@ import (
 
 	"github.com/delta/dalal-street-server/utils"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -102,7 +102,7 @@ func VerifyOTP(userId, otpNo uint32, phoneNo string) error {
 	otp.IsVerified = true
 	tx := db.Begin()
 	if err := tx.Save(otp).Error; err != nil {
-		l.Error("Error while modifiying IsVerified for phoneNo %s", otp.PhoneNo)
+		l.Errorf("Error while modifiying IsVerified for phoneNo %s", otp.PhoneNo)
 		tx.Rollback()
 		return InternalServerError
 	}
@@ -111,7 +111,7 @@ func VerifyOTP(userId, otpNo uint32, phoneNo string) error {
 	userOtp.OtpId = otp.Id
 	userOtp.UserId = userId
 	if err := tx.Save(userOtp).Error; err != nil {
-		l.Error("Error while adding to UserOtp table IsVerified for userId %s and otpId %s", userOtp.UserId, userOtp.OtpId)
+		l.Errorf("Error while adding to UserOtp table IsVerified for userId %d and otpId %d", userOtp.UserId, userOtp.OtpId)
 		tx.Rollback()
 		return InternalServerError
 	}

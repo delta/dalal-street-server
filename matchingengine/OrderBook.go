@@ -1,7 +1,7 @@
 package matchingengine
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/datastreams"
 	"github.com/delta/dalal-street-server/models"

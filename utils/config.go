@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"testing"
 )
 
 // Config contains all the configuration options
@@ -121,6 +122,7 @@ var configFileName *string
 // init reads the config.json file and loads the
 // config options into config
 func init() {
+	testing.Init() // as per go 1.13+
 	configFileName = flag.String("config", "config.json", "Name of the config file")
 	flag.Parse()
 

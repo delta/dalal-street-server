@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // DO NOT DELETE THIS COMMENT : It is required to generate mocks when running "go generate ./..."
@@ -276,7 +276,7 @@ func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint64
 		// IMPORTANT: This needs to be inspected and fixed
 		// Without this hack, we get an unsigned integer wraparound in Market Depth
 		if stockQuantity > mds.askDepth[price] {
-			l.Errorf("%d stockQuantity, %d price, %b isAsk, %b isMarket", stockQuantity, price, isAsk, isMarket)
+			l.Errorf("%d stockQuantity, %d price, %t isAsk, %t isMarket", stockQuantity, price, isAsk, isMarket)
 			stockQuantity = mds.askDepth[price]
 		}
 		mds.askDepth[price] -= stockQuantity
@@ -294,7 +294,7 @@ func (mds *marketDepthStream) CloseOrder(isMarket bool, isAsk bool, price uint64
 	// IMPORTANT: This needs to be inspected and fixed
 	// Without this hack, we get an unsigned integer wraparound in Market Depth
 	if stockQuantity > mds.bidDepth[price] {
-		l.Errorf("%d stockQuantity, %d price, %b isAsk, %b isMarket", stockQuantity, price, isAsk, isMarket)
+		l.Errorf("%d stockQuantity, %d price, %t isAsk, %t isMarket", stockQuantity, price, isAsk, isMarket)
 		stockQuantity = mds.bidDepth[price]
 	}
 	mds.bidDepth[price] -= stockQuantity

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
 )

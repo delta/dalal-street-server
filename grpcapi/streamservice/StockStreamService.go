@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	pb "github.com/delta/dalal-street-server/proto_build"
 	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 )

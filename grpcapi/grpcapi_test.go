@@ -16,9 +16,9 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 
-	"github.com/delta/dalal-street-server/proto_build"
-	"github.com/delta/dalal-street-server/proto_build/actions"
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
+	pb "github.com/delta/dalal-street-server/proto_build"
+	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	"github.com/delta/dalal-street-server/utils"
 	_ "github.com/delta/dalal-street-server/utils/test"
 )

@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/delta/dalal-street-server
     docker:
-      - image: circleci/golang:1.10
+      - image: circleci/golang:1.13
       - image: circleci/mysql:5.7
 
     steps:
@@ -14,18 +14,17 @@ jobs:
           command: |
             wget -q https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip
             unzip -qq protoc-3.2.0rc2-linux-x86_64.zip
+            cd ../
             go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
             cd $GOPATH/src/github.com/golang/protobuf/protoc-gen-go/
-            git reset --hard 1918e1ff6ffd2be7bed0553df8650672c3bfe80d
-            go install
+            git reset --hard ed6926b37a637426117ccab59282c3839528a700
+            go install github.com/golang/protobuf/protoc-gen-go
 
       - run:
           name: Install Go dependecies
           command: |
-            go get -u golang.org/x/net/context
-            go get -u google.golang.org/grpc
-            go get github.com/gemnasium/migrate
-            go get gopkg.in/jarcoal/httpmock.v1
+            cd ../
+            go get -v github.com/gemnasium/migrate
 
       - run:
           name: Update submodules
@@ -42,12 +41,13 @@ jobs:
       - run:
           name: Setup MySQL
           command: |
-            sudo apt install -y mysql-client
+            sudo apt-get update
+            sudo apt install -y default-mysql-client
             mysql -h 127.0.0.1 -u root -e 'CREATE DATABASE dalalstreet_test;'
       
       - run:
           name: Run unit and integration tests
           command: |
-            go get ./...
+            go get
             cp config.json.example config.json
             ./test.sh

@@ -6,10 +6,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 const TIMES_RESOLUTION = 60
@@ -247,7 +247,7 @@ func LoadStocks() error {
 	avgLastPrice.Unlock()
 	allStocks.Unlock()
 
-	l.Infof("Loaded %+v", allStocks)
+	l.Infof("Loaded %+v", &allStocks)
 
 	return nil
 }

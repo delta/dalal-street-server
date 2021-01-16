@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/utils"
 )
@@ -19,13 +19,13 @@ type Bid struct {
 	OrderType              OrderType `gorm:"column:orderType;not null" json:"order_type"`
 	Price                  uint64    `gorm:"not null" json:"price"`
 	StockQuantity          uint64    `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
-	StockQuantityFulfilled uint64    `gorm:"column:stockQuantityFulFilled;not null"json:"stock_quantity_fulfilled"`
+	StockQuantityFulfilled uint64    `gorm:"column:stockQuantityFulFilled;not null" json:"stock_quantity_fulfilled"`
 	IsClosed               bool      `gorm:"column:isClosed;not null" json:"is_closed"`
 	CreatedAt              string    `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt              string    `gorm:"column:updatedAt;not null" json:"updated_at"`
 }
 
-func (Bid) TableName() string {
+func (*Bid) TableName() string {
 	return "Bids"
 }
 

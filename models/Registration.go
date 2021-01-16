@@ -3,7 +3,7 @@ package models
 import (
 	"errors"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -44,7 +44,7 @@ func VerifyAccount(verificationKey string) error {
 
 	err := db.Where("verificationKey = ?", verificationKey).First(&registeredUser).Error
 	if err != nil {
-		l.Error("No verification key %s", verificationKey)
+		l.Errorf("No verification key %s", verificationKey)
 		return VerificationKeyNotFoundError
 	} else if registeredUser.IsVerified == true {
 		l.Infof("Already Verified")
@@ -52,7 +52,7 @@ func VerifyAccount(verificationKey string) error {
 	} else {
 		registeredUser.IsVerified = true
 		if err := db.Save(registeredUser).Error; err != nil {
-			l.Error("Error while modifiying IsVerified for key %s", verificationKey)
+			l.Errorf("Error while modifiying IsVerified for key %s", verificationKey)
 			registeredUser.IsVerified = false
 		}
 		return nil

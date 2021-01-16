@@ -3,7 +3,7 @@ package actionservice
 import (
 	"fmt"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/models"
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
 	"golang.org/x/net/context"
