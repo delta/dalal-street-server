@@ -36,6 +36,7 @@ var (
 	PragyanUserError              = errors.New("Pragyan user error")
 	InvalidTemporaryPasswordError = errors.New("Invalid temporary password")
 	UserNotFoundError             = errors.New("Invalid userId.")
+	InvalidReferralCodeError      = errors.New("Invalid Referral Code")
 	/*
 		Net worth <= 0 => tax percentage = 0%
 		0 < Net worth <= 100000 => tax percentage = 2%
@@ -214,7 +215,7 @@ func Login(email, password string) (User, error) {
 }
 
 // RegisterUser is called when a user tries to sign up in our site
-func RegisterUser(email, password, fullName string) error {
+func RegisterUser(email, password, fullName, referralCode string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "Register",
 		"param_email":    email,
@@ -260,6 +261,22 @@ func RegisterUser(email, password, fullName string) error {
 		UserId:          u.Id,
 		VerificationKey: verificationKey,
 	}
+
+	if(referralCode != ""){
+		// User has entered a valid referralCode
+		l.Errorf("the referral code is : %v\n\n", referralCode)
+		codeID, err := VerifyReferralCode(referralCode);
+		if codeID != 0{
+			(*register).ReferralCodeID = codeID
+		} else if (codeID == 0 && err == nil) {
+			// invalid referralCode
+			return InvalidReferralCodeError
+		} else {
+			// error while verifying referralcode
+			return err
+		}
+	}
+
 	err = db.Save(register).Error
 	if err != nil {
 		return err
