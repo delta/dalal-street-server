@@ -19,12 +19,6 @@ func (ReferralCode) TableName() string  {
 	return "ReferralCode"
 }
 
-/*
-	1. Generate a new Referral Code when the user requests for it
-	2. Verify if the Referral Code Given by the user is correct
-	3.
-*/
-
 // GetReferralCode fetches a user's referral code if its exists,
 // Else will generate one and sends it to the user 
 func GetReferralCode(email string) (string, error) {
@@ -170,8 +164,8 @@ func AddExtraCredit(userID uint32) (error) {
 	l.Debugf("Adding 2k rs to the code provider %v, with cash %v and code user %v with cash %v.", codeProvider.Email, codeProvider.Cash, codeUser.Email, codeUser.Cash)
 
 	// adding extra cash for the user
-	codeProvider.Cash += 2000
-	codeUser.Cash += 2000
+	codeProvider.Cash += config.ReferralCashReward
+	codeUser.Cash += config.ReferralCashReward
 
 	if err := tx.Save(&codeProvider).Error; err != nil {
 		tx.Rollback()
