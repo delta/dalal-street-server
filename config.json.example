@@ -25,7 +25,7 @@
       "PlivoAuthToken": "",
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
-      "MaxBlockCount":,
+      "MaxBlockCount":3,
       "ReferralCashReward": 2000
    },
 
