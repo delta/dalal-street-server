@@ -72,7 +72,7 @@ type Config struct {
 	// Maximum number of times the user can get blocked for a day in the game. After he hits maximum he will be blocked permanently
 	MaxBlockCount int
 	// Reward for user when someone registers with their referral code
-	ReferralCashReward string
+	ReferralCashReward uint64
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
