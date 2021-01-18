@@ -106,7 +106,7 @@ func VerifyReferralCode(referralCode string) (uint32, error) {
 
 
 // AddExtraCredit Adds extra credit for the users
-func AddExtraCredit(userID uint32) (error) {
+func AddExtraCredit(userID uint32) (uint64, error) {
 
 	var l = logger.WithFields(logrus.Fields{
 		"method":      "Adding extra credit",
@@ -123,7 +123,7 @@ func AddExtraCredit(userID uint32) (error) {
 		
 		// not able to find the user, for some reason
 		// shdnt happen but still
-		return err
+		return 0, err
 
 	}
 	// user exists
@@ -133,21 +133,21 @@ func AddExtraCredit(userID uint32) (error) {
 	if reg.ReferralCodeID == 0  {
 		// user didn't use a referral-code
 		l.Infof("User didn't use a referral-code")
-		return nil
+		return 200000, nil
 	}
 
 	var referCode ReferralCode
 	if err := db.Table("ReferralCode").Where("id = ?", reg.ReferralCodeID).First(&referCode).Error; err != nil {
 		// something went wrong
 		l.Errorf("Error while querying for the referral code table. %v\n", err)
-		return err;
+		return 0, err;
 	}
 
 	done, codeProvider, codeUser, err1 := getUserPairExclusive(referCode.UserID, userID)
 
 	if err1 != nil {
 		l.Errorf("Some error, %v", err1)
-		return err1;
+		return 0, err1;
 	}
 
 	// creating transactions for adding to db
@@ -170,15 +170,15 @@ func AddExtraCredit(userID uint32) (error) {
 	if err := tx.Save(&codeProvider).Error; err != nil {
 		tx.Rollback()
 		l.Errorf("Error while updating user's in-game cash. %v\n", err)
-		return err
+		return 0, err
 	}
 	if err := tx.Save(&codeUser).Error; err != nil {
 		tx.Rollback()
 		l.Errorf("Error while updating user's in-game cash. %v\n", err)
-		return err
+		return 0, err
 	}
 
 	l.Debug("Successfully added money to the users")
 
-	return tx.Commit().Error
+	return codeUser.Cash, tx.Commit().Error
 }

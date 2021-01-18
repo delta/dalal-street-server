@@ -289,9 +289,11 @@ func (d *dalalActionService) VerifyPhone(ctx context.Context, req *actions_pb.Ve
 		return makeError(actions_pb.VerifyOTPResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
-	if err := models.AddExtraCredit(userId);err != nil{
+	if userCash, err := models.AddExtraCredit(userId);err != nil{
 		// Already verified referral when registering, so only internal-error possible
 		return makeError(actions_pb.VerifyOTPResponse_InternalServerError, getInternalErrorMessage(err))
+	} else {
+		resp.UserCash = userCash;
 	}
 
 	return makeError(actions_pb.VerifyOTPResponse_OK, "OTP verification successful.")
