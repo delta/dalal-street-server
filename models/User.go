@@ -245,11 +245,7 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 		l.Errorf("Unexpected error: %+v", err)
 		return err
 	}
-	u, err := createUser(fullName, email)
-	if err != nil {
-		l.Errorf("Server error in Create user while logging in Pragyan user for the first time: %+v", err)
-		return err
-	}
+
 	password, _ = hashPassword(password)
 	verificationKey, _ := getVerificationKey(email)
 	register := &Registration{
@@ -258,7 +254,6 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 		IsPragyan:       false,
 		IsVerified:      false,
 		Name:            fullName,
-		UserId:          u.Id,
 		VerificationKey: verificationKey,
 	}
 
@@ -276,6 +271,13 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 			return err
 		}
 	}
+
+	u, err := createUser(fullName, email)
+	if err != nil {
+		l.Errorf("Server error in Create user while logging in Pragyan user for the first time: %+v", err)
+		return err
+	}
+	(*register).UserId = u.Id;
 
 	err = db.Save(register).Error
 	if err != nil {
