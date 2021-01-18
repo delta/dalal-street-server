@@ -17,7 +17,7 @@ import (
 
 func RealMain() {
 	config := utils.GetConfiguration()
-
+    fmt.Printf("server starte")
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("Error: '%+v'\n", r)
@@ -94,6 +94,7 @@ func RealMain() {
 }
 
 func main() {
+	fmt.Printf("server started222222222222222222222222222222222222222\n")
 	for {
 		RealMain()
 	}

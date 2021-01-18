@@ -180,5 +180,15 @@ func AddExtraCredit(userID uint32) (uint64, error) {
 
 	l.Debug("Successfully added money to the users")
 
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: referCode.UserID,
+		Uc: &UserReferredCredit{
+			Cash: codeProvider.Cash,  
+		},
+		GsType: UserReferredCreditUpdate,
+	}
+	gameStateStream.SendGameStateUpdate(g.ToProto())
+	
 	return codeUser.Cash, tx.Commit().Error
 }

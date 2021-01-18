@@ -31,12 +31,17 @@ type UserBlockState struct {
 	IsBlocked bool
 }
 
+type UserReferredCredit struct {
+	Cash uint64
+}
+
 var gameStateTypes = [...]string{
 	"MarketStateUpdate",
 	"StockDividendStateUpdate",
 	"OtpVerifiedStateUpdate",
 	"StockBankruptStateUdpate",
 	"UserBlockStateUpdate",
+	"UserReferredCreditUpdate",
 }
 
 const (
@@ -45,6 +50,7 @@ const (
 	OtpVerifiedStateUpdate
 	StockBankruptStateUpdate
 	UserBlockStateUpdate
+	UserReferredCreditUpdate
 )
 
 func (gsType GameStateType) String() string {
@@ -60,6 +66,7 @@ type GameState struct {
 	Ov     *OtpVerifiedState
 	Sb     *StockBankruptState
 	Ub     *UserBlockState
+	Uc     *UserReferredCredit
 }
 
 func (g *GameState) ToProto() *models_pb.GameState {
@@ -93,6 +100,11 @@ func (g *GameState) ToProto() *models_pb.GameState {
 		pGameState.Type = models_pb.GameStateUpdateType_UserBlockStateUpdate
 		pGameState.UserBlockState = &models_pb.UserBlockState{
 			IsBlocked: g.Ub.IsBlocked,
+		}
+	} else if g.GsType == UserReferredCreditUpdate {
+		pGameState.Type = models_pb.GameStateUpdateType_UserReferredCreditUpdate
+		pGameState.UserReferredCredit = &models_pb.UserReferredCredit{
+			Cash: g.Uc.Cash,
 		}
 	}
 
