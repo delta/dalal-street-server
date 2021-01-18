@@ -270,7 +270,6 @@ func (d* dalalActionService) GetReferralCode(ctx context.Context, req *actions_p
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
-
 	l.Infof("Get ReferralCode requested");
 
 	resp := &actions_pb.GetReferralCodeResponse{}
@@ -282,7 +281,6 @@ func (d* dalalActionService) GetReferralCode(ctx context.Context, req *actions_p
 	}
 
 	usrEmail := req.Email;
-
 	referralCode, err := models.GetReferralCode(usrEmail);
 
 	l.Debugf("Referral Code has been generated, %v", referralCode)
@@ -298,5 +296,4 @@ func (d* dalalActionService) GetReferralCode(ctx context.Context, req *actions_p
 		resp.StatusMessage = "success"
 		return resp, nil;
 	}
-
 }
