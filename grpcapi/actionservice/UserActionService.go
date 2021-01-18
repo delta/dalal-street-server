@@ -261,3 +261,39 @@ func (d *dalalActionService) ChangePassword(ctx context.Context, req *actions_pb
 
 	return resp, nil
 }
+
+
+func (d* dalalActionService) GetReferralCode(ctx context.Context, req *actions_pb.GetReferralCodeRequest) (*actions_pb.GetReferralCodeResponse, error)	{
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetReferralCode",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("Get ReferralCode requested");
+
+	resp := &actions_pb.GetReferralCodeResponse{}
+
+	makeError := func(st actions_pb.GetReferralCodeResponse_StatusCode, msg string) (*actions_pb.GetReferralCodeResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	usrEmail := req.Email;
+	referralCode, err := models.GetReferralCode(usrEmail);
+
+	l.Debugf("Referral Code has been generated, %v", referralCode)
+
+	switch {
+	case err == models.UserNotFoundError:
+		return makeError(actions_pb.GetReferralCodeResponse_InvalidUserError, "user does not exist")
+	case err != nil:
+		l.Errorf("Request failed due to : %v\n", err);
+		return makeError(actions_pb.GetReferralCodeResponse_InternalServerError, getInternalErrorMessage(err));
+	default:
+		resp.ReferralCode = referralCode
+		resp.StatusMessage = "success"
+		return resp, nil;
+	}
+}

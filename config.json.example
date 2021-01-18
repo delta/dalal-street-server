@@ -25,7 +25,8 @@
       "PlivoAuthToken": "",
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
-      "MaxBlockCount":3
+      "MaxBlockCount":3,
+      "ReferralCashReward": 2000
    },
 
    "Docker": {
@@ -54,7 +55,8 @@
       "PlivoAuthToken": "",
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
-      "MaxBlockCount":3
+      "MaxBlockCount":3,
+      "ReferralCashReward": 2000
    },
 
    "Prod": {
@@ -83,7 +85,8 @@
       "PlivoAuthToken": "",
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
-      "MaxBlockCount":3
+      "MaxBlockCount":3,
+      "ReferralCashReward": 2000
  },
 
    "Test": {
@@ -112,6 +115,7 @@
       "PlivoAuthToken": "",
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
-      "MaxBlockCount":3
+      "MaxBlockCount":3,
+      "ReferralCashReward": 2000
  }
 }

@@ -60,12 +60,14 @@ func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.Regis
 		return resp, nil
 	}
 
-	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetFullName())
+	err := models.RegisterUser(req.GetEmail(), req.GetPassword(), req.GetFullName(), req.GetReferralCode())
+	l.Errorf("Unable to register user due to : %v", err)
 	if err == models.AlreadyRegisteredError {
 		return makeError(actions_pb.RegisterResponse_AlreadyRegisteredError, "Already registered please Login")
+	} else if err == models.InvalidReferralCodeError {
+		return makeError(actions_pb.RegisterResponse_InvalidReferralCodeError, "Referral code is invalid")
 	}
 	if err != nil {
-		l.Errorf("Request failed due to: %+v", err)
 		return makeError(actions_pb.RegisterResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
@@ -285,6 +287,13 @@ func (d *dalalActionService) VerifyPhone(ctx context.Context, req *actions_pb.Ve
 		return makeError(actions_pb.VerifyOTPResponse_OTPMismatchError, "Invalid OTP entered")
 	} else if err == models.InvalidPhoneNumberError || err == models.InternalServerError {
 		return makeError(actions_pb.VerifyOTPResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	if userCash, err := models.AddExtraCredit(userId);err != nil{
+		// Already verified referral when registering, so only internal-error possible
+		return makeError(actions_pb.VerifyOTPResponse_InternalServerError, getInternalErrorMessage(err))
+	} else {
+		resp.UserCash = userCash;
 	}
 
 	return makeError(actions_pb.VerifyOTPResponse_OK, "OTP verification successful.")

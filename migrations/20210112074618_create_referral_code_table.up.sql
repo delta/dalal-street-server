@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS ReferralCode (
+
+    id int(255) UNSIGNED NOT NULL AUTO_INCREMENT,
+    userId int(11) UNSIGNED NOT NULL,
+    referralCode varchar(255) NOT NULL,
+    PRIMARY KEY (id),
+	FOREIGN KEY (userId) REFERENCES Users(id)
+
+) AUTO_INCREMENT=1;
