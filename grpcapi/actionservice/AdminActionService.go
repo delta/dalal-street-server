@@ -3,9 +3,9 @@ package actionservice
 import (
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/models"
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -79,6 +79,37 @@ func (d *dalalActionService) CloseMarket(ctx context.Context, req *actions_pb.Cl
 
 	return resp, nil
 
+}
+
+func (d *dalalActionService) UpdateEndOfDayValues(ctx context.Context, req *actions_pb.UpdateEndOfDayValuesRequest) (*actions_pb.UpdateEndOfDayValuesResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "UpdateEndOfDayValues",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	resp := &actions_pb.UpdateEndOfDayValuesResponse{}
+	makeError := func(st actions_pb.UpdateEndOfDayValuesResponse_StatusCode, msg string) (*actions_pb.UpdateEndOfDayValuesResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.UpdateEndOfDayValuesResponse_NotAdminUser, "User is not admin")
+	}
+
+	err := models.UpdateEndOfDayValues()
+
+	if err != nil {
+		l.Errorf("Error updationg EndOfDayValues due to: %+v", err)
+		return makeError(actions_pb.UpdateEndOfDayValuesResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	resp.StatusCode = actions_pb.UpdateEndOfDayValuesResponse_OK
+	resp.StatusMessage = "OK"
+
+	return resp, err
 }
 
 func (d *dalalActionService) SendNotifications(ctx context.Context, req *actions_pb.SendNotificationsRequest) (*actions_pb.SendNotificationsResponse, error) {
