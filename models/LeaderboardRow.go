@@ -80,6 +80,10 @@ func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *Leade
 	return leaderboardDetails, &currentUserDetails, TotalUserCount, nil
 }
 
+func GetDailyLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *LeaderboardRow, uint32, error) {
+	return nil, nil, 0, nil
+}
+
 type leaderboardQueryData struct {
 	UserId     uint32
 	UserName   string

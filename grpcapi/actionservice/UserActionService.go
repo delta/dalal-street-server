@@ -3,11 +3,11 @@ package actionservice
 import (
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/models"
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
 	"github.com/delta/dalal-street-server/session"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -182,6 +182,39 @@ func (d *dalalActionService) GetLeaderboard(ctx context.Context, req *actions_pb
 	resp.TotalUsers = totalUsers
 	for _, leaderboardEntry := range leaderboard {
 		resp.RankList = append(resp.RankList, leaderboardEntry.ToProto())
+	}
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}
+
+func (d dalalActionService) GetDailyLeaderboard(ctx context.Context, req *actions_pb.GetLeaderboardRequest) (*actions_pb.GetLeaderboardResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetDailyLeaderboard",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("GetDailyLeaderboard requested")
+
+	resp := &actions_pb.GetLeaderboardResponse{}
+
+	userId := getUserId(ctx)
+	startingId := req.StartingId
+	count := req.Count
+
+	leaderboard, currentUserRow, totalUsers, err := models.GetDailyLeaderboard(userId, startingId, count)
+	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
+		resp.StatusCode = actions_pb.GetLeaderboardResponse_InternalServerError
+		resp.StatusMessage = getInternalErrorMessage(err)
+		return resp, nil
+	}
+
+	resp.MyRank = currentUserRow.Rank
+	resp.TotalUsers = totalUsers
+	for _, leaderboardRow := range leaderboard {
+		resp.RankList = append(resp.RankList, leaderboardRow.ToProto())
 	}
 
 	l.Infof("Request completed successfully")
