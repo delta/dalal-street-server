@@ -575,3 +575,37 @@ func (d *dalalActionService) UnBlockAllUsers(ctx context.Context, req *actions_p
 
 	return makeError(actions_pb.UnblockAllUsersResponse_OK, "All users unblocked successfully.")
 }
+
+func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions_pb.AddDailyChallengeRequest) (*actions_pb.AddDailyChallengeResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "AddDailyChallenge",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	res := &actions_pb.AddDailyChallengeResponse{}
+
+	makeError := func(st actions_pb.AddDailyChallengeResponse_StatusCode, msg string) (*actions_pb.AddDailyChallengeResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.AddDailyChallengeResponse_NotAdminUserError, "access unauthorised, User is not Admin")
+
+	}
+	// add daily challenge to db
+	err := models.AddDailyChallenge(req.Value, req.MarketDay, req.StockId, req.ChallengeType.String())
+
+	if err != nil {
+		l.Errorf("request failed! %+v", err)
+		return makeError(actions_pb.AddDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.StatusMessage = "Done"
+	res.StatusCode = actions_pb.AddDailyChallengeResponse_OK
+	return res, nil
+}
