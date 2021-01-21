@@ -609,3 +609,44 @@ func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions
 	res.StatusCode = actions_pb.AddDailyChallengeResponse_OK
 	return res, nil
 }
+
+func (d *dalalActionService) CloseDailyChallenge(ctx context.Context, req *actions_pb.CloseDailyChallengeRequest) (*actions_pb.CloseDailyChallengeResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "CloseDailyChallenge",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+	})
+
+	l.Infof("CloseDailyChallenge Requested")
+
+	res := &actions_pb.CloseDailyChallengeResponse{}
+
+	makeError := func(st actions_pb.CloseDailyChallengeResponse_StatusCode, msg string) (*actions_pb.CloseDailyChallengeResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.CloseDailyChallengeResponse_NotAdminUserError, "access unauthorised, User is not Admin")
+
+	}
+
+	if models.IsChallengeOpen == false {
+		return makeError(actions_pb.CloseDailyChallengeResponse_InvalidRequestError, "DailyChallenge already closed!")
+	}
+
+	//check whether the user finished that market day challenge
+	err := models.CloseDailyChallenge()
+
+	if err != nil {
+		l.Errorf("request failed! %+v", err)
+		return makeError(actions_pb.CloseDailyChallengeResponse_InternalServerError, "DailyChallenge already closed!")
+	}
+
+	res.StatusCode = actions_pb.CloseDailyChallengeResponse_OK
+	res.StatusMessage = "Done"
+
+	return res, nil
+}

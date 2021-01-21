@@ -9,7 +9,7 @@ import (
 
 var (
 	MarketDay       = 1
-	isChallengeOpen = false
+	IsChallengeOpen = false
 )
 
 type DailyChallenge struct {
@@ -92,6 +92,14 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 	}
 
 	l.Infof("successfully added daily challenge")
+
+	return nil
+}
+
+func CloseDailyChallenge() error {
+	//TODO: close DailyChallenge
+	// and compute dailychallenges
+	IsChallengeOpen = false
 
 	return nil
 }
