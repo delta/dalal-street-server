@@ -330,3 +330,34 @@ func (d *dalalActionService) GetReferralCode(ctx context.Context, req *actions_p
 		return resp, nil
 	}
 }
+
+func (d *dalalActionService) GetDailyChallenges(ctx context.Context, req *actions_pb.GetDailyChallengesRequest) (*actions_pb.GetDailyChallengesResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetDailyChallenges",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+	})
+
+	l.Infof("GetDailyChallenges Requested")
+
+	res := &actions_pb.GetDailyChallengesResponse{}
+
+	makeError := func(st actions_pb.GetDailyChallengesResponse_StatusCode, msg string) (*actions_pb.GetDailyChallengesResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+	DailyChallenges, err := models.GetDailyChallenges()
+
+	if err != nil {
+		l.Errorf("failed to load daily challenges")
+		return makeError(actions_pb.GetDailyChallengesResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	for _, challenge := range DailyChallenges {
+		res.DailyChallenges = append(res.DailyChallenges, challenge.ToProto())
+	}
+
+	res.StatusCode = actions_pb.GetDailyChallengesResponse_OK
+	res.StatusMessage = "Done"
+	return res, nil
+}
