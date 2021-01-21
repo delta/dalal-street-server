@@ -12,7 +12,7 @@ type EndOfDayValue struct {
 }
 
 func (EndOfDayValue) TableName() string {
-	return "EndOfDayValue"
+	return "EndOfDayValues"
 }
 
 // Updates EndOfDayValues Table which is used to Calculate DailyLeaderboard
