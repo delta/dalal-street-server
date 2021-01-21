@@ -1,9 +1,7 @@
 package models
 
 import (
-	"errors"
-	"fmt"
-
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,30 +22,37 @@ func (DailyChallenge) TableName() string {
 	return "DailyChallenge"
 }
 
-func GetDailyChallenge(day uint32) ([]DailyChallenge, error) {
+func (d *DailyChallenge) ToProto() *models_pb.DailyChallenge {
+	pDailyChallenge := &models_pb.DailyChallenge{
+		ChallengeId:   d.Id,
+		MarketDay:     d.MarketDay,
+		ChallengeType: d.ChallengeType,
+		Value:         d.Value,
+		StockId:       d.StockId,
+	}
+	return pDailyChallenge
+}
+
+func GetDailyChallenges() ([]*DailyChallenge, error) {
 
 	l := logger.WithFields(logrus.Fields{
-		"method":    "GetDailyChallenge",
-		"marketDay": day,
+		"method":    "GetDailyChallenges",
+		"marketDay": MarketDay,
 	})
 
-	var dailyChallenge []DailyChallenge
-
-	if day == 0 {
-		return nil, errors.New("incorrect day")
-	}
+	var dailyChallenges []*DailyChallenge
 
 	l.Infof("Attempting to get dailyChallenges")
 
 	db := getDB()
 
-	if err := db.Where("marketDay = ?", day).Find(&dailyChallenge).Error; err != nil {
-		fmt.Println(err)
+	if err := db.Table("DailyChallenge").Where("marketDay = ?", MarketDay).Find(&dailyChallenges).Error; err != nil {
+		l.Errorf("error while querying from db")
 		return nil, err
 	}
 
 	l.Infof("Successfully fetched dailyChallenges")
-	return dailyChallenge, nil
+	return dailyChallenges, nil
 }
 
 //saves registered users state when market opens
