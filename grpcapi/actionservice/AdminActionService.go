@@ -678,7 +678,7 @@ func (d *dalalActionService) CloseDailyChallenge(ctx context.Context, req *actio
 		return makeError(actions_pb.CloseDailyChallengeResponse_InvalidRequestError, "DailyChallenge already closed!")
 	}
 
-	//check whether the user finished that market day challenge
+	//update whether the user finished that market day challenge
 	err := models.CloseDailyChallenge()
 
 	if err != nil {

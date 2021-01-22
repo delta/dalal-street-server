@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS DailyChallenge(
     `stockId` int(11) UNSIGNED DEFAULT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (stockId) REFERENCES Stocks(id),
-    CONSTRAINT check_daily_challenge CHECK((challengeType='SpecificStock' AND stockId>0 ) OR (challengeType<>'SpecificStock' AND stockId=0))
+    CONSTRAINT check_daily_challenge CHECK((challengeType='SpecificStock' AND stockId>0 ) OR (challengeType<>'SpecificStock' AND stockId=NULL))
 ) AUTO_INCREMENT=1;
