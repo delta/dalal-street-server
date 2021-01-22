@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	MarketDay       = 1
-	IsChallengeOpen = false
+	MarketDay       uint32 = 1
+	IsChallengeOpen bool   = false
 )
 
 type DailyChallenge struct {
@@ -98,6 +98,13 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 
 	l.Infof("successfully added daily challenge")
 
+	return nil
+}
+
+func OpenDailyChallenge() error {
+	//TODO: open dailyChallenge
+	//and save user state for later computation
+	IsChallengeOpen = true
 	return nil
 }
 
