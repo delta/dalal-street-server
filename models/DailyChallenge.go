@@ -15,7 +15,7 @@ type DailyChallenge struct {
 	MarketDay     uint32 `gorm:"column:marketDay;not null" json:"market_day"`
 	ChallengeType string `gorm:"column:challengeType;not null" json:"challenge_type"`
 	Value         uint64 `gorm:"column:value;not null" json:"value"`
-	StockId       uint32 `gorm:"column:stockIdnot null" json:"stock_id"`
+	StockId       uint32 `gorm:"column:stockId; default null" json:"stock_id"`
 }
 
 func (DailyChallenge) TableName() string {
@@ -85,15 +85,19 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 		MarketDay:     marketDay,
 		ChallengeType: challengeType,
 		Value:         value,
+		StockId:       stockId,
 	}
 
-	if stockId != 0 {
-		dailyChallenge.StockId = stockId
-	}
-
-	if err := db.Save(dailyChallenge).Error; err != nil {
-		l.Error(err)
-		return err
+	if stockId == 0 {
+		if err := db.Table("DailyChallenge").Omit("StockId").Save(dailyChallenge).Error; err != nil {
+			l.Error(err)
+			return err
+		}
+	} else {
+		if err := db.Table("DailyChallenge").Save(dailyChallenge).Error; err != nil {
+			l.Error(err)
+			return err
+		}
 	}
 
 	l.Infof("successfully added daily challenge")
