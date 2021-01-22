@@ -189,7 +189,7 @@ func (d *dalalActionService) GetLeaderboard(ctx context.Context, req *actions_pb
 	return resp, nil
 }
 
-func (d dalalActionService) GetDailyLeaderboard(ctx context.Context, req *actions_pb.GetLeaderboardRequest) (*actions_pb.GetLeaderboardResponse, error) {
+func (d dalalActionService) GetDailyLeaderboard(ctx context.Context, req *actions_pb.GetDailyLeaderboardRequest) (*actions_pb.GetDailyLeaderboardResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "GetDailyLeaderboard",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
@@ -197,7 +197,7 @@ func (d dalalActionService) GetDailyLeaderboard(ctx context.Context, req *action
 	})
 	l.Infof("GetDailyLeaderboard requested")
 
-	resp := &actions_pb.GetLeaderboardResponse{}
+	resp := &actions_pb.GetDailyLeaderboardResponse{}
 
 	userId := getUserId(ctx)
 	startingId := req.StartingId
@@ -206,12 +206,13 @@ func (d dalalActionService) GetDailyLeaderboard(ctx context.Context, req *action
 	leaderboard, currentUserRow, totalUsers, err := models.GetDailyLeaderboard(userId, startingId, count)
 	if err != nil {
 		l.Errorf("Request failed due to: %+v", err)
-		resp.StatusCode = actions_pb.GetLeaderboardResponse_InternalServerError
+		resp.StatusCode = actions_pb.GetDailyLeaderboardResponse_InternalServerError
 		resp.StatusMessage = getInternalErrorMessage(err)
 		return resp, nil
 	}
 
 	resp.MyRank = currentUserRow.Rank
+	resp.MyTotalWorth = currentUserRow.TotalWorth
 	resp.TotalUsers = totalUsers
 	for _, leaderboardRow := range leaderboard {
 		resp.RankList = append(resp.RankList, leaderboardRow.ToProto())
@@ -295,15 +296,14 @@ func (d *dalalActionService) ChangePassword(ctx context.Context, req *actions_pb
 	return resp, nil
 }
 
-
-func (d* dalalActionService) GetReferralCode(ctx context.Context, req *actions_pb.GetReferralCodeRequest) (*actions_pb.GetReferralCodeResponse, error)	{
+func (d *dalalActionService) GetReferralCode(ctx context.Context, req *actions_pb.GetReferralCodeRequest) (*actions_pb.GetReferralCodeResponse, error) {
 
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "GetReferralCode",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
-	l.Infof("Get ReferralCode requested");
+	l.Infof("Get ReferralCode requested")
 
 	resp := &actions_pb.GetReferralCodeResponse{}
 
@@ -313,8 +313,8 @@ func (d* dalalActionService) GetReferralCode(ctx context.Context, req *actions_p
 		return resp, nil
 	}
 
-	usrEmail := req.Email;
-	referralCode, err := models.GetReferralCode(usrEmail);
+	usrEmail := req.Email
+	referralCode, err := models.GetReferralCode(usrEmail)
 
 	l.Debugf("Referral Code has been generated, %v", referralCode)
 
@@ -322,11 +322,11 @@ func (d* dalalActionService) GetReferralCode(ctx context.Context, req *actions_p
 	case err == models.UserNotFoundError:
 		return makeError(actions_pb.GetReferralCodeResponse_InvalidUserError, "user does not exist")
 	case err != nil:
-		l.Errorf("Request failed due to : %v\n", err);
-		return makeError(actions_pb.GetReferralCodeResponse_InternalServerError, getInternalErrorMessage(err));
+		l.Errorf("Request failed due to : %v\n", err)
+		return makeError(actions_pb.GetReferralCodeResponse_InternalServerError, getInternalErrorMessage(err))
 	default:
 		resp.ReferralCode = referralCode
 		resp.StatusMessage = "success"
-		return resp, nil;
+		return resp, nil
 	}
 }

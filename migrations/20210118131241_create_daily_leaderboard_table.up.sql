@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS DailyLeaderboard (
     id int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
     userId int(11) UNSIGNED NOT NULL,
-    cash bigint(11) UNSIGNED NOT NULL,
+    cash bigint(11) SIGNED NOT NULL,
     `rank` int(11) UNSIGNED NOT NULL,
     debt bigint(11) UNSIGNED NOT NULL,
     stockWorth bigint(11) SIGNED NOT NULL,
