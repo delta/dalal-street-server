@@ -335,6 +335,7 @@ func (d *dalalActionService) GetDailyChallenges(ctx context.Context, req *action
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "GetDailyChallenges",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
 	l.Infof("GetDailyChallenges Requested")
@@ -346,7 +347,12 @@ func (d *dalalActionService) GetDailyChallenges(ctx context.Context, req *action
 		res.StatusMessage = msg
 		return res, nil
 	}
-	DailyChallenges, err := models.GetDailyChallenges()
+	marketday := req.MarketDay
+
+	if marketday <= 0 && marketday > 7 {
+		return makeError(actions_pb.GetDailyChallengesResponse_InvalidRequestError, "invalid request, marketday not supported")
+	}
+	DailyChallenges, err := models.GetDailyChallenges(marketday)
 
 	if err != nil {
 		l.Errorf("failed to load daily challenges")

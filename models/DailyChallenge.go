@@ -33,7 +33,7 @@ func (d *DailyChallenge) ToProto() *models_pb.DailyChallenge {
 	return pDailyChallenge
 }
 
-func GetDailyChallenges() ([]*DailyChallenge, error) {
+func GetDailyChallenges(marketDay uint32) ([]*DailyChallenge, error) {
 
 	l := logger.WithFields(logrus.Fields{
 		"method":    "GetDailyChallenges",

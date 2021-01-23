@@ -597,6 +597,10 @@ func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions
 		return makeError(actions_pb.AddDailyChallengeResponse_NotAdminUserError, "access unauthorised, User is not Admin")
 
 	}
+
+	if req.ChallengeType.String() != "SpecificStock" && req.StockId != 0 {
+		return makeError(actions_pb.AddDailyChallengeResponse_InvalidRequestError, "Invalid Request,stockId is not required for this challenge type")
+	}
 	// add daily challenge to db
 	err := models.AddDailyChallenge(req.Value, req.MarketDay, req.StockId, req.ChallengeType.String())
 
