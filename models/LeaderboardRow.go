@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type LeaderboardRow struct {
@@ -37,6 +37,28 @@ func (l *LeaderboardRow) ToProto() *models_pb.LeaderboardRow {
 		TotalWorth: l.TotalWorth,
 		IsBlocked:  l.IsBlocked,
 	}
+}
+
+// Returns the Entire Leaderboard
+func GetEntireLeaderboard() ([]*LeaderboardRow, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetEntireLeaderboard",
+	})
+
+	l.Infof("Attempting to fetch Leaderboard")
+
+	db := getDB()
+
+	//for storing leaderboard details
+	var leaderboardDetails []*LeaderboardRow
+
+	if err := db.Order("rank asc").Find(&leaderboardDetails).Error; err != nil {
+		return nil, err
+	}
+
+	l.Infof("Successfully fetched leaderboard for userId : %+v", leaderboardDetails)
+
+	return leaderboardDetails, nil
 }
 
 func GetLeaderboard(userId, startingId, count uint32) ([]*LeaderboardRow, *LeaderboardRow, uint32, error) {
@@ -180,6 +202,7 @@ func UpdateLeaderboard() {
 func UpdateLeaderboardTicker() {
 	for {
 		UpdateLeaderboard()
+		UpdateDailyLeaderboard()
 		time.Sleep(30 * time.Second)
 	}
 }
