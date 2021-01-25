@@ -616,13 +616,13 @@ func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions
 
 func (d *dalalActionService) OpenDailyChallenge(ctx context.Context, req *actions_pb.OpenDailyChallengeRequest) (*actions_pb.OpenDailyChallengeResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":        "CloseDailyChallenge",
+		"method":        "OpenDailyChallenge",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 	})
 
 	res := &actions_pb.OpenDailyChallengeResponse{}
 
-	l.Infof("CloseDailyChallenge Requested")
+	l.Infof("OpenDailyChallenge Requested")
 
 	makeError := func(st actions_pb.OpenDailyChallengeResponse_StatusCode, msg string) (*actions_pb.OpenDailyChallengeResponse, error) {
 		res.StatusCode = st
