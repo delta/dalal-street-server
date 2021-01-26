@@ -19,6 +19,14 @@ var (
 	IsChallengeOpen bool   = false
 )
 
+//Reward for diff ChallengeType
+var (
+	cashChallengeReward          = 2000
+	netWorthChallengeReward      = 2000
+	specificStockChallengeReward = 2000
+	stockWorthChallengeReward    = 2000
+)
+
 var wg sync.WaitGroup
 
 // DailyChallenge model
@@ -32,12 +40,14 @@ type DailyChallenge struct {
 
 //UserState model
 type UserState struct {
-	ChallengeId  uint32 `gorm:"column:challengeId;not null" json:"challenge_id"`
-	UserId       uint32 `gorm:"column:userId;not null" json:"user_id"`
-	MarketDay    uint32 `gorm:"column:marketDay;not null" json:"market_day"`
-	InitialValue int64  `gorm:"column:initialValue;not null" json:"initial_value"`
-	FinalValue   int64  `gorm:"column:finalValue;default null" json:"final_value"`
-	IsCompleted  bool   `gorm:"column:isCompleted;default false" json:"is_completed"`
+	Id              uint32 `gorm:"column:id;primary_key;AUTO_INCREMENT" json:"id"`
+	ChallengeId     uint32 `gorm:"column:challengeId;not null" json:"challenge_id"`
+	UserId          uint32 `gorm:"column:userId;not null" json:"user_id"`
+	MarketDay       uint32 `gorm:"column:marketDay;not null" json:"market_day"`
+	InitialValue    int64  `gorm:"column:initialValue;not null" json:"initial_value"`
+	FinalValue      int64  `gorm:"column:finalValue;default null" json:"final_value"`
+	IsCompleted     bool   `gorm:"column:isCompleted;default false" json:"is_completed"`
+	IsRewardClamied bool   `gorm:"column:isRewardClaimed;default false" json:"is_rewardclaimed"`
 }
 
 type userStateQueryData struct {
@@ -50,6 +60,16 @@ type userStateQueryData struct {
 type specificStockUserEntry struct {
 	UserId        uint32
 	StockQuantity int64
+}
+
+type updateUserStateQueryData struct {
+	Id            uint32
+	UserId        uint32
+	ChallengeId   uint32
+	InitialValue  int64
+	ChallengeType string
+	Value         uint64
+	StockId       uint32
 }
 
 func (DailyChallenge) TableName() string {
@@ -79,9 +99,11 @@ func GetDailyChallenges(marketDay uint32) ([]*DailyChallenge, error) {
 		"marketDay": MarketDay,
 	})
 
+	l.Infof("GetDailyChallenges Requested for market day:%d", MarketDay)
+
 	var dailyChallenges []*DailyChallenge
 
-	l.Infof("Attempting to get dailyChallenges")
+	l.Debugf("Attempting to get dailyChallenges")
 
 	db := getDB()
 
@@ -90,7 +112,7 @@ func GetDailyChallenges(marketDay uint32) ([]*DailyChallenge, error) {
 		return nil, err
 	}
 
-	l.Infof("Successfully fetched dailyChallenges")
+	l.Infof("Successfully fetched dailyChallenges for marketday:%d", MarketDay)
 	return dailyChallenges, nil
 }
 
@@ -154,7 +176,7 @@ func OpenDailyChallenge() error {
 	}
 
 	if err := saveUsersState(dailyChallenges); err != nil {
-		l.Error(err)
+		l.Errorf("failed to save userstate %+e", err)
 		return err
 	}
 
@@ -163,24 +185,206 @@ func OpenDailyChallenge() error {
 	return nil
 }
 
-//CloseDailyChallenge closes dailychallenge and computes whether all the users completed them
-//and reward the user who have completed their challenges
+//CloseDailyChallenge closes dailychallenge and updates UserState
 func CloseDailyChallenge() error {
-	//TODO: close DailyChallenge
-	// and compute dailychallenges
+	l := logger.WithFields(logrus.Fields{
+		"method":     "CloseDailyChallenge",
+		"market_day": MarketDay,
+	})
+
+	l.Infof("CloseDailyChallenge Requested")
+
+	if err := updateUserState(); err != nil {
+		l.Errorf("failed to update userState %+e", err)
+		return err
+	}
+
 	IsChallengeOpen = false
 
+	l.Infof("Successfully updated Userstate")
+
 	return nil
+}
+
+//updateUsersState updates userState when dailyChallenges Closes
+//similiar to saveUsersState,invoked inside CloseDailyChallenge
+func updateUserState() error {
+	l := logger.WithFields(logrus.Fields{
+		"method": "updateUserState",
+	})
+
+	l.Debugf("Attempting to update userState")
+
+	db := getDB()
+
+	//begin transaction
+	tx := db.Begin()
+
+	if err := tx.Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	var queryResults []updateUserStateQueryData
+
+	query := fmt.Sprintf(`SELECT U.id AS id,U.userId AS user_id, U.challengeId AS challenge_id,U.initialValue AS initial_value,D.challengeType AS challenge_type,D.value AS value,D.stockId AS stock_id
+	 FROM
+	UserState U LEFT JOIN DailyChallenge D ON U.challengeId = D.id WHERE U.marketDay = %d;`, MarketDay)
+
+	if err := tx.Raw(query).Scan(&queryResults).Error; err != nil {
+		l.Errorf("error, fetching userSate query data %+e", err)
+		return err
+	}
+
+	l.Printf("%+v \n", queryResults[0])
+	l.Println(len(queryResults))
+
+	for _, q := range queryResults {
+
+		switch q.ChallengeType {
+		case "Cash":
+			var userStateEntry = &UserState{
+				Id: q.Id,
+			}
+
+			ch, user, err := getUserExclusively(q.UserId)
+			if err != nil {
+				l.Errorf("Errored : %+v ", err)
+				return err
+			}
+			l.Debugf("Acquired")
+
+			if q.InitialValue+int64(q.Value) >= int64(user.Cash+user.ReservedCash) {
+				userStateEntry.IsCompleted = true
+			}
+
+			userStateEntry.FinalValue = int64(user.Cash)
+
+			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed saving userState cash Challenge type %+e", err)
+				tx.Rollback()
+				close(ch)
+				return err
+			}
+
+			close(ch)
+			l.Debugf("Released exclusive write on user")
+
+			l.Debugf("updated userstate challenge type cash")
+
+		case "NetWorth":
+			var userStateEntry = &UserState{
+				Id: q.Id,
+			}
+
+			ch, user, err := getUserExclusively(q.UserId)
+			if err != nil {
+				l.Errorf("Errored : %+v ", err)
+				return err
+			}
+			l.Debugf("Acquired")
+
+			if q.InitialValue+int64(q.Value) >= int64(user.Total) {
+				userStateEntry.IsCompleted = true
+			}
+
+			userStateEntry.FinalValue = int64(user.Total)
+
+			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed saving userState net worth Challenge type %+e", err)
+				tx.Rollback()
+				close(ch)
+				return err
+			}
+
+			close(ch)
+			l.Debugf("Released exclusive write on user")
+
+		case "SpecificStock":
+			var userStateEntry = &UserState{
+				Id: q.Id,
+			}
+
+			ch, user, err := getUserExclusively(q.UserId)
+			if err != nil {
+				l.Errorf("Errored : %+v ", err)
+				return err
+			}
+			l.Debugf("Acquired")
+
+			stockQuantity, err := getSingleStockCount(user, q.StockId)
+
+			if err != nil {
+				l.Error(err)
+				return err
+			}
+
+			if q.InitialValue+int64(q.Value) >= stockQuantity {
+				userStateEntry.IsCompleted = true
+			}
+
+			userStateEntry.FinalValue = int64(stockQuantity)
+
+			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed saving userState specific stock Challenge type %+e", err)
+				tx.Rollback()
+				close(ch)
+				return err
+			}
+
+			close(ch)
+			l.Debugf("Released exclusive write on user")
+
+		case "StockWorth":
+			var userStateEntry = &UserState{
+				Id: q.Id,
+			}
+			stockWorth, err := GetUserStockWorth(q.UserId)
+
+			if err != nil {
+				l.Error(err)
+				return err
+			}
+
+			if q.InitialValue+int64(q.Value) >= stockWorth {
+				userStateEntry.IsCompleted = true
+			}
+
+			userStateEntry.FinalValue = int64(stockWorth)
+
+			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed saving userState stockworth Challenge type %+e", err)
+				tx.Rollback()
+				return err
+			}
+
+		default:
+			l.Error("something went wrong, updating userState failed,Rolling back...")
+			tx.Rollback()
+			return errors.New("challenge type not supported")
+
+		}
+
+	}
+	//commit transaction
+	if err := tx.Commit().Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	return nil
+
 }
 
 //saveUsersState saves registered users cash,stockworth,Networth,specificstock quantity based on challenge type
 //invoked inside OpenDailyChallenge
 func saveUsersState(c []*DailyChallenge) error {
 	l := logger.WithFields(logrus.Fields{
-		"method": "saveUsersState",
+		"method":     "saveUsersState",
+		"market_day": MarketDay,
 	})
 
-	l.Infof("Attempting to save user state")
+	l.Debugf("Attempting to save user state")
 
 	var queryResults []userStateQueryData
 
@@ -200,10 +404,10 @@ func saveUsersState(c []*DailyChallenge) error {
 	 ifNull((SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed)) ),0) AS stock_worth,
 	 ifnull((U.cash + U.reservedCash + SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed))),U.cash) AS total
 	 FROM
-	Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id WHERE U.blockCount < %d GROUP BY U.id;`, 3)
+	Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id WHERE U.blockCount < %d GROUP BY U.id;`, config.MaxBlockCount)
 
 	if err := tx.Raw(query).Scan(&queryResults).Error; err != nil {
-		l.Errorf("error when fetching userSate query data %+e", err)
+		l.Errorf("error, fetching userSate query data %+e", err)
 		return err
 	}
 
@@ -222,8 +426,8 @@ func saveUsersState(c []*DailyChallenge) error {
 					InitialValue: int64(u.Cash),
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
-					l.Errorf("failed Updating userState cash Challenge type %+e", err)
+				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState cash Challenge type %+e", err)
 					tx.Rollback()
 					return err
 				}
@@ -240,8 +444,8 @@ func saveUsersState(c []*DailyChallenge) error {
 					InitialValue: u.Total,
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
-					l.Errorf("failed Updating userState NetWorth Challenge type %+e", err)
+				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState NetWorth Challenge type %+e", err)
 					tx.Rollback()
 					return err
 				}
@@ -258,8 +462,8 @@ func saveUsersState(c []*DailyChallenge) error {
 					InitialValue: u.StockWorth,
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
-					l.Errorf("failed Updating userState StockWorth Challenge type %+e", err)
+				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState StockWorth Challenge type %+e", err)
 					tx.Rollback()
 					return err
 				}
@@ -284,15 +488,16 @@ func saveUsersState(c []*DailyChallenge) error {
 					InitialValue: u.StockQuantity,
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
-					l.Errorf("failed Updating userState SpecificStockType Challenge type %+e", err)
+				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState SpecificStockType Challenge type %+e", err)
 					tx.Rollback()
 					return err
 				}
 			}
 
 		default:
-			l.Error("challenge type not supported")
+			l.Error("challenge type not supported, userstate not saved")
+			tx.Rollback()
 			return errors.New("challenge type not supported")
 		}
 
@@ -314,7 +519,7 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 		"stock_id": stockId,
 	})
 
-	l.Infof("getSpecificStockEntry requested")
+	l.Debugf("getSpecificStockEntry requested")
 
 	var results []specificStockUserEntry
 
@@ -331,7 +536,7 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 
 	}
 
-	l.Infof("successfully fetched specificStockUserEntry from db")
+	l.Debugf("successfully fetched specificStockUserEntry from db")
 
 	return results, nil
 }
