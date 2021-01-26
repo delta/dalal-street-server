@@ -257,13 +257,13 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 		VerificationKey: verificationKey,
 	}
 
-	if(referralCode != ""){
+	if referralCode != "" {
 		// User has entered a valid referralCode
 		l.Errorf("the referral code is : %v\n\n", referralCode)
-		codeID, err := VerifyReferralCode(referralCode);
-		if codeID != 0{
+		codeID, err := VerifyReferralCode(referralCode)
+		if codeID != 0 {
 			(*register).ReferralCodeID = codeID
-		} else if (codeID == 0 && err == nil) {
+		} else if codeID == 0 && err == nil {
 			// invalid referralCode
 			return InvalidReferralCodeError
 		} else {
@@ -277,7 +277,7 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 		l.Errorf("Server error in Create user while logging in Pragyan user for the first time: %+v", err)
 		return err
 	}
-	(*register).UserId = u.Id;
+	(*register).UserId = u.Id
 
 	err = db.Save(register).Error
 	if err != nil {
@@ -2443,4 +2443,40 @@ func UnBlockAllUsers() error {
 	}
 
 	return nil
+}
+
+//GetUserStockWorth returns total stockworth of a user including reserved StockWorth
+func GetUserStockWorth(userId uint32) (int64, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "UnBlockAllUsers",
+		"user_id": "userId",
+	})
+
+	l.Debugf("Attempting to get stockworth")
+
+	var stockworth int64
+
+	ch, _, err := getUserExclusively(userId)
+
+	if err != nil {
+		close(ch)
+		return stockworth, nil
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	db := getDB()
+
+	query := " ifNull((SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed)) ),0) AS stock_worth FROM Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id WHERE U.userId = ?;"
+
+	row := db.Raw(query, userId).Row()
+
+	if err := row.Scan(&stockworth).Error; err != nil {
+		return stockworth, errors.New(err())
+	}
+
+	return stockworth, nil
 }
