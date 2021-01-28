@@ -36,6 +36,7 @@ type DailyChallenge struct {
 	ChallengeType string `gorm:"column:challengeType;not null" json:"challenge_type"`
 	Value         uint64 `gorm:"column:value;not null" json:"value"`
 	StockId       uint32 `gorm:"column:stockId; default null" json:"stock_id"`
+	Reward        uint32 `gorm:"column:reward; not null" json:"reward`
 }
 
 //UserState model
@@ -87,8 +88,23 @@ func (d *DailyChallenge) ToProto() *models_pb.DailyChallenge {
 		ChallengeType: d.ChallengeType,
 		Value:         d.Value,
 		StockId:       d.StockId,
+		Reward:        d.Reward,
 	}
 	return pDailyChallenge
+}
+
+func (d *UserState) ToProto() *models_pb.UserState {
+	pUserState := &models_pb.UserState{
+		Id:              d.Id,
+		ChallengeId:     d.ChallengeId,
+		UserId:          d.UserId,
+		InitialValue:    d.InitialValue,
+		FinalValue:      d.FinalValue,
+		IsCompleted:     d.IsCompleted,
+		IsRewardClamied: d.IsRewardClamied,
+	}
+
+	return pUserState
 }
 
 //GetDailyChallenges returns challenges as array for a given market day
@@ -117,7 +133,7 @@ func GetDailyChallenges(marketDay uint32) ([]*DailyChallenge, error) {
 }
 
 //AddDailyChallenge add daily challenge to db, only Admin can invoke this function
-func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challengeType string) error {
+func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challengeType string, reward uint32) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":              "AddDailyChallenge",
 		"param_day":           MarketDay,
@@ -135,6 +151,7 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 		ChallengeType: challengeType,
 		Value:         value,
 		StockId:       stockId,
+		Reward:        reward,
 	}
 
 	if stockId == 0 {
@@ -186,6 +203,7 @@ func OpenDailyChallenge() error {
 }
 
 //CloseDailyChallenge closes dailychallenge and updates UserState
+//TODO: Uuse go concurrency to update userState
 func CloseDailyChallenge() error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "CloseDailyChallenge",
@@ -539,4 +557,29 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 	l.Debugf("successfully fetched specificStockUserEntry from db")
 
 	return results, nil
+}
+
+func GetUserState(marketDay uint32, userId uint32, challengeId uint32) (*UserState, error) {
+
+	l := logger.WithFields(logrus.Fields{
+		"method":       "GetUserState",
+		"market_day":   marketDay,
+		"user_id":      userId,
+		"challenge_id": challengeId,
+	})
+
+	l.Debugf("GetUserState Requested!")
+
+	var userState *UserState
+
+	db := getDB()
+
+	if err := db.Table("UserState").Where(" userId = ? ", userId).Where("marketDay = ?", marketDay).Where("challengeId = ?", challengeId).Find(&userState).Error; err != nil {
+		l.Errorf("error loading userState %+e", err)
+		return userState, err
+	}
+	l.Debugf("successfully fetched UserState")
+
+	return userState, nil
+
 }

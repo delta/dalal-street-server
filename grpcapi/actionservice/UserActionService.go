@@ -338,7 +338,7 @@ func (d *dalalActionService) GetDailyChallenges(ctx context.Context, req *action
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
-	l.Infof("GetDailyChallenges Requested")
+	l.Debugf("GetDailyChallenges Requested")
 
 	res := &actions_pb.GetDailyChallengesResponse{}
 
@@ -349,7 +349,7 @@ func (d *dalalActionService) GetDailyChallenges(ctx context.Context, req *action
 	}
 	marketday := req.MarketDay
 
-	if marketday <= 0 && marketday > 7 {
+	if marketday <= 0 {
 		return makeError(actions_pb.GetDailyChallengesResponse_InvalidRequestError, "invalid request, marketday not supported")
 	}
 	DailyChallenges, err := models.GetDailyChallenges(marketday)
@@ -366,4 +366,38 @@ func (d *dalalActionService) GetDailyChallenges(ctx context.Context, req *action
 	res.StatusCode = actions_pb.GetDailyChallengesResponse_OK
 	res.StatusMessage = "Done"
 	return res, nil
+}
+
+func (d *dalalActionService) GetMyUserState(ctx context.Context, req *actions_pb.GetMyUserStateRequest) (*actions_pb.GetMyUserStateResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetMyUserState",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Debugf("GetMyUserState requested")
+
+	res := &actions_pb.GetMyUserStateResponse{}
+
+	makeError := func(st actions_pb.GetMyUserStateResponse_StatusCode, msg string) (*actions_pb.GetMyUserStateResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	userState, err := models.GetUserState(req.MarketDay, userId, req.ChallengeId)
+
+	if err != nil {
+		l.Errorf("Error %+e", err)
+		return makeError(actions_pb.GetMyUserStateResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+	res.UserState = userState.ToProto()
+	res.StatusCode = actions_pb.GetMyUserStateResponse_OK
+	res.StatusMessage = "Done"
+
+	l.Debugf("Done")
+
+	return res, nil
+
 }
