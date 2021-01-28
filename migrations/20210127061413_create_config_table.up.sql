@@ -1,4 +1,4 @@
 CREATE TABLE IF NOT EXISTS Config (
     isDailyChallengeOpen BOOLEAN NOT NULL DEFAULT FALSE,
-    marketDay int(11) UNSIGNED NOT NULL DEFAULT 0,
+    marketDay int(11) UNSIGNED NOT NULL DEFAULT 0
 ); 
