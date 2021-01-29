@@ -401,3 +401,72 @@ func (d *dalalActionService) GetMyUserState(ctx context.Context, req *actions_pb
 	return res, nil
 
 }
+
+func (d *dalalActionService) GetMyReward(ctx context.Context, req *actions_pb.GetMyRewardRequest) (*actions_pb.GetMyRewardResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetMyReward",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Debugf("GetMyUserState requested")
+
+	res := &actions_pb.GetMyRewardResponse{}
+
+	makeError := func(st actions_pb.GetMyRewardResponse_StatusCode, msg string) (*actions_pb.GetMyRewardResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	reward, err := models.GetMyReward(req.UserStateId, userId)
+
+	if err == models.InternalServerError {
+		return makeError(actions_pb.GetMyRewardResponse_InternalServerError, getInternalErrorMessage(err))
+	} else if err == models.InvalidUserError {
+		return makeError(actions_pb.GetMyRewardResponse_InvalidUserError, "Invalid user")
+	} else if err == models.InvalidCerdentialError {
+		return makeError(actions_pb.GetMyRewardResponse_InvalidCerdentialError, "better luck next time")
+	} else {
+		return makeError(actions_pb.GetMyRewardResponse_InvalidRequestError, "Invalid request")
+	}
+
+	res.Reward = reward
+	res.StatusCode = actions_pb.GetMyRewardResponse_OK
+	res.StatusMessage = "Done"
+
+	return res, nil
+
+}
+
+//TODO: do Error handling
+func (d *dalalActionService) GetDailyChallengeConfig(ctx context.Context, req *actions_pb.GetDailyChallengeConfigRequest) (*actions_pb.GetDailyChallengeConfigResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetDailyChallengeConfig",
+	})
+
+	l.Debugf("GetDailyChallengeConfig Requested")
+
+	res := &actions_pb.GetDailyChallengeConfigResponse{}
+
+	makeError := func(st actions_pb.GetDailyChallengeConfigResponse_StatusCode, msg string) (*actions_pb.GetDailyChallengeConfigResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	config, err := models.GetDailyChallengeConfig()
+
+	if err != nil {
+		return makeError(actions_pb.GetDailyChallengeConfigResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.MarketDay = config.MarketDay
+	res.IsDailyChallengOpen = config.IsDailyChallengeOpen
+	res.StatusCode = actions_pb.GetDailyChallengeConfigResponse_OK
+	res.StatusMessage = "Done"
+
+	return res, nil
+
+}

@@ -691,3 +691,32 @@ func (d *dalalActionService) CloseDailyChallenge(ctx context.Context, req *actio
 
 	return res, nil
 }
+
+func (d *dalalActionService) SetMarketDay(ctx context.Context, req *actions_pb.SetMarketDayRequest) (*actions_pb.SetMarketDayResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "SetMarketDay",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"market_day":    req.MarketDay,
+	})
+
+	l.Debugf("SetMarketDay requested")
+
+	res := &actions_pb.SetMarketDayResponse{}
+
+	makeError := func(st actions_pb.SetMarketDayResponse_StatusCode, msg string) (*actions_pb.SetMarketDayResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	if err := models.SetMarketDay(req.MarketDay); err != nil {
+		l.Errorf("failed to set market day %+e", err)
+		return makeError(actions_pb.SetMarketDayResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.StatusCode = actions_pb.SetMarketDayResponse_OK
+	res.StatusMessage = "Done"
+
+	return res, nil
+
+}

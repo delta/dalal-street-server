@@ -126,3 +126,25 @@ func SetMarketDay(marketDay uint32) error {
 	return nil
 
 }
+
+func GetDailyChallengeConfig() (*Config, error) {
+	l := logger.WithFields(logrus.Fields{
+		"method": "GetDailyChallengeConfig",
+	})
+
+	l.Debugf("requested")
+
+	var config *Config
+
+	db := getDB()
+
+	if err := db.Table("Config").First(&config).Error; err != nil {
+		l.Errorf("failed fetching DailyChallengeConfig %+e", err)
+		return config, err
+	}
+
+	return config, nil
+
+	l.Debugf("Done")
+
+}

@@ -10,7 +10,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var InvalidRequestError = errors.New("Invalid Request")
+var (
+	InvalidRequestError    = errors.New("Invalid Request")
+	InvalidUserError       = errors.New("Invalid User")
+	InvalidCerdentialError = errors.New("invalid credentials")
+)
 
 // DailyChallenge model
 type DailyChallenge struct {
@@ -31,7 +35,7 @@ type UserState struct {
 	InitialValue    int64  `gorm:"column:initialValue;not null" json:"initial_value"`
 	FinalValue      int64  `gorm:"column:finalValue;default null" json:"final_value"`
 	IsCompleted     bool   `gorm:"column:isCompleted;default false" json:"is_completed"`
-	IsRewardClamied bool   `gorm:"column:isRewardClaimed;default false" json:"is_rewardclaimed"`
+	IsRewardClamied bool   `gorm:"column:isRewardClaimed;default false" json:"is_reward_claimed"`
 }
 
 type userStateQueryData struct {
@@ -54,6 +58,16 @@ type updateUserStateQueryData struct {
 	ChallengeType string
 	Value         uint64
 	StockId       uint32
+}
+
+type getMyRewardQueryData struct {
+	Id              uint32
+	UserId          uint32
+	FinalValue      uint32
+	IsCompleted     bool
+	IsRewardClaimed bool
+	Marketday       uint32
+	Value           uint64
 }
 
 func (DailyChallenge) TableName() string {
@@ -577,7 +591,7 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 	if err := tx.Raw(query).Scan(&results).Error; err != nil {
 		l.Errorf("failed fetching SpecificStockEntry %+e", err)
 		tx.Rollback()
-		return nil, err
+		return results, err
 
 	}
 
@@ -586,7 +600,7 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 	return results, nil
 }
 
-func GetUserState(marketDay uint32, userId uint32, challengeId uint32) (*UserState, error) {
+func GetUserState(marketDay, userId, challengeId uint32) (*UserState, error) {
 
 	l := logger.WithFields(logrus.Fields{
 		"method":       "GetUserState",
@@ -608,5 +622,83 @@ func GetUserState(marketDay uint32, userId uint32, challengeId uint32) (*UserSta
 	l.Debugf("successfully fetched UserState")
 
 	return userState, nil
+
+}
+
+func GetMyReward(userStateId, userId uint32) (uint64, error) {
+
+	l := logger.WithFields(logrus.Fields{
+		"method":        "GetMyReward",
+		"user_id":       userId,
+		"user_state_id": userStateId,
+	})
+
+	l.Debugf("GetMyReward Requested")
+
+	db := getDB()
+
+	//begin transaction
+	tx := db.Begin()
+
+	if err := tx.Error; err != nil {
+		l.Error(err)
+		return 0, InternalServerError
+	}
+
+	var userRewardQuery *getMyRewardQueryData
+
+	query := "SELECT U.id AS id,U.userid AS user_id, U.finalValue AS final_value, U.isCompleted AS is_completed,U.isRewardClaimed AS is_reward_claimed,U.marketday AS market_day,D.value AS value FROM UserState U LEFT JOIN DailyChallenge D ON U.challengeId  = D.id WHERE U.id = ?"
+
+	if err := tx.Raw(query, userStateId).Scan(&userRewardQuery).Error; err != nil {
+		l.Errorf("failed fetching userRewardQuery %+e", err)
+		tx.Rollback()
+		return 0, InternalServerError
+
+	}
+
+	if userRewardQuery.UserId != userId {
+		return 0, InvalidUserError
+	}
+
+	if userRewardQuery.Marketday == GetMarketDay() && IsDailyChallengeOpen() {
+		return 0, InvalidRequestError
+	}
+
+	if !userRewardQuery.IsCompleted {
+		return 0, InvalidCerdentialError
+	}
+
+	if userRewardQuery.IsRewardClaimed {
+		return 0, InvalidRequestError
+	}
+
+	ch, user, err := getUserExclusively(userId)
+
+	if err != nil {
+		close(ch)
+		return 0, InternalServerError
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	user.Cash += userRewardQuery.Value
+
+	if err := tx.Save(&user).Error; err != nil {
+		tx.Rollback()
+		l.Errorf("Error updating user cash. %+e", err)
+		return 0, InternalServerError
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		l.Error(err)
+		return 0, InternalServerError
+	}
+
+	l.Debugf("Successfully rewarded cash to the user")
+
+	return userRewardQuery.Value, nil
 
 }
