@@ -142,9 +142,8 @@ func GetDailyChallengeConfig() (*Config, error) {
 		l.Errorf("failed fetching DailyChallengeConfig %+e", err)
 		return config, err
 	}
+	l.Debugf("Done")
 
 	return config, nil
-
-	l.Debugf("Done")
 
 }
