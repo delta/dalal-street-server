@@ -583,6 +583,8 @@ func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
+	l.Debugf("AddDailyChallenge Requested")
+
 	res := &actions_pb.AddDailyChallengeResponse{}
 
 	makeError := func(st actions_pb.AddDailyChallengeResponse_StatusCode, msg string) (*actions_pb.AddDailyChallengeResponse, error) {
@@ -594,18 +596,15 @@ func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions
 	userId := getUserId(ctx)
 
 	if !models.IsAdminAuth(userId) {
-		return makeError(actions_pb.AddDailyChallengeResponse_NotAdminUserError, "access unauthorised, User is not Admin")
+		return makeError(actions_pb.AddDailyChallengeResponse_NotAdminUserError, "User is not Admin")
 
 	}
 
-	if req.ChallengeType.String() != "SpecificStock" && req.StockId != 0 {
-		return makeError(actions_pb.AddDailyChallengeResponse_InvalidRequestError, "Invalid Request,stockId is not required for this challenge type")
-	}
-	// add daily challenge to db
 	err := models.AddDailyChallenge(req.Value, req.MarketDay, req.StockId, req.ChallengeType.String(), req.Reward)
 
-	if err != nil {
-		l.Errorf("request failed! %+v", err)
+	if err == models.InvalidRequestError {
+		return makeError(actions_pb.AddDailyChallengeResponse_InvalidRequestError, "stock id not required")
+	} else if err == models.InternalServerError {
 		return makeError(actions_pb.AddDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
@@ -633,24 +632,26 @@ func (d *dalalActionService) OpenDailyChallenge(ctx context.Context, req *action
 	userId := getUserId(ctx)
 
 	if !models.IsAdminAuth(userId) {
-		return makeError(actions_pb.OpenDailyChallengeResponse_NotAdminUserError, "access unauthorised, User is not Admin")
+		return makeError(actions_pb.OpenDailyChallengeResponse_NotAdminUserError, "User is not Admin")
 	}
 
-	if models.IsChallengeOpen == true {
-		return makeError(actions_pb.OpenDailyChallengeResponse_InvalidRequestError, "DailyChallenge already opened!")
+	marketDay := models.GetMarketDay()
+
+	if marketDay == 0 {
+		return makeError(actions_pb.OpenDailyChallengeResponse_InvalidRequestError, "marketday is zero")
 	}
 
-	// open dailychallenge of that day and save userstate for later computation
-	err := models.OpenDailyChallenge()
+	err := models.OpenDailyChallenge(marketDay)
 
-	if err != nil {
-		l.Errorf("request failed! %+v", err)
+	if err == models.InvalidRequestError {
+		return makeError(actions_pb.OpenDailyChallengeResponse_InvalidRequestError, "dailychallenge is opened already for the day")
+	} else if err == models.InternalServerError {
 		return makeError(actions_pb.OpenDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	res.StatusCode = actions_pb.OpenDailyChallengeResponse_OK
 	res.StatusMessage = "Done"
-	res.MarketDay = models.MarketDay
+	res.MarketDay = marketDay
 
 	return res, nil
 }
@@ -674,20 +675,15 @@ func (d *dalalActionService) CloseDailyChallenge(ctx context.Context, req *actio
 	userId := getUserId(ctx)
 
 	if !models.IsAdminAuth(userId) {
-		return makeError(actions_pb.CloseDailyChallengeResponse_NotAdminUserError, "access unauthorised, User is not Admin")
-
+		return makeError(actions_pb.CloseDailyChallengeResponse_NotAdminUserError, "User is not Admin")
 	}
 
-	if models.IsChallengeOpen == false {
-		return makeError(actions_pb.CloseDailyChallengeResponse_InvalidRequestError, "DailyChallenge already closed!")
-	}
-
-	//update whether the user finished that market day challenge
 	err := models.CloseDailyChallenge()
 
-	if err != nil {
-		l.Errorf("request failed! %+v", err)
-		return makeError(actions_pb.CloseDailyChallengeResponse_InternalServerError, "DailyChallenge already closed!")
+	if err == models.InvalidRequestError {
+		return makeError(actions_pb.CloseDailyChallengeResponse_InvalidRequestError, "DailyChallenge already closed for that day")
+	} else if err == models.InternalServerError {
+		return makeError(actions_pb.CloseDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
 	res.StatusCode = actions_pb.CloseDailyChallengeResponse_OK

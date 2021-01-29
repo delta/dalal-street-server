@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/jinzhu/gorm"
 
@@ -11,23 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// MarketDay
-// ischallengeOpen for now initialized as variable
-// TODO: store in db
-var (
-	MarketDay       uint32 = 1
-	IsChallengeOpen bool   = false
-)
-
-//Reward for diff ChallengeType
-var (
-	cashChallengeReward          = 2000
-	netWorthChallengeReward      = 2000
-	specificStockChallengeReward = 2000
-	stockWorthChallengeReward    = 2000
-)
-
-var wg sync.WaitGroup
+var InvalidRequestError = errors.New("Invalid Request")
 
 // DailyChallenge model
 type DailyChallenge struct {
@@ -112,10 +95,10 @@ func GetDailyChallenges(marketDay uint32) ([]*DailyChallenge, error) {
 
 	l := logger.WithFields(logrus.Fields{
 		"method":    "GetDailyChallenges",
-		"marketDay": MarketDay,
+		"marketDay": marketDay,
 	})
 
-	l.Infof("GetDailyChallenges Requested for market day:%d", MarketDay)
+	l.Infof("GetDailyChallenges Requested for market day:%d", marketDay)
 
 	var dailyChallenges []*DailyChallenge
 
@@ -128,7 +111,7 @@ func GetDailyChallenges(marketDay uint32) ([]*DailyChallenge, error) {
 		return nil, err
 	}
 
-	l.Infof("Successfully fetched dailyChallenges for marketday:%d", MarketDay)
+	l.Infof("Successfully fetched dailyChallenges for marketday:%d", marketDay)
 	return dailyChallenges, nil
 }
 
@@ -136,11 +119,15 @@ func GetDailyChallenges(marketDay uint32) ([]*DailyChallenge, error) {
 func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challengeType string, reward uint32) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":              "AddDailyChallenge",
-		"param_day":           MarketDay,
+		"param_day":           marketDay,
 		"param_value":         value,
 		"param_stockid":       stockId,
 		"param_challengeType": challengeType,
 	})
+
+	if challengeType != "SpecificStock" && stockId != 0 {
+		return InvalidRequestError
+	}
 
 	db := getDB()
 
@@ -157,12 +144,12 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 	if stockId == 0 {
 		if err := db.Table("DailyChallenge").Omit("StockId").Save(dailyChallenge).Error; err != nil {
 			l.Error(err)
-			return err
+			return InternalServerError
 		}
 	} else {
 		if err := db.Table("DailyChallenge").Save(dailyChallenge).Error; err != nil {
 			l.Error(err)
-			return err
+			return InternalServerError
 		}
 	}
 
@@ -175,29 +162,47 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 //saves initial user state depending upon the challengetype in db for later computation while Closing dailyChallenge
 //Admin can only invoke this function
 //TODO: use go concurrency  to save initial userstate effciently
-func OpenDailyChallenge() error {
+func OpenDailyChallenge(marketDay uint32) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "OpenDailyChallenge",
-		"market_day": MarketDay,
+		"market_day": marketDay,
 	})
 
 	l.Infof("OpenChallenge Requested!")
 
-	IsChallengeOpen = true
+	challengeStatus := IsDailyChallengeOpen()
 
-	dailyChallenges, err := GetDailyChallenges(MarketDay)
-
-	if err != nil {
-		l.Error(err)
-		return err
+	if challengeStatus == true {
+		return InvalidRequestError
 	}
 
-	if err := saveUsersState(dailyChallenges); err != nil {
+	dailyChallenges, err := GetDailyChallenges(marketDay)
+
+	if err != nil {
+		return InternalServerError
+	}
+
+	if err := saveUsersState(dailyChallenges, marketDay); err != nil {
 		l.Errorf("failed to save userstate %+e", err)
-		return err
+		return InternalServerError
 	}
 
 	l.Infof("succesfully saved userstate for DailyChallenges")
+
+	if err := SetIsDailyChallengeOpen(true); err != nil {
+		l.Errorf("failed to update dailyChallenge status %+e", err)
+		return InternalServerError
+	}
+
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: 0,
+		Dc: &DailyChallengeStatus{
+			IsDailyChallengeOpen: true,
+		},
+		GsType: DailyChallengeStatusUpdate,
+	}
+	gameStateStream.SendGameStateUpdate(g.ToProto())
 
 	return nil
 }
@@ -205,30 +210,53 @@ func OpenDailyChallenge() error {
 //CloseDailyChallenge closes dailychallenge and updates UserState
 //TODO: Uuse go concurrency to update userState
 func CloseDailyChallenge() error {
+	marketDay := GetMarketDay()
+
 	l := logger.WithFields(logrus.Fields{
 		"method":     "CloseDailyChallenge",
-		"market_day": MarketDay,
+		"market_day": marketDay,
 	})
 
 	l.Infof("CloseDailyChallenge Requested")
 
-	if err := updateUserState(); err != nil {
-		l.Errorf("failed to update userState %+e", err)
-		return err
+	challengeStatus := IsDailyChallengeOpen()
+
+	if challengeStatus == false {
+		return InvalidRequestError
 	}
 
-	IsChallengeOpen = false
+	if err := updateUserState(marketDay); err != nil {
+		l.Errorf("failed to update userState %+e", err)
+		return InternalServerError
+	}
 
 	l.Infof("Successfully updated Userstate")
+
+	//setting isDailyChallengeOpen to false
+	if err := SetIsDailyChallengeOpen(false); err != nil {
+		l.Errorf("failed to update dailyChallenge status %+e", err)
+		return InternalServerError
+	}
+
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: 0,
+		Dc: &DailyChallengeStatus{
+			IsDailyChallengeOpen: false,
+		},
+		GsType: DailyChallengeStatusUpdate,
+	}
+	gameStateStream.SendGameStateUpdate(g.ToProto())
 
 	return nil
 }
 
 //updateUsersState updates userState when dailyChallenges Closes
 //similiar to saveUsersState,invoked inside CloseDailyChallenge
-func updateUserState() error {
+func updateUserState(marketday uint32) error {
 	l := logger.WithFields(logrus.Fields{
-		"method": "updateUserState",
+		"method":     "updateUserState",
+		"market_day": marketday,
 	})
 
 	l.Debugf("Attempting to update userState")
@@ -247,7 +275,7 @@ func updateUserState() error {
 
 	query := fmt.Sprintf(`SELECT U.id AS id,U.userId AS user_id, U.challengeId AS challenge_id,U.initialValue AS initial_value,D.challengeType AS challenge_type,D.value AS value,D.stockId AS stock_id
 	 FROM
-	UserState U LEFT JOIN DailyChallenge D ON U.challengeId = D.id WHERE U.marketDay = %d;`, MarketDay)
+	UserState U LEFT JOIN DailyChallenge D ON U.challengeId = D.id WHERE U.marketDay = %d;`, marketday)
 
 	if err := tx.Raw(query).Scan(&queryResults).Error; err != nil {
 		l.Errorf("error, fetching userSate query data %+e", err)
@@ -396,10 +424,9 @@ func updateUserState() error {
 
 //saveUsersState saves registered users cash,stockworth,Networth,specificstock quantity based on challenge type
 //invoked inside OpenDailyChallenge
-func saveUsersState(c []*DailyChallenge) error {
+func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 	l := logger.WithFields(logrus.Fields{
-		"method":     "saveUsersState",
-		"market_day": MarketDay,
+		"method": "saveUsersState",
 	})
 
 	l.Debugf("Attempting to save user state")
