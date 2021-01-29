@@ -21,7 +21,11 @@ require (
 	github.com/sendgrid/sendgrid-go v3.7.2+incompatible
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.5.1
-	golang.org/x/net v0.0.0-20200421231249-e086a090c8fd
+	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
+	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
+	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c // indirect
+	golang.org/x/term v0.0.0-20201210144234-2321bbc49cbf // indirect
+	golang.org/x/text v0.3.5 // indirect
 	google.golang.org/grpc v1.34.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )

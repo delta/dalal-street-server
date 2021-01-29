@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS UserSubscriptions;
+DROP TABLE IF EXISTS UserSubscription;
