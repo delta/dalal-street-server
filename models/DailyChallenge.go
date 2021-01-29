@@ -67,7 +67,7 @@ type getMyRewardQueryData struct {
 	IsCompleted     bool
 	IsRewardClaimed bool
 	Marketday       uint32
-	Value           uint64
+	Reward          uint64
 }
 
 func (DailyChallenge) TableName() string {
@@ -647,7 +647,7 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 
 	var userRewardQuery *getMyRewardQueryData
 
-	query := "SELECT U.id AS id,U.userid AS user_id, U.finalValue AS final_value, U.isCompleted AS is_completed,U.isRewardClaimed AS is_reward_claimed,U.marketday AS market_day,D.value AS value FROM UserState U LEFT JOIN DailyChallenge D ON U.challengeId  = D.id WHERE U.id = ?"
+	query := "SELECT U.id AS id,U.userid AS user_id, U.finalValue AS final_value, U.isCompleted AS is_completed,U.isRewardClaimed AS is_reward_claimed,U.marketday AS market_day,D.reward AS reward FROM UserState U LEFT JOIN DailyChallenge D ON U.challengeId  = D.id WHERE U.id = ?"
 
 	if err := tx.Raw(query, userStateId).Scan(&userRewardQuery).Error; err != nil {
 		l.Errorf("failed fetching userRewardQuery %+e", err)
@@ -684,7 +684,7 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 		l.Debugf("Released exclusive write on user")
 	}()
 
-	user.Cash += userRewardQuery.Value
+	user.Cash += userRewardQuery.Reward
 
 	if err := tx.Save(&user).Error; err != nil {
 		tx.Rollback()
@@ -699,6 +699,6 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 
 	l.Debugf("Successfully rewarded cash to the user")
 
-	return userRewardQuery.Value, nil
+	return userRewardQuery.Reward, nil
 
 }
