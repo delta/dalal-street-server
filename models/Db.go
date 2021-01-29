@@ -5,9 +5,9 @@
 package models
 
 import (
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/datastreams"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 var logger *logrus.Entry
@@ -24,5 +24,6 @@ func Init(conf *utils.Config, dsm datastreams.Manager) {
 	config = conf
 	datastreamsManager = dsm
 
+	ConfigDataInit()
 	LoadStocks()
 }

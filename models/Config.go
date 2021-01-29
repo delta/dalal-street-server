@@ -1,10 +1,13 @@
 package models
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/sirupsen/logrus"
+)
 
 type Config struct {
 	IsDailyChallengeOpen bool   `gorm:"column:isDailyChallengeOpen;default false not null" json:"is_dailychallengeopen"`
-	MarketDay            uint32 `gorm:"column:id;marketDay;not null default 0" json:"market_day"`
+	MarketDay            uint32 `gorm:"column:marketDay;not null default 0 unsigned" json:"market_day"`
+	IsMarketOpen         bool   `gorm:"column:isMarketOpen;not null default 0 unsigned" json:"is_marketopen"`
 }
 
 func ConfigDataInit() {
@@ -24,6 +27,7 @@ func ConfigDataInit() {
 	config := &Config{
 		IsDailyChallengeOpen: false,
 		MarketDay:            0,
+		IsMarketOpen:         false,
 	}
 
 	if err := tx.Table("Config").Save(&config).Error; err != nil {
@@ -39,7 +43,7 @@ func ConfigDataInit() {
 
 }
 
-func IsDailyChallengeOpen() (bool, error) {
+func IsDailyChallengeOpen() bool {
 	l := logger.WithFields(logrus.Fields{
 		"method": "IsDailyChallengeOpen",
 	})
@@ -48,19 +52,21 @@ func IsDailyChallengeOpen() (bool, error) {
 
 	db := getDB()
 
-	var queryData bool
+	var challengeStatus bool
 
-	if err := db.Table("Config").Select("isDailyChallengeOpen").First(&queryData).Error; err != nil {
-		l.Errorf("failed to fetch isDailyChallenge from db %+e", err)
-		return queryData, err
-	}
+	query := "SELECT DISTINCT isDailyChallengeOpen FROM `Config`"
+
+	row := db.Raw(query).Row()
+
+	row.Scan(&challengeStatus)
+
 	l.Debugf("Done")
 
-	return queryData, nil
+	return challengeStatus
 
 }
 
-func setIsDailyChallengeOpen(challengeStatus bool) error {
+func SetIsDailyChallengeOpen(challengeStatus bool) error {
 	l := logger.WithFields(logrus.Fields{
 		"method": "setIsDailyChallengeOpen",
 	})
@@ -79,7 +85,7 @@ func setIsDailyChallengeOpen(challengeStatus bool) error {
 
 }
 
-func GetMarketDay() (uint32, error) {
+func GetMarketDay() uint32 {
 	l := logger.WithFields(logrus.Fields{
 		"method": "GetMarketDay",
 	})
@@ -89,14 +95,15 @@ func GetMarketDay() (uint32, error) {
 
 	var marketDay uint32
 
-	if err := db.Table("Config").Select("marketDay").First(&marketDay).Error; err != nil {
-		l.Errorf("failed to fetch isDailyChallenge from db %+e", err)
-		return marketDay, err
-	}
+	query := "SELECT DISTINCT marketDay FROM `Config`"
+
+	row := db.Raw(query).Row()
+
+	row.Scan(&marketDay)
 
 	l.Debugf("Done")
 
-	return marketDay, nil
+	return marketDay
 
 }
 
