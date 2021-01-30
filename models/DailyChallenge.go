@@ -611,11 +611,11 @@ func GetUserState(marketDay, userId, challengeId uint32) (*UserState, error) {
 
 	l.Debugf("GetUserState Requested!")
 
-	var userState *UserState
+	var userState = &UserState{}
 
 	db := getDB()
 
-	if err := db.Table("UserState").Where(" userId = ? ", userId).Where("marketDay = ?", marketDay).Where("challengeId = ?", challengeId).Find(&userState).Error; err != nil {
+	if err := db.Table("UserState").Where(" userId = ? ", userId).Where("marketDay = ?", marketDay).Where("challengeId = ?", challengeId).First(&userState).Error; err != nil {
 		l.Errorf("error loading userState %+e", err)
 		return userState, err
 	}

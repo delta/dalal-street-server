@@ -440,7 +440,6 @@ func (d *dalalActionService) GetMyReward(ctx context.Context, req *actions_pb.Ge
 
 }
 
-//TODO: do Error handling
 func (d *dalalActionService) GetDailyChallengeConfig(ctx context.Context, req *actions_pb.GetDailyChallengeConfigRequest) (*actions_pb.GetDailyChallengeConfigResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetDailyChallengeConfig",
