@@ -54,17 +54,15 @@ func IsDailyChallengeOpen() bool {
 
 	db := getDB()
 
-	var challengeStatus bool
+	queryData := &Config{}
 
-	query := "SELECT isDailyChallengeOpen FROM `Config` WHERE id = 1`"
-
-	row := db.Raw(query).Row()
-
-	row.Scan(&challengeStatus)
+	if err := db.Table("Config").Select("isDailyChallengeOpen").First(queryData).Error; err != nil {
+		l.Error(err)
+	}
 
 	l.Debugf("Done")
 
-	return challengeStatus
+	return queryData.IsDailyChallengeOpen
 
 }
 
@@ -95,17 +93,15 @@ func GetMarketDay() uint32 {
 
 	db := getDB()
 
-	var marketDay uint32
+	queryData := &Config{}
 
-	query := "SELECT DISTINCT marketDay FROM `Config`"
-
-	row := db.Raw(query).Row()
-
-	row.Scan(&marketDay)
+	if err := db.Table("Config").Select("marketDay").First(queryData).Error; err != nil {
+		l.Error(err)
+	}
 
 	l.Debugf("Done")
 
-	return marketDay
+	return queryData.MarketDay
 
 }
 

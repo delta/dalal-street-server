@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	InvalidRequestError    = errors.New("Invalid Request")
-	InvalidUserError       = errors.New("Invalid User")
-	InvalidCerdentialError = errors.New("invalid credentials")
+	InvalidRequestError       = errors.New("Invalid Request")
+	InvalidUserError          = errors.New("Invalid User")
+	InvalidCerdentialError    = errors.New("invalid credentials")
+	InvalidChallengeTypeError = errors.New("challenge type not supported")
 )
 
 // DailyChallenge model
@@ -174,8 +175,6 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 
 //OpenDailyChallenge opens dailyChallenge
 //saves initial user state depending upon the challengetype in db for later computation while Closing dailyChallenge
-//Admin can only invoke this function
-//TODO: use go concurrency  to save initial userstate effciently
 func OpenDailyChallenge(marketDay uint32) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "OpenDailyChallenge",
@@ -222,7 +221,6 @@ func OpenDailyChallenge(marketDay uint32) error {
 }
 
 //CloseDailyChallenge closes dailychallenge and updates UserState
-//TODO: Uuse go concurrency to update userState
 func CloseDailyChallenge() error {
 	marketDay := GetMarketDay()
 
@@ -235,7 +233,7 @@ func CloseDailyChallenge() error {
 
 	challengeStatus := IsDailyChallengeOpen()
 
-	if challengeStatus == true {
+	if challengeStatus == false {
 		return InvalidRequestError
 	}
 
@@ -421,7 +419,7 @@ func updateUserState(marketday uint32) error {
 		default:
 			l.Error("something went wrong, updating userState failed,Rolling back...")
 			tx.Rollback()
-			return errors.New("challenge type not supported")
+			return InvalidChallengeTypeError
 
 		}
 
@@ -557,7 +555,7 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 		default:
 			l.Error("challenge type not supported, userstate not saved")
 			tx.Rollback()
-			return errors.New("challenge type not supported")
+			return InvalidChallengeTypeError
 		}
 
 	}
@@ -701,4 +699,80 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 
 	return userRewardQuery.Reward, nil
 
+}
+
+func saveNewUserState(userId uint32) error {
+	l := logger.WithFields(logrus.Fields{
+		"method":  "GetMyReward",
+		"user_id": userId,
+	})
+
+	l.Debugf("saveNewUserState Requested")
+
+	marketDay := GetMarketDay()
+
+	challenges, err := GetDailyChallenges(marketDay)
+
+	if err != nil {
+		l.Errorf("failed fetching daily challenges")
+		return err
+	}
+
+	db := getDB()
+
+	//begin transaction
+	tx := db.Begin()
+
+	if err := tx.Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	for _, c := range challenges {
+
+		if c.ChallengeType == "Cash" || c.ChallengeType == "NetWorth" {
+			userStateEntry := &UserState{
+				ChallengeId:  c.Id,
+				UserId:       userId,
+				MarketDay:    c.MarketDay,
+				InitialValue: STARTING_CASH,
+			}
+
+			if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed saving userState %+e", err)
+				tx.Rollback()
+				return err
+			}
+
+		} else if c.ChallengeType == "StockWorth" || c.ChallengeType == "SpecificStock" {
+
+			userStateEntry := &UserState{
+				ChallengeId:  c.Id,
+				UserId:       userId,
+				MarketDay:    c.MarketDay,
+				InitialValue: 0,
+			}
+
+			if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed saving userState %+e", err)
+				tx.Rollback()
+				return err
+			}
+		} else {
+			l.Error("challenge type not supported, userstate not saved")
+			tx.Rollback()
+			return InvalidChallengeTypeError
+		}
+
+	}
+
+	//commit transaction
+	if err := tx.Commit().Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	l.Debugf("Done")
+
+	return nil
 }
