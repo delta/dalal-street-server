@@ -5,6 +5,7 @@ import (
 )
 
 type Config struct {
+	Id                   uint32 `gorm:"column:id;primary_key;not null" json:"id"`
 	IsDailyChallengeOpen bool   `gorm:"column:isDailyChallengeOpen;default false not null" json:"is_dailychallengeopen"`
 	MarketDay            uint32 `gorm:"column:marketDay;not null default 0 unsigned" json:"market_day"`
 	IsMarketOpen         bool   `gorm:"column:isMarketOpen;not null default 0 unsigned" json:"is_marketopen"`
@@ -25,6 +26,7 @@ func ConfigDataInit() {
 	tx.Exec("TRUNCATE TABLE Config")
 
 	config := &Config{
+		Id:                   1,
 		IsDailyChallengeOpen: false,
 		MarketDay:            0,
 		IsMarketOpen:         false,
@@ -54,7 +56,7 @@ func IsDailyChallengeOpen() bool {
 
 	var challengeStatus bool
 
-	query := "SELECT DISTINCT isDailyChallengeOpen FROM `Config`"
+	query := "SELECT isDailyChallengeOpen FROM `Config` WHERE id = 1`"
 
 	row := db.Raw(query).Row()
 
@@ -134,7 +136,7 @@ func GetDailyChallengeConfig() (*Config, error) {
 
 	l.Debugf("requested")
 
-	var config *Config
+	config := &Config{}
 
 	db := getDB()
 
