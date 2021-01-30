@@ -235,7 +235,7 @@ func CloseDailyChallenge() error {
 
 	challengeStatus := IsDailyChallengeOpen()
 
-	if challengeStatus == false {
+	if challengeStatus == true {
 		return InvalidRequestError
 	}
 

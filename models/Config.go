@@ -141,7 +141,7 @@ func GetDailyChallengeConfig() (*Config, error) {
 	db := getDB()
 
 	if err := db.Table("Config").First(&config).Error; err != nil {
-		l.Errorf("failed fetching DailyChallengeConfig %+e", err)
+		l.Errorf("failed fetching DailyChallengeConfig %v", err)
 		return config, err
 	}
 	l.Debugf("Done")
