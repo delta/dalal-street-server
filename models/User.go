@@ -376,15 +376,6 @@ func createUser(name string, email string) (*User, error) {
 		return nil, err
 	}
 
-	challengeStatus := IsDailyChallengeOpen()
-	// saving initial user state of a user when dailychallenge is open
-	if challengeStatus == true {
-		err := saveNewUserState(u.Id)
-		if err != nil {
-			l.Errorf("failed saving user state %v", err)
-		}
-	}
-
 	//update total user count
 	atomic.AddUint32(&TotalUserCount, 1)
 
