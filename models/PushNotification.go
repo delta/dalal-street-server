@@ -9,6 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
+	"crypto/aes"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 )
@@ -21,18 +23,23 @@ type UserSubscription struct {
 	Auth string `gorm:"column:auth; not null" json:"auth"`
 }
 
+type PushNotification struct {
+	Title string
+	Message string
+}
+
 
 func (UserSubscription) TableName() string {
 	return "UserSubscription"
 }
 
 // Adds the subscription keys for sending push notifications
-func AddUserSubscription(email string ,data string) error {
+func AddUserSubscription(userID uint32,data string) error {
 
 	var l = logger.WithFields(logrus.Fields{
-		"method":      "Add User Subscription",
-		"param_email": email,
-		"param_data":  data,
+		"method":       "Add User Subscription",
+		"param_userid": userID,
+		"param_data":   data,
 	})
 
 	l.Infof("Add User subscription details requsted")
@@ -40,10 +47,10 @@ func AddUserSubscription(email string ,data string) error {
 	db := getDB()
 
 	user := User{
-		Email : email,
+		Id: userID,
 	}
 
-	err := db.Table("Users").Where("email = ?",email).First(&user).Error; 
+	err := db.Table("Users").Where("id = ?",userID).First(&user).Error; 
 
 	if err != nil {
 	   l.Errorf("User not found in Database")
@@ -56,7 +63,7 @@ func AddUserSubscription(email string ,data string) error {
 	keys := result["keys"].(map[string]interface{})
 
 	userSubscription := &UserSubscription{
-		UserID :   user.Id,
+		UserID :   userID,
 		EndPoint : result["endpoint"].(string),
 		P256dh : keys["p256dh"].(string),
 		Auth : keys["auth"].(string),
@@ -72,7 +79,7 @@ func AddUserSubscription(email string ,data string) error {
 
 /** WEB PUSH LOGIC */
 
-func sendNotification(s *UserSubscription) {
+func sendNotification(s *UserSubscription,Pnotif *PushNotification) error {
 	curve := elliptic.P256()
 
 	// get dh key for creating a common key
@@ -111,6 +118,38 @@ func sendNotification(s *UserSubscription) {
 	nonceInfo.Write(dh)
 	nonceInfo.Write(serverPublicKey)
 	nonce := HKDF(salt, prk, nonceInfo.Bytes(), 12)
+
+	// padding with len 0
+	
+	padding := bytes.NewBuffer([]byte("00"))
+
+	// cipher
+
+	cipher_block,err := aes.NewCipher(contentEncryptionKey)
+
+	if err != nil {
+		// error while generating cipher
+		return InternalServerError
+	}
+
+	// used for converting our payload data from golang obj to bytes
+
+	payloadBytes := new(bytes.Buffer)
+	json.NewEncoder(payloadBytes).Encode(Pnotif)	
+
+	if err != nil {
+		fmt.Errorf("Error while encoding Push notification object %+v",err)
+	}
+    
+
+	payload := new(bytes.Buffer)
+
+	payload.Write(nonce)
+	payload.Write(payloadBytes.Bytes())
+
+    finalCipher := cipher.NewCFBEncrypter(cipher_block,payload)
+	
+	result := new(bytes.Buffer)
 
 }
 

@@ -487,11 +487,11 @@ func (d *dalalActionService) AddUserSubscription(ctx context.Context,req *action
 		return resp, nil
 	}
 
-	email := req.Email
+	userID := getUserId(ctx)
 	// data contains endpoint and keys in string format
 	data := req.Data
 
-	err := models.AddUserSubscription(email,data) 
+	err := models.AddUserSubscription(userID,data) 
 
 	switch  {
 	case err == models.UserNotFoundError:
