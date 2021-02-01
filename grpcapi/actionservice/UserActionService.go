@@ -428,7 +428,7 @@ func (d *dalalActionService) GetMyReward(ctx context.Context, req *actions_pb.Ge
 		return makeError(actions_pb.GetMyRewardResponse_InvalidUserError, "Invalid user")
 	} else if err == models.InvalidCerdentialError {
 		return makeError(actions_pb.GetMyRewardResponse_InvalidCerdentialError, "better luck next time")
-	} else {
+	} else if err == models.InvalidRequestError {
 		return makeError(actions_pb.GetMyRewardResponse_InvalidRequestError, "Invalid request")
 	}
 

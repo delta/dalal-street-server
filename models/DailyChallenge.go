@@ -716,6 +716,16 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 		return 0, InternalServerError
 	}
 
+	gameStateStream := datastreamsManager.GetGameStateStream()
+	g := &GameState{
+		UserID: userId,
+		Ur: &UserRewardCredit{
+			Cash: user.Cash,
+		},
+		GsType: UserRewardCreditUpdate,
+	}
+	gameStateStream.SendGameStateUpdate(g.ToProto())
+
 	l.Debugf("Successfully rewarded cash to the user")
 
 	return userRewardQuery.Reward, nil
