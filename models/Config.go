@@ -4,6 +4,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// this files handles config for daily challenges
+
+// Config model
 type Config struct {
 	Id                   uint32 `gorm:"column:id;primary_key;not null" json:"id"`
 	IsDailyChallengeOpen bool   `gorm:"column:isDailyChallengeOpen;default false not null" json:"is_dailychallengeopen"`
@@ -11,6 +14,7 @@ type Config struct {
 	IsMarketOpen         bool   `gorm:"column:isMarketOpen;not null default 0 unsigned" json:"is_marketopen"`
 }
 
+//ConfigDataInit init initial values for Config table
 func ConfigDataInit() {
 	l := logger.WithFields(logrus.Fields{
 		"method": "ConfigDataInit",
@@ -45,6 +49,7 @@ func ConfigDataInit() {
 
 }
 
+//IsDailyChallengeOpen returns dailychallenge status
 func IsDailyChallengeOpen() bool {
 	l := logger.WithFields(logrus.Fields{
 		"method": "IsDailyChallengeOpen",
@@ -66,6 +71,7 @@ func IsDailyChallengeOpen() bool {
 
 }
 
+// SetIsDailyChallengeOpen update IsDailyChallengeOpen in db
 func SetIsDailyChallengeOpen(challengeStatus bool) error {
 	l := logger.WithFields(logrus.Fields{
 		"method": "setIsDailyChallengeOpen",
@@ -85,6 +91,7 @@ func SetIsDailyChallengeOpen(challengeStatus bool) error {
 
 }
 
+//GetMarketDay returns current marketday
 func GetMarketDay() uint32 {
 	l := logger.WithFields(logrus.Fields{
 		"method": "GetMarketDay",
@@ -105,6 +112,7 @@ func GetMarketDay() uint32 {
 
 }
 
+//SetMarketDay updates marketday in db
 func SetMarketDay(marketDay uint32) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "SetMarketDay",
@@ -125,6 +133,7 @@ func SetMarketDay(marketDay uint32) error {
 
 }
 
+// GetDailyChallengeConfig returns DailyChallengeConfig
 func GetDailyChallengeConfig() (*Config, error) {
 	l := logger.WithFields(logrus.Fields{
 		"method": "GetDailyChallengeConfig",

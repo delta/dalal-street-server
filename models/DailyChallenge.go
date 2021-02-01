@@ -253,7 +253,7 @@ func CloseDailyChallenge() error {
 		l.Errorf("failed to update dailyChallenge status %+e", err)
 		return InternalServerError
 	}
-
+	// streaming dailyChallenge status
 	gameStateStream := datastreamsManager.GetGameStateStream()
 	g := &GameState{
 		UserID: 0,
@@ -617,6 +617,7 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 	return results, nil
 }
 
+//GetUserState returns userState
 func GetUserState(marketDay, userId, challengeId uint32) (*UserState, error) {
 
 	l := logger.WithFields(logrus.Fields{
@@ -642,6 +643,7 @@ func GetUserState(marketDay, userId, challengeId uint32) (*UserState, error) {
 
 }
 
+//GetMyReward add reward to user as  cash
 func GetMyReward(userStateId, userId uint32) (uint64, error) {
 
 	l := logger.WithFields(logrus.Fields{
@@ -719,7 +721,7 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 		l.Error(err)
 		return 0, InternalServerError
 	}
-
+	//streams user reward credit
 	gameStateStream := datastreamsManager.GetGameStateStream()
 	g := &GameState{
 		UserID: userId,
@@ -736,6 +738,7 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 
 }
 
+//saveNewUserState saves new user state i.e users who registers when dailyChallenge is open
 func saveNewUserState(userId uint32) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":  "GetMyReward",
