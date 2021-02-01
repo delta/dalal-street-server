@@ -140,7 +140,11 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 		"param_challengeType": challengeType,
 	})
 
-	if challengeType != "SpecificStock" && stockId != 0 {
+	if challengeType == "SpecificStock" {
+		if stockId == 0 {
+			return InvalidRequestError
+		}
+	} else if stockId != 0 {
 		return InvalidRequestError
 	}
 

@@ -603,7 +603,7 @@ func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions
 	err := models.AddDailyChallenge(req.Value, req.MarketDay, req.StockId, req.ChallengeType.String(), req.Reward)
 
 	if err == models.InvalidRequestError {
-		return makeError(actions_pb.AddDailyChallengeResponse_InvalidRequestError, "stock id not required")
+		return makeError(actions_pb.AddDailyChallengeResponse_InvalidRequestError, "invalid request check stockid")
 	} else if err == models.InternalServerError {
 		return makeError(actions_pb.AddDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
 	}
