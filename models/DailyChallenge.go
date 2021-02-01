@@ -24,7 +24,7 @@ type DailyChallenge struct {
 	ChallengeType string `gorm:"column:challengeType;not null" json:"challenge_type"`
 	Value         uint64 `gorm:"column:value;not null" json:"value"`
 	StockId       uint32 `gorm:"column:stockId; default null" json:"stock_id"`
-	Reward        uint32 `gorm:"column:reward; not null" json:"reward`
+	Reward        uint32 `gorm:"column:reward; not null" json:"reward"`
 }
 
 //UserState model
@@ -35,8 +35,8 @@ type UserState struct {
 	MarketDay       uint32 `gorm:"column:marketDay;not null" json:"market_day"`
 	InitialValue    int64  `gorm:"column:initialValue;not null" json:"initial_value"`
 	FinalValue      int64  `gorm:"column:finalValue;default null" json:"final_value"`
-	IsCompleted     bool   `gorm:"column:isCompleted;default false" json:"is_completed"`
-	IsRewardClamied bool   `gorm:"column:isRewardClaimed;default false" json:"is_reward_claimed"`
+	IsCompleted     bool   `gorm:"column:isCompleted;" json:"is_completed"`
+	IsRewardClamied bool   `gorm:"column:isRewardClaimed;" json:"is_reward_claimed"`
 }
 
 type userStateQueryData struct {
@@ -294,14 +294,11 @@ func updateUserState(marketday uint32) error {
 		return err
 	}
 
-	l.Printf("%+v \n", queryResults[0])
-	l.Println(len(queryResults))
-
 	for _, q := range queryResults {
 
 		switch q.ChallengeType {
 		case "Cash":
-			var userStateEntry = &UserState{
+			userStateEntry := &UserState{
 				Id: q.Id,
 			}
 
@@ -312,13 +309,13 @@ func updateUserState(marketday uint32) error {
 			}
 			l.Debugf("Acquired")
 
-			if q.InitialValue+int64(q.Value) >= int64(user.Cash+user.ReservedCash) {
+			if int64(user.Cash+user.ReservedCash) >= q.InitialValue+int64(q.Value) {
 				userStateEntry.IsCompleted = true
 			}
 
 			userStateEntry.FinalValue = int64(user.Cash)
 
-			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
+			if err := tx.Table("UserState").Select("FinalValue", "IsCompleted").Save(userStateEntry).Error; err != nil {
 				l.Errorf("failed saving userState cash Challenge type %+e", err)
 				tx.Rollback()
 				close(ch)
@@ -331,7 +328,7 @@ func updateUserState(marketday uint32) error {
 			l.Debugf("updated userstate challenge type cash")
 
 		case "NetWorth":
-			var userStateEntry = &UserState{
+			userStateEntry := &UserState{
 				Id: q.Id,
 			}
 
@@ -342,13 +339,13 @@ func updateUserState(marketday uint32) error {
 			}
 			l.Debugf("Acquired")
 
-			if q.InitialValue+int64(q.Value) >= int64(user.Total) {
+			if int64(user.Total) >= q.InitialValue+int64(q.Value) {
 				userStateEntry.IsCompleted = true
 			}
 
 			userStateEntry.FinalValue = int64(user.Total)
 
-			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
+			if err := tx.Table("UserState").Select("FinalValue", "IsCompleted").Save(userStateEntry).Error; err != nil {
 				l.Errorf("failed saving userState net worth Challenge type %+e", err)
 				tx.Rollback()
 				close(ch)
@@ -358,8 +355,10 @@ func updateUserState(marketday uint32) error {
 			close(ch)
 			l.Debugf("Released exclusive write on user")
 
+			l.Debugf("updated userstate challenge type networth")
+
 		case "SpecificStock":
-			var userStateEntry = &UserState{
+			userStateEntry := &UserState{
 				Id: q.Id,
 			}
 
@@ -377,14 +376,14 @@ func updateUserState(marketday uint32) error {
 				return err
 			}
 
-			if q.InitialValue+int64(q.Value) >= stockQuantity {
+			if stockQuantity >= q.InitialValue+int64(q.Value) {
 				userStateEntry.IsCompleted = true
 			}
 
 			userStateEntry.FinalValue = int64(stockQuantity)
 
-			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
-				l.Errorf("failed saving userState specific stock Challenge type %+e", err)
+			if err := tx.Table("UserState").Select("FinalValue", "IsCompleted").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed updating userState specific stock Challenge type %+e", err)
 				tx.Rollback()
 				close(ch)
 				return err
@@ -393,8 +392,10 @@ func updateUserState(marketday uint32) error {
 			close(ch)
 			l.Debugf("Released exclusive write on user")
 
+			l.Debugf("updated userstate challenge type SpecificStock")
+
 		case "StockWorth":
-			var userStateEntry = &UserState{
+			userStateEntry := &UserState{
 				Id: q.Id,
 			}
 			stockWorth, err := GetUserStockWorth(q.UserId)
@@ -403,18 +404,21 @@ func updateUserState(marketday uint32) error {
 				l.Error(err)
 				return err
 			}
+			fmt.Println(stockWorth, q.Value, q.InitialValue, q.InitialValue+int64(q.Value))
 
-			if q.InitialValue+int64(q.Value) >= stockWorth {
+			if stockWorth >= q.InitialValue+int64(q.Value) {
 				userStateEntry.IsCompleted = true
 			}
 
 			userStateEntry.FinalValue = int64(stockWorth)
 
-			if err := tx.Table("UserState").Select("FinalValue", "Iscompleted").Save(userStateEntry).Error; err != nil {
-				l.Errorf("failed saving userState stockworth Challenge type %+e", err)
+			if err := tx.Table("UserState").Select("FinalValue", "IsCompleted").Save(userStateEntry).Error; err != nil {
+				l.Errorf("failed updating userState stockworth Challenge type %+e", err)
 				tx.Rollback()
 				return err
 			}
+
+			l.Debugf("updated userstate challenge type stockworth")
 
 		default:
 			l.Error("something went wrong, updating userState failed,Rolling back...")
@@ -477,13 +481,15 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 
 			for _, u := range queryResults {
 				userStateEntry = &UserState{
-					ChallengeId:  challenge.Id,
-					UserId:       u.UserId,
-					MarketDay:    challenge.MarketDay,
-					InitialValue: int64(u.Cash),
+					ChallengeId:     challenge.Id,
+					UserId:          u.UserId,
+					MarketDay:       challenge.MarketDay,
+					InitialValue:    int64(u.Cash),
+					IsCompleted:     false,
+					IsRewardClamied: false,
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+				if err := tx.Table("UserState").Omit("FinalValue").Save(userStateEntry).Error; err != nil {
 					l.Errorf("failed saving userState cash Challenge type %+e", err)
 					tx.Rollback()
 					return err
@@ -495,13 +501,15 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 
 			for _, u := range queryResults {
 				userStateEntry = &UserState{
-					ChallengeId:  challenge.Id,
-					UserId:       u.UserId,
-					MarketDay:    challenge.MarketDay,
-					InitialValue: u.Total,
+					ChallengeId:     challenge.Id,
+					UserId:          u.UserId,
+					MarketDay:       challenge.MarketDay,
+					InitialValue:    u.Total,
+					IsCompleted:     false,
+					IsRewardClamied: false,
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+				if err := tx.Table("UserState").Omit("FinalValue").Save(userStateEntry).Error; err != nil {
 					l.Errorf("failed saving userState NetWorth Challenge type %+e", err)
 					tx.Rollback()
 					return err
@@ -513,13 +521,15 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 
 			for _, u := range queryResults {
 				userStateEntry = &UserState{
-					ChallengeId:  challenge.Id,
-					UserId:       u.UserId,
-					MarketDay:    challenge.MarketDay,
-					InitialValue: u.StockWorth,
+					ChallengeId:     challenge.Id,
+					UserId:          u.UserId,
+					MarketDay:       challenge.MarketDay,
+					InitialValue:    u.StockWorth,
+					IsCompleted:     false,
+					IsRewardClamied: false,
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+				if err := tx.Table("UserState").Omit("FinalValue").Save(userStateEntry).Error; err != nil {
 					l.Errorf("failed saving userState StockWorth Challenge type %+e", err)
 					tx.Rollback()
 					return err
@@ -539,13 +549,15 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 
 			for _, u := range result {
 				userStateEntry = &UserState{
-					ChallengeId:  challenge.Id,
-					UserId:       u.UserId,
-					MarketDay:    challenge.MarketDay,
-					InitialValue: u.StockQuantity,
+					ChallengeId:     challenge.Id,
+					UserId:          u.UserId,
+					MarketDay:       challenge.MarketDay,
+					InitialValue:    u.StockQuantity,
+					IsCompleted:     false,
+					IsRewardClamied: false,
 				}
 
-				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+				if err := tx.Table("UserState").Omit("FinalValue").Save(userStateEntry).Error; err != nil {
 					l.Errorf("failed saving userState SpecificStockType Challenge type %+e", err)
 					tx.Rollback()
 					return err
@@ -580,11 +592,14 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 
 	var results []specificStockUserEntry
 
-	query := fmt.Sprintf(`SELECT U.id AS user_id,
-	IFNULL( ( SUM( CAST(T.stockQuantity AS SIGNED) ) + SUM( CAST( T.reservedStockQuantity AS SIGNED ) ) ), 0 ) AS stock_quantity
-	 FROM
-	Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id WHERE S.id = %d
-	 GROUP BY U.id;`, stockId)
+	query := fmt.Sprintf(`SELECT
+    U.id AS user_id,
+    IFNULL(
+        (
+            SUM(T.stockQuantity) + SUM(T.reservedStockQuantity)
+        ),
+        0
+    ) AS stock_quantity FROM  Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = %d WHERE U.blockCount < %d GROUP BY U.id;`, stockId, config.MaxBlockCount)
 
 	if err := tx.Raw(query).Scan(&results).Error; err != nil {
 		l.Errorf("failed fetching SpecificStockEntry %+e", err)
@@ -643,7 +658,7 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 		return 0, InternalServerError
 	}
 
-	var userRewardQuery *getMyRewardQueryData
+	userRewardQuery := getMyRewardQueryData{}
 
 	query := "SELECT U.id AS id,U.userid AS user_id, U.finalValue AS final_value, U.isCompleted AS is_completed,U.isRewardClaimed AS is_reward_claimed,U.marketday AS market_day,D.reward AS reward FROM UserState U LEFT JOIN DailyChallenge D ON U.challengeId  = D.id WHERE U.id = ?"
 

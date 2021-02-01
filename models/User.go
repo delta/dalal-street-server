@@ -2448,19 +2448,18 @@ func UnBlockAllUsers() error {
 //GetUserStockWorth returns total stockworth of a user including reserved StockWorth
 func GetUserStockWorth(userId uint32) (int64, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":  "UnBlockAllUsers",
-		"user_id": "userId",
+		"method":  "GetUserStockWorth",
+		"user_id": userId,
 	})
 
 	l.Debugf("Attempting to get stockworth")
 
-	var stockworth int64
-
+	var stockWorth int64
 	ch, _, err := getUserExclusively(userId)
 
 	if err != nil {
 		close(ch)
-		return stockworth, nil
+		return stockWorth, nil
 	}
 	l.Debugf("Acquired")
 	defer func() {
@@ -2470,13 +2469,13 @@ func GetUserStockWorth(userId uint32) (int64, error) {
 
 	db := getDB()
 
-	query := " ifNull((SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed)) ),0) AS stock_worth FROM Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id WHERE U.userId = ?;"
+	query := "SELECT ifNull((SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed)) ),0) AS stockWorth FROM Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id WHERE U.id = ?"
 
 	row := db.Raw(query, userId).Row()
 
-	if err := row.Scan(&stockworth).Error; err != nil {
-		return stockworth, errors.New(err())
-	}
+	row.Scan(&stockWorth)
 
-	return stockworth, nil
+	l.Debugf("Got %d \n", stockWorth)
+
+	return stockWorth, nil
 }

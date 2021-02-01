@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS UserState (
      `marketDay` int(11) UNSIGNED NOT NULL,
      `initialValue`bigint(11) SIGNED NOT NULL,
      `finalValue`bigint(11) SIGNED DEFAULT NULL,
-     `isCompleted`BOOLEAN DEFAULT FALSE,
-     `isRewardClaimed`BOOLEAN DEFAULT FALSE,
+     `isCompleted`BOOLEAN,
+     `isRewardClaimed`BOOLEAN,
      PRIMARY KEY (id),
      FOREIGN KEY (challengeId) REFERENCES DailyChallenge(id),
      FOREIGN KEY (userId) REFERENCES Users(id)
