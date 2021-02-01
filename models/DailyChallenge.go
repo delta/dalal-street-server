@@ -705,6 +705,12 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 		return 0, InternalServerError
 	}
 
+	if err := tx.Table("UserState").Where("id = ?", userStateId).Update("isRewardClaimed", true).Error; err != nil {
+		l.Errorf("Error updating isRewardClaimed %v", err)
+		tx.Rollback()
+		return 0, InternalServerError
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		l.Error(err)
 		return 0, InternalServerError
