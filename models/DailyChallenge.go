@@ -23,7 +23,7 @@ type DailyChallenge struct {
 	MarketDay     uint32 `gorm:"column:marketDay;not null" json:"market_day"`
 	ChallengeType string `gorm:"column:challengeType;not null" json:"challenge_type"`
 	Value         uint64 `gorm:"column:value;not null" json:"value"`
-	StockId       uint32 `gorm:"column:stockId; default null" json:"stock_id"`
+	StockId       uint32 `gorm:"column:stockId;default null" json:"stock_id"`
 	Reward        uint32 `gorm:"column:reward; not null" json:"reward"`
 }
 
@@ -35,8 +35,8 @@ type UserState struct {
 	MarketDay       uint32 `gorm:"column:marketDay;not null" json:"market_day"`
 	InitialValue    int64  `gorm:"column:initialValue;not null" json:"initial_value"`
 	FinalValue      int64  `gorm:"column:finalValue;default null" json:"final_value"`
-	IsCompleted     bool   `gorm:"column:isCompleted;" json:"is_completed"`
-	IsRewardClamied bool   `gorm:"column:isRewardClaimed;" json:"is_reward_claimed"`
+	IsCompleted     bool   `gorm:"column:isCompleted;default false" json:"is_completed"`
+	IsRewardClamied bool   `gorm:"column:isRewardClaimed;default false" json:"is_reward_claimed"`
 }
 
 type userStateQueryData struct {
@@ -749,11 +749,18 @@ func saveNewUserState(userId uint32) error {
 
 	marketDay := GetMarketDay()
 
-	challenges, err := GetDailyChallenges(marketDay)
+	var totalChallenges []*DailyChallenge
 
-	if err != nil {
-		l.Errorf("failed fetching daily challenges")
-		return err
+	var i uint32
+
+	for i = 1; i <= marketDay; i++ {
+		challenges, err := GetDailyChallenges(i)
+
+		if err != nil {
+			l.Errorf("failed fetching daily challenges for day %d", i)
+			return err
+		}
+		totalChallenges = append(totalChallenges, challenges...)
 	}
 
 	db := getDB()
@@ -766,7 +773,7 @@ func saveNewUserState(userId uint32) error {
 		return err
 	}
 
-	for _, c := range challenges {
+	for _, c := range totalChallenges {
 
 		if c.ChallengeType == "Cash" || c.ChallengeType == "NetWorth" {
 			userStateEntry := &UserState{
@@ -776,10 +783,19 @@ func saveNewUserState(userId uint32) error {
 				InitialValue: STARTING_CASH,
 			}
 
-			if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
-				l.Errorf("failed saving userState %+e", err)
-				tx.Rollback()
-				return err
+			if c.MarketDay < marketDay {
+				userStateEntry.FinalValue = STARTING_CASH
+				if err := tx.Table("UserState").Omit("Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState %+e", err)
+					tx.Rollback()
+					return err
+				}
+			} else {
+				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState %+e", err)
+					tx.Rollback()
+					return err
+				}
 			}
 
 		} else if c.ChallengeType == "StockWorth" || c.ChallengeType == "SpecificStock" {
@@ -790,11 +806,19 @@ func saveNewUserState(userId uint32) error {
 				MarketDay:    c.MarketDay,
 				InitialValue: 0,
 			}
-
-			if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
-				l.Errorf("failed saving userState %+e", err)
-				tx.Rollback()
-				return err
+			if c.MarketDay < marketDay {
+				userStateEntry.FinalValue = 0
+				if err := tx.Table("UserState").Omit("Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState %+e", err)
+					tx.Rollback()
+					return err
+				}
+			} else {
+				if err := tx.Table("UserState").Omit("FinalValue", "Iscompleted", "IsRewardClaimed").Save(userStateEntry).Error; err != nil {
+					l.Errorf("failed saving userState %+e", err)
+					tx.Rollback()
+					return err
+				}
 			}
 		} else {
 			l.Error("challenge type not supported, userstate not saved")
