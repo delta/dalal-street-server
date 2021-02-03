@@ -140,6 +140,12 @@ func AddDailyChallenge(value uint64, marketDay uint32, stockId uint32, challenge
 		"param_challengeType": challengeType,
 	})
 
+	liveMarketDay := GetMarketDay()
+
+	if liveMarketDay == 0 || liveMarketDay > marketDay {
+		return InvalidRequestError
+	}
+
 	if challengeType == "SpecificStock" {
 		if stockId == 0 {
 			return InvalidRequestError
