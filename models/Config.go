@@ -134,12 +134,14 @@ func SetMarketDay(marketDay uint32) error {
 }
 
 // GetDailyChallengeConfig returns DailyChallengeConfig
-func GetDailyChallengeConfig() (*Config, error) {
+func GetDailyChallengeConfig() (*Config, uint32, error) {
 	l := logger.WithFields(logrus.Fields{
 		"method": "GetDailyChallengeConfig",
 	})
 
 	l.Debugf("requested")
+
+	totalMarketDays := config.TotalMarketDays
 
 	config := &Config{}
 
@@ -147,10 +149,10 @@ func GetDailyChallengeConfig() (*Config, error) {
 
 	if err := db.Table("Config").First(&config).Error; err != nil {
 		l.Errorf("failed fetching DailyChallengeConfig %v", err)
-		return config, err
+		return config, totalMarketDays, err
 	}
 	l.Debugf("Done")
 
-	return config, nil
+	return config, totalMarketDays, nil
 
 }

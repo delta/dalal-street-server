@@ -455,7 +455,7 @@ func (d *dalalActionService) GetDailyChallengeConfig(ctx context.Context, req *a
 		return res, nil
 	}
 
-	config, err := models.GetDailyChallengeConfig()
+	config, totalMarketDays, err := models.GetDailyChallengeConfig()
 
 	if err != nil {
 		return makeError(actions_pb.GetDailyChallengeConfigResponse_InternalServerError, getInternalErrorMessage(err))
@@ -463,6 +463,7 @@ func (d *dalalActionService) GetDailyChallengeConfig(ctx context.Context, req *a
 
 	res.MarketDay = config.MarketDay
 	res.IsDailyChallengOpen = config.IsDailyChallengeOpen
+	res.TotalMarketDays = totalMarketDays
 	res.StatusCode = actions_pb.GetDailyChallengeConfigResponse_OK
 	res.StatusMessage = "Done"
 

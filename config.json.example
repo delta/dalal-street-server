@@ -26,7 +26,8 @@
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
-      "ReferralCashReward": 2000
+      "ReferralCashReward": 2000,
+      "TotalMarketDays":7
    },
 
    "Docker": {
@@ -56,7 +57,8 @@
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
-      "ReferralCashReward": 2000
+      "ReferralCashReward": 2000,
+      "TotalMarketDays":7
    },
 
    "Prod": {
@@ -86,7 +88,8 @@
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
-      "ReferralCashReward": 2000
+      "ReferralCashReward": 2000,
+      "TotalMarketDays":7
  },
 
    "Test": {
@@ -116,6 +119,7 @@
       "MaxOTPRequestCount":100,
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
-      "ReferralCashReward": 2000
+      "ReferralCashReward": 2000,
+      "TotalMarketDays":7
  }
 }
