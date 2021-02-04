@@ -31,6 +31,7 @@ import (
 // ErrMaxPadExceeded if length of marshalled payload is more than the max length
 var ErrMaxPadExceeded = errors.New("payload has exceeded the maximum length")
 
+// UserSubscription is stores all the subscription info along with the user foreign key
 type UserSubscription struct {
 	ID       uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserID   uint32 `gorm:"column:userId; not null" json:"user_id"`
@@ -39,16 +40,18 @@ type UserSubscription struct {
 	Auth     string `gorm:"column:auth; not null" json:"auth"`
 }
 
+// PushNotification the message format for the notification
 type PushNotification struct {
 	Title   string
 	Message string
 }
 
+// TableName returns UserSubscription table name
 func (UserSubscription) TableName() string {
 	return "UserSubscription"
 }
 
-// Adds the subscription keys for sending push notifications
+// AddUserSubscription Adds the subscription keys for sending push notifications
 func AddUserSubscription(userID uint32, data string) error {
 
 	var l = logger.WithFields(logrus.Fields{
@@ -92,7 +95,52 @@ func AddUserSubscription(userID uint32, data string) error {
 	return nil
 }
 
-/** WEB PUSH LOGIC */
+// SendPushNotification sends notification to the user
+func SendPushNotification(userID uint32, p PushNotification) error {
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":     "Sending push notification",
+		"param_data": p,
+	})
+
+	l.Infof("Sending push notifications to the users")
+
+	db := getDB()
+
+	var subscriptions []UserSubscription
+
+	if err := db.Table("UserSubscription").Where("userId = ?", userID).Find(&subscriptions).Error; err != nil {
+		l.Errorf("Error while finding the user subscription, %+v", err)
+		return err
+	}
+
+	l.Debugf("Found a total of %v subscriptions for the user", len(subscriptions))
+
+	for i, sub := range subscriptions {
+		l.Debugf("Sending notif to the %v-th subscription, %+v", i, sub)
+		message, err := json.Marshal(p)
+		if err != nil {
+			l.Errorf("Error while marshalling payload, %+v", p, " . Error, %+v", err)
+		}
+		resp, err := sendPushNotification(message, &sub, &options{
+			Subscriber:      config.PushNotificationEmail,
+			VAPIDPublicKey:  config.PushNotificationVAPIDPublicKey,
+			VAPIDPrivateKey: config.PushNotificationVAPIDPrivateKey,
+		})
+		if err != nil {
+			l.Errorf("Couldn't send notification to the subscription, %+v", sub, ". Error : %+v", err)
+		}
+		defer resp.Body.Close()
+	}
+	l.Infof("Successfully sent push notification to the user")
+
+	return nil
+}
+
+/**
+WEB PUSH LOGIC
+Written with help of https://github.com/SherClockHolmes/webpush-go
+*/
 
 const maxRecordSize uint32 = 4096
 
@@ -108,9 +156,8 @@ var saltFunc = func() ([]byte, error) {
 }
 
 type options struct {
-	RecordSize      uint32 // Limit the record size
+	RecordSize      uint32 // Limit the record size, (optional)
 	Subscriber      string // Sub in VAPID JWT token
-	TTL             int    // Set the TTL on the endpoint POST request
 	VAPIDPublicKey  string // VAPID public key, passed in VAPID Authorization header
 	VAPIDPrivateKey string // VAPID private key, used to sign VAPID JWT token
 }
