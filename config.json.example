@@ -28,6 +28,9 @@
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
       "TotalMarketDays":7
+      "PushNotificationVAPIDPublicKey": "",
+      "PushNotificationVAPIDPrivateKey": "",
+      "PushNotificationEmail": "mailto:example@example.com"
    },
 
    "Docker": {
@@ -59,6 +62,9 @@
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
       "TotalMarketDays":7
+      "PushNotificationVAPIDPublicKey": "",
+      "PushNotificationVAPIDPrivateKey": "",
+      "PushNotificationEmail": "mailto:example@example.com"
    },
 
    "Prod": {
@@ -90,6 +96,9 @@
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
       "TotalMarketDays":7
+      "PushNotificationVAPIDPublicKey": "",
+      "PushNotificationVAPIDPrivateKey": "",
+      "PushNotificationEmail": "mailto:example@example.com"
  },
 
    "Test": {
@@ -121,5 +130,8 @@
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
       "TotalMarketDays":7
+      "PushNotificationVAPIDPublicKey": "",
+      "PushNotificationVAPIDPrivateKey": "",
+      "PushNotificationEmail": "mailto:example@example.com"
  }
 }

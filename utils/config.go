@@ -75,6 +75,12 @@ type Config struct {
 	ReferralCashReward uint64
 	// total marketdays
 	TotalMarketDays uint32
+	// Public Vapid key needed for push notification
+	PushNotificationVAPIDPublicKey string
+	// Private public key needed for push notification
+	PushNotificationVAPIDPrivateKey string
+	// notification email needed for push notification
+	PushNotificationEmail string
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
