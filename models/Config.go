@@ -27,22 +27,31 @@ func ConfigDataInit() {
 	//begin transaction
 	tx := db.Begin()
 
-	tx.Exec("TRUNCATE TABLE Config")
+	query := "SELECT id FROM `Config` WHERE id = ?"
 
-	config := &Config{
-		Id:                   1,
-		IsDailyChallengeOpen: false,
-		MarketDay:            0,
-		IsMarketOpen:         false,
-	}
+	row := tx.Raw(query, 1).Row()
 
-	if err := tx.Table("Config").Save(&config).Error; err != nil {
-		l.Errorf("failed %+e", err)
-		tx.Rollback()
-	}
+	var id uint32
 
-	if err := tx.Commit().Error; err != nil {
-		l.Errorf("Error %+e", err)
+	row.Scan(&id)
+
+	if id == 0 {
+		config := &Config{
+			Id:                   1,
+			IsDailyChallengeOpen: false,
+			MarketDay:            0,
+			IsMarketOpen:         false,
+		}
+
+		if err := tx.Table("Config").Save(&config).Error; err != nil {
+			l.Errorf("failed %+e", err)
+			tx.Rollback()
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			l.Errorf("Error %+e", err)
+		}
+
 	}
 
 	l.Debugf("Done")
