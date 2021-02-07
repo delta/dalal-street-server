@@ -2455,7 +2455,7 @@ func GetUserStockWorth(userId uint32) (int64, error) {
 	l.Debugf("Attempting to get stockworth")
 
 	var stockWorth int64
-	ch, _, err := getUserExclusively(userId)
+	ch, user, err := getUserExclusively(userId)
 
 	if err != nil {
 		close(ch)
@@ -2467,13 +2467,7 @@ func GetUserStockWorth(userId uint32) (int64, error) {
 		l.Debugf("Released exclusive write on user")
 	}()
 
-	db := getDB()
-
-	query := "SELECT ifNull((SUM(cast(S.currentPrice AS signed) * cast(T.stockQuantity AS signed)) + SUM(cast(S.currentPrice AS signed) * cast(T.reservedStockQuantity AS signed)) ),0) AS stockWorth FROM Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = S.id WHERE U.id = ?"
-
-	row := db.Raw(query, userId).Row()
-
-	row.Scan(&stockWorth)
+	stockWorth = user.Total - (int64(user.Cash) + int64(user.ReservedCash))
 
 	l.Debugf("Got %d \n", stockWorth)
 

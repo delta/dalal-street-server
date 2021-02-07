@@ -32,7 +32,6 @@ type UserState struct {
 	Id              uint32 `gorm:"column:id;primary_key;AUTO_INCREMENT" json:"id"`
 	ChallengeId     uint32 `gorm:"column:challengeId;not null" json:"challenge_id"`
 	UserId          uint32 `gorm:"column:userId;not null" json:"user_id"`
-	MarketDay       uint32 `gorm:"column:marketDay;not null" json:"market_day"`
 	InitialValue    int64  `gorm:"column:initialValue;not null" json:"initial_value"`
 	FinalValue      int64  `gorm:"column:finalValue;default null" json:"final_value"`
 	IsCompleted     bool   `gorm:"column:isCompleted;default false" json:"is_completed"`
@@ -297,7 +296,7 @@ func updateUserState(marketday uint32) error {
 
 	query := fmt.Sprintf(`SELECT U.id AS id,U.userId AS user_id, U.challengeId AS challenge_id,U.initialValue AS initial_value,D.challengeType AS challenge_type,D.value AS value,D.stockId AS stock_id
 	 FROM
-	UserState U LEFT JOIN DailyChallenge D ON U.challengeId = D.id WHERE U.marketDay = %d;`, marketday)
+	UserState U INNER JOIN DailyChallenge D ON U.challengeId = D.id WHERE D.marketDay = %d;`, marketday)
 
 	if err := tx.Raw(query).Scan(&queryResults).Error; err != nil {
 		l.Errorf("error, fetching userSate query data %+e", err)
@@ -414,7 +413,6 @@ func updateUserState(marketday uint32) error {
 				l.Error(err)
 				return err
 			}
-			fmt.Println(stockWorth, q.Value, q.InitialValue, q.InitialValue+int64(q.Value))
 
 			if stockWorth >= q.InitialValue+int64(q.Value) {
 				userStateEntry.IsCompleted = true
@@ -493,7 +491,6 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 				userStateEntry = &UserState{
 					ChallengeId:     challenge.Id,
 					UserId:          u.UserId,
-					MarketDay:       challenge.MarketDay,
 					InitialValue:    int64(u.Cash),
 					IsCompleted:     false,
 					IsRewardClamied: false,
@@ -513,7 +510,6 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 				userStateEntry = &UserState{
 					ChallengeId:     challenge.Id,
 					UserId:          u.UserId,
-					MarketDay:       challenge.MarketDay,
 					InitialValue:    u.Total,
 					IsCompleted:     false,
 					IsRewardClamied: false,
@@ -533,7 +529,6 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 				userStateEntry = &UserState{
 					ChallengeId:     challenge.Id,
 					UserId:          u.UserId,
-					MarketDay:       challenge.MarketDay,
 					InitialValue:    u.StockWorth,
 					IsCompleted:     false,
 					IsRewardClamied: false,
@@ -561,7 +556,6 @@ func saveUsersState(c []*DailyChallenge, marketday uint32) error {
 				userStateEntry = &UserState{
 					ChallengeId:     challenge.Id,
 					UserId:          u.UserId,
-					MarketDay:       challenge.MarketDay,
 					InitialValue:    u.StockQuantity,
 					IsCompleted:     false,
 					IsRewardClamied: false,
@@ -624,11 +618,10 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 }
 
 //GetUserState returns userState
-func GetUserState(marketDay, userId, challengeId uint32) (*UserState, error) {
+func GetUserState(userId, challengeId uint32) (*UserState, error) {
 
 	l := logger.WithFields(logrus.Fields{
 		"method":       "GetUserState",
-		"market_day":   marketDay,
 		"user_id":      userId,
 		"challenge_id": challengeId,
 	})
@@ -639,7 +632,7 @@ func GetUserState(marketDay, userId, challengeId uint32) (*UserState, error) {
 
 	db := getDB()
 
-	if err := db.Table("UserState").Where(" userId = ? ", userId).Where("marketDay = ?", marketDay).Where("challengeId = ?", challengeId).First(&userState).Error; err != nil {
+	if err := db.Table("UserState").Where(" userId = ? ", userId).Where("challengeId = ?", challengeId).First(&userState).Error; err != nil {
 		l.Errorf("error loading userState %+e", err)
 		return userState, err
 	}
@@ -672,7 +665,7 @@ func GetMyReward(userStateId, userId uint32) (uint64, error) {
 
 	userRewardQuery := getMyRewardQueryData{}
 
-	query := "SELECT U.id AS id,U.userid AS user_id, U.finalValue AS final_value, U.isCompleted AS is_completed,U.isRewardClaimed AS is_reward_claimed,U.marketday AS market_day,D.reward AS reward FROM UserState U LEFT JOIN DailyChallenge D ON U.challengeId  = D.id WHERE U.id = ?"
+	query := "SELECT U.id AS id,U.userid AS user_id, U.finalValue AS final_value, U.isCompleted AS is_completed,U.isRewardClaimed AS is_reward_claimed,D.marketday AS market_day,D.reward AS reward FROM UserState U LEFT JOIN DailyChallenge D ON U.challengeId  = D.id WHERE U.id = ?"
 
 	if err := tx.Raw(query, userStateId).Scan(&userRewardQuery).Error; err != nil {
 		l.Errorf("failed fetching userRewardQuery %+e", err)
@@ -785,7 +778,6 @@ func saveNewUserState(userId uint32) error {
 			userStateEntry := &UserState{
 				ChallengeId:  c.Id,
 				UserId:       userId,
-				MarketDay:    c.MarketDay,
 				InitialValue: STARTING_CASH,
 			}
 
@@ -809,7 +801,6 @@ func saveNewUserState(userId uint32) error {
 			userStateEntry := &UserState{
 				ChallengeId:  c.Id,
 				UserId:       userId,
-				MarketDay:    c.MarketDay,
 				InitialValue: 0,
 			}
 			if c.MarketDay < marketDay {

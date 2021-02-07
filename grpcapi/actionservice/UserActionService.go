@@ -386,7 +386,7 @@ func (d *dalalActionService) GetMyUserState(ctx context.Context, req *actions_pb
 
 	userId := getUserId(ctx)
 
-	userState, err := models.GetUserState(req.MarketDay, userId, req.ChallengeId)
+	userState, err := models.GetUserState(userId, req.ChallengeId)
 
 	if err != nil {
 		l.Errorf("Error %+e", err)
