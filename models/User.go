@@ -257,13 +257,13 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 		VerificationKey: verificationKey,
 	}
 
-	if(referralCode != ""){
+	if referralCode != "" {
 		// User has entered a valid referralCode
 		l.Errorf("the referral code is : %v\n\n", referralCode)
-		codeID, err := VerifyReferralCode(referralCode);
-		if codeID != 0{
+		codeID, err := VerifyReferralCode(referralCode)
+		if codeID != 0 {
 			(*register).ReferralCodeID = codeID
-		} else if (codeID == 0 && err == nil) {
+		} else if codeID == 0 && err == nil {
 			// invalid referralCode
 			return InvalidReferralCodeError
 		} else {
@@ -277,7 +277,7 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 		l.Errorf("Server error in Create user while logging in Pragyan user for the first time: %+v", err)
 		return err
 	}
-	(*register).UserId = u.Id;
+	(*register).UserId = u.Id
 
 	err = db.Save(register).Error
 	if err != nil {
@@ -2443,4 +2443,33 @@ func UnBlockAllUsers() error {
 	}
 
 	return nil
+}
+
+//GetUserStockWorth returns total stockworth of a user including reserved StockWorth
+func GetUserStockWorth(userId uint32) (int64, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":  "GetUserStockWorth",
+		"user_id": userId,
+	})
+
+	l.Debugf("Attempting to get stockworth")
+
+	var stockWorth int64
+	ch, user, err := getUserExclusively(userId)
+
+	if err != nil {
+		close(ch)
+		return stockWorth, nil
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	stockWorth = user.Total - (int64(user.Cash) + int64(user.ReservedCash))
+
+	l.Debugf("Got %d \n", stockWorth)
+
+	return stockWorth, nil
 }

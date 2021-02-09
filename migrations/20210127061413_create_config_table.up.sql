@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS Config (
+    id int(11) UNSIGNED NOT NULL, 
+    isDailyChallengeOpen BOOLEAN NOT NULL DEFAULT FALSE,
+    marketDay int(11) UNSIGNED NOT NULL DEFAULT 0,
+    isMarketOpen BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id)
+);

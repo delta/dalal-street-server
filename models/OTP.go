@@ -131,6 +131,14 @@ func VerifyOTP(userId, otpNo uint32, phoneNo string) error {
 		return InternalServerError
 	}
 
+	// saving userstate for dailychallenges
+	marketDay := GetMarketDay()
+	if marketDay != 0 {
+		if err := saveNewUserState(userId); err != nil {
+			l.Errorf("failed saving user state %v", err)
+		}
+	}
+
 	return nil
 }
 

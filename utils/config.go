@@ -73,6 +73,8 @@ type Config struct {
 	MaxBlockCount int
 	// Reward for user when someone registers with their referral code
 	ReferralCashReward uint64
+	// total marketdays
+	TotalMarketDays uint32
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
@@ -118,6 +120,7 @@ var config = &Config{
 	OTPExpiryTime:      5,
 	MaxBlockCount:      3,
 	ReferralCashReward: 2000,
+	TotalMarketDays:    7,
 }
 
 var configFileName *string

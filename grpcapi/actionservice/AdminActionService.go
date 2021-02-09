@@ -575,3 +575,148 @@ func (d *dalalActionService) UnBlockAllUsers(ctx context.Context, req *actions_p
 
 	return makeError(actions_pb.UnblockAllUsersResponse_OK, "All users unblocked successfully.")
 }
+
+func (d *dalalActionService) AddDailyChallenge(ctx context.Context, req *actions_pb.AddDailyChallengeRequest) (*actions_pb.AddDailyChallengeResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "AddDailyChallenge",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Debugf("AddDailyChallenge Requested")
+
+	res := &actions_pb.AddDailyChallengeResponse{}
+
+	makeError := func(st actions_pb.AddDailyChallengeResponse_StatusCode, msg string) (*actions_pb.AddDailyChallengeResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.AddDailyChallengeResponse_NotAdminUserError, "User is not Admin")
+
+	}
+
+	err := models.AddDailyChallenge(req.Value, req.MarketDay, req.StockId, req.ChallengeType.String(), req.Reward)
+
+	if err == models.InvalidRequestError {
+		return makeError(actions_pb.AddDailyChallengeResponse_InvalidRequestError, "invalid request")
+	} else if err == models.InternalServerError {
+		return makeError(actions_pb.AddDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.StatusMessage = "Done"
+	res.StatusCode = actions_pb.AddDailyChallengeResponse_OK
+	return res, nil
+}
+
+func (d *dalalActionService) OpenDailyChallenge(ctx context.Context, req *actions_pb.OpenDailyChallengeRequest) (*actions_pb.OpenDailyChallengeResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "OpenDailyChallenge",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+	})
+
+	res := &actions_pb.OpenDailyChallengeResponse{}
+
+	l.Infof("OpenDailyChallenge Requested")
+
+	makeError := func(st actions_pb.OpenDailyChallengeResponse_StatusCode, msg string) (*actions_pb.OpenDailyChallengeResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.OpenDailyChallengeResponse_NotAdminUserError, "User is not Admin")
+	}
+
+	marketDay := models.GetMarketDay()
+
+	if marketDay == 0 {
+		return makeError(actions_pb.OpenDailyChallengeResponse_InvalidRequestError, "marketday is zero")
+	}
+
+	err := models.OpenDailyChallenge(marketDay)
+
+	if err == models.InvalidRequestError {
+		return makeError(actions_pb.OpenDailyChallengeResponse_InvalidRequestError, "dailychallenge is opened already for the day")
+	} else if err == models.InternalServerError {
+		return makeError(actions_pb.OpenDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.StatusCode = actions_pb.OpenDailyChallengeResponse_OK
+	res.StatusMessage = "Done"
+	res.MarketDay = marketDay
+
+	return res, nil
+}
+
+func (d *dalalActionService) CloseDailyChallenge(ctx context.Context, req *actions_pb.CloseDailyChallengeRequest) (*actions_pb.CloseDailyChallengeResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "CloseDailyChallenge",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+	})
+
+	l.Infof("CloseDailyChallenge Requested")
+
+	res := &actions_pb.CloseDailyChallengeResponse{}
+
+	makeError := func(st actions_pb.CloseDailyChallengeResponse_StatusCode, msg string) (*actions_pb.CloseDailyChallengeResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.CloseDailyChallengeResponse_NotAdminUserError, "User is not Admin")
+	}
+
+	err := models.CloseDailyChallenge()
+
+	if err == models.InvalidRequestError {
+		return makeError(actions_pb.CloseDailyChallengeResponse_InvalidRequestError, "DailyChallenge already closed for that day")
+	} else if err == models.InternalServerError {
+		return makeError(actions_pb.CloseDailyChallengeResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.StatusCode = actions_pb.CloseDailyChallengeResponse_OK
+	res.StatusMessage = "Done"
+
+	return res, nil
+}
+
+func (d *dalalActionService) SetMarketDay(ctx context.Context, req *actions_pb.SetMarketDayRequest) (*actions_pb.SetMarketDayResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "SetMarketDay",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"market_day":    req.MarketDay,
+	})
+
+	l.Debugf("SetMarketDay requested")
+
+	res := &actions_pb.SetMarketDayResponse{}
+
+	makeError := func(st actions_pb.SetMarketDayResponse_StatusCode, msg string) (*actions_pb.SetMarketDayResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	if err := models.SetMarketDay(req.MarketDay); err != nil {
+		l.Errorf("failed to set market day %+e", err)
+		return makeError(actions_pb.SetMarketDayResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.StatusCode = actions_pb.SetMarketDayResponse_OK
+	res.StatusMessage = "Done"
+
+	return res, nil
+
+}

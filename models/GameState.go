@@ -35,6 +35,14 @@ type UserReferredCredit struct {
 	Cash uint64
 }
 
+type DailyChallengeStatus struct {
+	IsDailyChallengeOpen bool
+}
+
+type UserRewardCredit struct {
+	Cash uint64
+}
+
 var gameStateTypes = [...]string{
 	"MarketStateUpdate",
 	"StockDividendStateUpdate",
@@ -42,6 +50,8 @@ var gameStateTypes = [...]string{
 	"StockBankruptStateUdpate",
 	"UserBlockStateUpdate",
 	"UserReferredCreditUpdate",
+	"DailyChallengeStatusUpdate",
+	"UserRewardCreditUpdate",
 }
 
 const (
@@ -51,6 +61,8 @@ const (
 	StockBankruptStateUpdate
 	UserBlockStateUpdate
 	UserReferredCreditUpdate
+	DailyChallengeStatusUpdate
+	UserRewardCreditUpdate
 )
 
 func (gsType GameStateType) String() string {
@@ -67,6 +79,8 @@ type GameState struct {
 	Sb     *StockBankruptState
 	Ub     *UserBlockState
 	Uc     *UserReferredCredit
+	Dc     *DailyChallengeStatus
+	Ur     *UserRewardCredit
 }
 
 func (g *GameState) ToProto() *models_pb.GameState {
@@ -105,6 +119,16 @@ func (g *GameState) ToProto() *models_pb.GameState {
 		pGameState.Type = models_pb.GameStateUpdateType_UserReferredCreditUpdate
 		pGameState.UserReferredCredit = &models_pb.UserReferredCredit{
 			Cash: g.Uc.Cash,
+		}
+	} else if g.GsType == DailyChallengeStatusUpdate {
+		pGameState.Type = models_pb.GameStateUpdateType_DailyChallengeStatusUpdate
+		pGameState.DailyChallengeState = &models_pb.DailyChallengeState{
+			IsDailyChallengeOpen: g.Dc.IsDailyChallengeOpen,
+		}
+	} else if g.GsType == UserRewardCreditUpdate {
+		pGameState.Type = models_pb.GameStateUpdateType_UserRewardCreditUpdate
+		pGameState.UserRewardCredit = &models_pb.UserRewardCredit{
+			Cash: g.Ur.Cash,
 		}
 	}
 
