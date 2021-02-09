@@ -99,8 +99,9 @@ func AddUserSubscription(userID uint32, data string) error {
 func SendPushNotification(userID uint32, p PushNotification) error {
 
 	var l = logger.WithFields(logrus.Fields{
-		"method":     "Sending push notification",
-		"param_data": p,
+		"method":        "Sending push notification",
+		"param_data":    p,
+		"param_user_id": userID,
 	})
 
 	l.Infof("Sending push notifications to the users")
@@ -109,12 +110,23 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 
 	var subscriptions []UserSubscription
 
-	if err := db.Table("UserSubscription").Where("userId = ?", userID).Find(&subscriptions).Error; err != nil {
-		l.Errorf("Error while finding the user subscription, %+v", err)
-		return err
+	if userID == 0 {
+		// broadcast notif
+		l.Infof("A broadcast notification was requested")
+		if err := db.Table("UserSubscription").Find(&subscriptions).Error; err != nil {
+			l.Errorf("Error while finding the user subscription, %+v", err)
+			return err
+		}
+		l.Debugf("Found a total of %v subscriptions were found", len(subscriptions))
+	} else {
+		// single notif
+		l.Infof("Notification for a specific user was requested")
+		if err := db.Table("UserSubscription").Where("userId = ?", userID).Find(&subscriptions).Error; err != nil {
+			l.Errorf("Error while finding the user subscription, %+v", err)
+			return err
+		}
+		l.Debugf("Found a total of %v subscriptions for the user", len(subscriptions))
 	}
-
-	l.Debugf("Found a total of %v subscriptions for the user", len(subscriptions))
 
 	for i, sub := range subscriptions {
 		l.Debugf("Sending notif to the %v-th subscription, %+v", i, sub)
