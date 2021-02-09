@@ -331,7 +331,6 @@ func (d *dalalActionService) GetReferralCode(ctx context.Context, req *actions_p
 	}
 }
 
-<<<<<<< HEAD
 func (d *dalalActionService) GetDailyChallenges(ctx context.Context, req *actions_pb.GetDailyChallengesRequest) (*actions_pb.GetDailyChallengesResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "GetDailyChallenges",
@@ -469,7 +468,7 @@ func (d *dalalActionService) GetDailyChallengeConfig(ctx context.Context, req *a
 	res.StatusMessage = "Done"
 
 	return res, nil
-=======
+}
 func (d *dalalActionService) AddUserSubscription(ctx context.Context,req *actions_pb.AddUserSubscriptionRequest) (*actions_pb.AddUserSubscriptionResponse,error) {
 
 	var l = logger.WithFields(logrus.Fields{
@@ -501,6 +500,5 @@ func (d *dalalActionService) AddUserSubscription(ctx context.Context,req *action
 		return makeError(actions_pb.AddUserSubscriptionResponse_InternalServerError, getInternalErrorMessage(err))
 	}	
 	return resp,nil;
->>>>>>> d6c020f ([Add]: rpc for storing user subscription details)
 
 }
