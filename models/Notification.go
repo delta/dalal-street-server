@@ -92,7 +92,7 @@ func SendNotification(userId uint32, text string, isBroadcast bool) error {
 	err := SendPushNotification(userId, PushNotification{Title: "Message from Dalal Street", Message: text})
 
 	if err != nil {
-		l.Errorf("Couldn't send push notification, ", err)
+		l.Errorf("Couldn't send push notification, %v", err)
 	}
 
 	l.Infof("Done")

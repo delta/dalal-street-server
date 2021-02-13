@@ -132,7 +132,7 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 		l.Debugf("Sending notif to the %v-th subscription, %+v", i, sub)
 		message, err := json.Marshal(p)
 		if err != nil {
-			l.Errorf("Error while marshalling payload, %+v", p, " . Error, %+v", err)
+			l.Errorf("Error while marshalling payload, %+v . Error, %+v", p, err)
 		}
 		resp, err := sendPushNotification(message, &sub, &options{
 			Subscriber:      config.PushNotificationEmail,
@@ -140,7 +140,7 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 			VAPIDPrivateKey: config.PushNotificationVAPIDPrivateKey,
 		})
 		if err != nil {
-			l.Errorf("Couldn't send notification to the subscription, %+v", sub, ". Error : %+v", err)
+			l.Errorf("Couldn't send notification to the subscription, %+v. Error : %+v", sub, err)
 		}
 		defer resp.Body.Close()
 	}

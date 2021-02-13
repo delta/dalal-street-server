@@ -127,6 +127,9 @@ var config = &Config{
 	MaxBlockCount:      3,
 	ReferralCashReward: 2000,
 	TotalMarketDays:    7,
+	PushNotificationVAPIDPublicKey: "",
+	PushNotificationVAPIDPrivateKey: "",
+	PushNotificationEmail: "",
 }
 
 var configFileName *string
