@@ -1,9 +1,9 @@
 package models
 
 import (
-	"github.com/sirupsen/logrus"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type Notification struct {
@@ -88,6 +88,12 @@ func SendNotification(userId uint32, text string, isBroadcast bool) error {
 
 	notificationsStream := datastreamsManager.GetNotificationsStream()
 	notificationsStream.SendNotification(n.ToProto())
+
+	err := SendPushNotification(userId, PushNotification{Title: "Message from Dalal Street", Message: text})
+
+	if err != nil {
+		l.Errorf("Couldn't send push notification, %v", err)
+	}
 
 	l.Infof("Done")
 

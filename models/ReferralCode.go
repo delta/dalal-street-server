@@ -1,10 +1,11 @@
 package models
 
 import (
-	"github.com/sirupsen/logrus"
-	"github.com/delta/dalal-street-server/utils"
 	"fmt"
+
+	"github.com/delta/dalal-street-server/utils"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 )
 
 // ReferralCode for new users

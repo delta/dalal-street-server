@@ -468,5 +468,37 @@ func (d *dalalActionService) GetDailyChallengeConfig(ctx context.Context, req *a
 	res.StatusMessage = "Done"
 
 	return res, nil
+}
+func (d *dalalActionService) AddUserSubscription(ctx context.Context,req *actions_pb.AddUserSubscriptionRequest) (*actions_pb.AddUserSubscriptionResponse,error) {
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "AddUserSubscription",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("Add User Subscription requsted")
+
+	resp := &actions_pb.AddUserSubscriptionResponse{}
+
+	makeError := func(st actions_pb.AddUserSubscriptionResponse_StatusCode, msg string) (*actions_pb.AddUserSubscriptionResponse,error) {
+		resp.StatusCode = st;
+		resp.StatusMessage = msg;
+		return resp, nil
+	}
+
+	userID := getUserId(ctx)
+	// data contains endpoint and keys in string format
+	data := req.Data
+
+	err := models.AddUserSubscription(userID,data) 
+
+	switch  {
+	case err == models.UserNotFoundError:
+		return makeError(actions_pb.AddUserSubscriptionResponse_InvalidUserError , "User does not exist")
+	case err != nil:
+		l.Errorf("Request failed due to : %v\n", err)
+		return makeError(actions_pb.AddUserSubscriptionResponse_InternalServerError, getInternalErrorMessage(err))
+	}	
+	return resp,nil;
 
 }

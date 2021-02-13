@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/mock v1.1.1
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-querystring v1.0.0 // indirect
@@ -21,7 +22,11 @@ require (
 	github.com/sendgrid/sendgrid-go v3.7.2+incompatible
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.5.1
-	golang.org/x/net v0.0.0-20200421231249-e086a090c8fd
+	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
+	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c // indirect
+	golang.org/x/term v0.0.0-20201210144234-2321bbc49cbf // indirect
+	golang.org/x/text v0.3.5 // indirect
 	google.golang.org/grpc v1.34.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
