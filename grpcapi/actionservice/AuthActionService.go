@@ -10,6 +10,7 @@ import (
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/session"
+	"github.com/delta/dalal-street-server/utils"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -186,6 +187,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		IsMarketOpen:             models.IsMarketOpen(),
 		MarketIsClosedHackyNotif: models.MARKET_IS_CLOSED_HACKY_NOTIF,
 		MarketIsOpenHackyNotif:   models.MARKET_IS_OPEN_HACKY_NOTIF,
+		VapidPublicKey: 					utils.GetConfiguration().PushNotificationVAPIDPublicKey,
 		ReservedStocksOwned:      reservedStocksOwned,
 	}
 

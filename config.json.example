@@ -27,7 +27,7 @@
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
-      "TotalMarketDays":7
+      "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com"
@@ -61,7 +61,7 @@
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
-      "TotalMarketDays":7
+      "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com"
@@ -95,7 +95,7 @@
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
-      "TotalMarketDays":7
+      "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com"
@@ -129,7 +129,7 @@
 	   "OTPExpiryTime":5,
       "MaxBlockCount":3,
       "ReferralCashReward": 2000,
-      "TotalMarketDays":7
+      "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com"
