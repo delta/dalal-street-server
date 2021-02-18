@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type MarketEvent struct {
@@ -55,8 +55,11 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 	var marketEvents []*MarketEvent
 
 	//set default value of count if it is zero
+	// set value to 10000 to fetch all news
 	if count == 0 {
 		count = MARKET_EVENT_COUNT
+	} else if count == 10000 { // Setting a large value to get all the news
+		count = 10000
 	} else {
 		count = utils.MinInt32(count, MARKET_EVENT_COUNT)
 	}
