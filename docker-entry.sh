@@ -11,13 +11,17 @@ echo "######## Unzipping protoc compiler ##########"
 unzip protoc-3.2.0rc2-linux-x86_64.zip -d /root/protobuf
 
 echo "######## Fetching Go dependencies ##########"
-go get -v github.com/golang/protobuf/proto
-go get -v github.com/golang/protobuf/protoc-gen-go
-go get -v golang.org/x/net/context
-go get -v google.golang.org/grpc
+cd ../
 go get -v github.com/gemnasium/migrate
-go get -v github.com/sendgrid/sendgrid-go
+go get -u github.com/golang/protobuf/proto
+go get -u github.com/golang/protobuf/protoc-gen-go
+cd $GOPATH/src/github.com/golang/protobuf/protoc-gen-go/
+git reset --hard ed6926b37a637426117ccab59282c3839528a700
+go install github.com/golang/protobuf/protoc-gen-go
+cd $GOPATH/src/github.com/delta/dalal-street-server/
+go get
 
+git submodule update --init --recursive
 
 
 echo "######## Adding to path ##########"
@@ -49,7 +53,8 @@ while [ $maxtry -gt 0 ]; do
 done
 
 echo "######### Running migrations ##########"
-migrate -url "mysql://root:$dbPass@tcp(db:3306)/dalalstreet_docker" -path ./migrations up
+#migrate -url "mysql://root:$dbPass@tcp(db:3306)/dalalstreet_docker" -path ./migrations up
+migrate -url "mysql://root:$dbPass@tcp(db)/dalalstreet_docker" -path ./migrations up
 
 echo "################## Starting server ##################"
 go run main.go
