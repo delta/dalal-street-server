@@ -1,22 +1,20 @@
 version: "2"
 services:
     web:
-        container_name: dalalstreet_web_1
-        image: nginx:latest
+        container_name: dalalstreet_frontend
+        restart: always
         build:
             context: ./frontend
         volumes:
             - ./frontend/conf:/etc/nginx/conf.d
-            - ./frontend:/var/www/dalalstreet
         ports:
-            - "80:80"
-            - "443:443"
-
+            - "8080:80"
     dalalserver:
-        container_name: dalalstreet_server_1
+        container_name: dalalstreet_backend
         build: .
+        restart: always
         volumes:
-            - $GOPATH:/go
+            - ${GOPATH}:/go
             - ./:/go/src/github.com/delta/dalal-street-server
         ports:
             - "8000:8000"
@@ -29,8 +27,9 @@ services:
             DALAL_ENV: Docker
 
     db:
-        container_name: dalalstreet_db_1
+        container_name: dalalstreet_db
         image: mysql:5.7
+        restart: always
         volumes:
             - ./docker/mysql:/var/lib/mysql
         env_file:
@@ -42,16 +41,18 @@ services:
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
 
     phpmyadmin:
-        container_name: dalalstreet_pma_1
+        container_name: dalalstreet_pma
         image: phpmyadmin/phpmyadmin
+        restart: always
         env_file:
             - .env
         ports:
             - "9040:80"
         depends_on:
             - db
-    # bots:
-    #     container_name: dalalstreet_bots_1
+    # dalal_bots:
+    #     container_name: dalalstreet_bots
+    #     restart: always
     #     build:
     #         context: ./bots
     #     volumes:
