@@ -108,7 +108,6 @@ func UpdateDailyLeaderboard() {
 	       ifnull(L.totalWorth,0) - ifnull(E.totalWorth,%d) as total
 	FROM Leaderboard L
 	LEFT JOIN EndOfDayValues E ON L.userId = E.userId
-	GROUP BY L.userId
 	ORDER BY Total DESC;
 	`, STARTING_CASH, STARTING_CASH)
 

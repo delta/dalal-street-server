@@ -47,7 +47,7 @@ func GetInspectUserDetails(userID uint32, transType bool, day uint32) ([]Inspect
 
 	for i := 0; i < len(inspectUserEntries); i++ {
 		var temp Lrank
-		err = db.Raw("SELECT rank as position FROM Leaderboard WHERE userId = ?", inspectUserEntries[i].UserId).Scan(&temp).Error
+		err = db.Raw("SELECT `rank` as position FROM Leaderboard WHERE userId = ?", inspectUserEntries[i].UserId).Scan(&temp).Error
 		inspectUserEntries[i].Position = temp.Position
 	}
 
