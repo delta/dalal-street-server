@@ -89,7 +89,7 @@ func RealMain() {
 		),
 	}
 
-	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
+	utils.Logger.Fatal(httpServer.ListenAndServe())
 }
 
 func main() {
