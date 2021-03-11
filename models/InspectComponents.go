@@ -94,7 +94,7 @@ func getComponents(nnodes int32)(res1[] InspectComponentResult){
 		for j = 1;j <= nnodes;j++{
 			if weights[i][j] > 0{
 				listGraph.edges[i] = append(listGraph.edges[i], j)
-				reversedGraph.edges[j] = append(listGraph.edges[j], i)
+				reversedGraph.edges[j] = append(reversedGraph.edges[j], i)
 			}
 		}
 	}
@@ -143,6 +143,10 @@ func getComponents(nnodes int32)(res1[] InspectComponentResult){
 	for i = 1;i <= nnodes;i++{
 		visited[i] = false
 	}
+
+	for i, j := 0, len(order)-1; i < j; i, j = i+1, j-1 {
+        order[i], order[j] = order[j], order[i]
+    }
 
 	for i = 1;i <= nnodes;i++{
 		if !visited[order[i - 1]]{
