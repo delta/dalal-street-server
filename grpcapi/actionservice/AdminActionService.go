@@ -5,6 +5,7 @@ import (
 
 	"github.com/delta/dalal-street-server/models"
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
@@ -716,6 +717,77 @@ func (d *dalalActionService) SetMarketDay(ctx context.Context, req *actions_pb.S
 
 	res.StatusCode = actions_pb.SetMarketDayResponse_OK
 	res.StatusMessage = "Done"
+
+	return res, nil
+
+}
+
+func (d *dalalActionService) InspectUserDegree(ctx context.Context, req *actions_pb.InspectDegreeRequest) (*actions_pb.InspectDegreeResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "InspectUserDegree",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+	})
+
+	l.Debugf("InspectUserDegree requested")
+
+	res := &actions_pb.InspectDegreeResponse{}
+
+	makeError := func(st actions_pb.InspectDegreeResponse_StatusCode, msg string) (*actions_pb.InspectDegreeResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	var resDetails models.InspectDegreeDetails
+	resDetails, err := models.InspectUserDegree(); 
+	if err != nil {
+		l.Errorf("failed to set market day %+e", err)
+		return makeError(actions_pb.InspectDegreeResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	res.StatusCode = actions_pb.InspectDegreeResponse_OK
+	res.StatusMessage = "Done"
+	res.Volume = resDetails.Volume
+	res.Position = resDetails.Position
+
+	return res, nil
+
+}
+
+func (d *dalalActionService) InspectConnectedComponents(ctx context.Context, req *actions_pb.InspectComponentsRequest) (*actions_pb.InspectComponentsResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "InspectConnectedComponents",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+	})
+
+	l.Debugf("InspectConnectedComponents requested")
+
+	res := &actions_pb.InspectComponentsResponse{}
+
+	makeError := func(st actions_pb.InspectComponentsResponse_StatusCode, msg string) (*actions_pb.InspectComponentsResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+
+	componentResults, err := models.InspectComponents(); 
+
+	if err != nil {
+		l.Errorf("failed to set market day %+e", err)
+		return makeError(actions_pb.InspectComponentsResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	var protoClusters[] *models_pb.Cluster
+
+	for i := 0;i < len(componentResults);i++{
+		protoClusters = append(protoClusters, componentResults[i].ToProto())
+	}
+
+	res.StatusCode = actions_pb.InspectComponentsResponse_OK
+	res.StatusMessage = "Done"
+	res.Clusters = protoClusters
+
 
 	return res, nil
 
