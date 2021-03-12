@@ -1,0 +1,8 @@
+frontend
+.*
+bots
+public
+docker-compose.yml
+Dockerfile
+*.md
+tls_keys

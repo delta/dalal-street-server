@@ -39,7 +39,7 @@
       "EventId": "19",
       "EventSecret": "5881add25851d3051e96a6b0be4bcaf1",
 
-      "LogFileName": "./dalalstreet_docker.log",
+      "LogFileName": "./logs/dalalstreet_docker.log",
       "LogMaxSize": 50,
       "LogLevel": "info",
 

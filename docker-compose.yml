@@ -14,8 +14,9 @@ services:
         build: .
         restart: always
         volumes:
-            - ${GOPATH}:/go
-            - ./:/go/src/github.com/delta/dalal-street-server
+            - ./docker/logs:/go/src/github.com/delta/dalal-street-server/logs
+        #    - ${GOPATH}:/go
+        #    - ./:/go/src/github.com/delta/dalal-street-server
         ports:
             - "8000:8000"
         depends_on:
