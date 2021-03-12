@@ -8,7 +8,12 @@ RUN apt-get update && \
     curl \
     netcat
 
-WORKDIR  /go/src/github.com/delta/dalal-street-server 
+RUN mkdir -p /go/src/github.com/delta/dalal-street-server
+
+WORKDIR  /go/src/github.com/delta/dalal-street-server
+
+RUN mkdir logs
+
 COPY . .
 
 CMD ["./docker-entry.sh"]
