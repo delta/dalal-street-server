@@ -88,7 +88,7 @@ func RealMain() {
 			},
 		),
 	}
-
+	models.InspectComponents()
 	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
 }
 
