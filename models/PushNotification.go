@@ -109,6 +109,10 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 
 	db := getDB()
 
+	if p.LogoUrl == "" {
+		p.LogoUrl = fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl)
+	}
+
 	var subscriptions []UserSubscription
 
 	if userID == 0 {
