@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 var isMarketOpen = false
 
@@ -20,6 +23,12 @@ func OpenMarket(updateDayHighAndLow bool) error {
 		GsType: MarketStateUpdate,
 	}
 	gameStateStream.SendGameStateUpdate(g.ToProto())
+
+	SendPushNotification(0, PushNotification{
+		Title:   "Message from Dalal Street! The market just opened.",
+		Message: "The Market just opened! Click here to begin your trading.",
+		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
+	})
 
 	if updateDayHighAndLow {
 		return SetDayHighAndLow()
