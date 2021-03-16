@@ -42,10 +42,9 @@ type UserSubscription struct {
 
 // PushNotification the message format for the notification
 type PushNotification struct {
-	Title       string
-	Message     string
-	LogoUrl     string
-	FrontEndUrl string
+	Title   string
+	Message string
+	LogoUrl string
 }
 
 // TableName returns UserSubscription table name
@@ -109,7 +108,6 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 	l.Infof("Sending push notifications to the users")
 
 	db := getDB()
-	p.FrontEndUrl = config.FrontEndUrl
 
 	var subscriptions []UserSubscription
 
