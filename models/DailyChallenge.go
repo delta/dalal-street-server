@@ -224,6 +224,13 @@ func OpenDailyChallenge(marketDay uint32) error {
 		},
 		GsType: DailyChallengeStatusUpdate,
 	}
+
+	SendPushNotification(0, PushNotification{
+		Title:   "Message from Dalal Street! Daily Challenges are out.",
+		Message: ("Today's challenges are out! Click here to know more."),
+		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
+	})
+
 	gameStateStream.SendGameStateUpdate(g.ToProto())
 
 	return nil
