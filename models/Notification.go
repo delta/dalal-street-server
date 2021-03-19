@@ -89,11 +89,11 @@ func SendNotification(userId uint32, text string, isBroadcast bool) error {
 	notificationsStream := datastreamsManager.GetNotificationsStream()
 	notificationsStream.SendNotification(n.ToProto())
 
-	err := SendPushNotification(userId, PushNotification{Title: "Message from Dalal Street", Message: text})
+	// err := SendPushNotification(userId, PushNotification{Title: "Message from Dalal Street", Message: text})
 
-	if err != nil {
-		l.Errorf("Couldn't send push notification, %v", err)
-	}
+	// if err != nil {
+	// 	l.Errorf("Couldn't send push notification, %v", err)
+	// }
 
 	l.Infof("Done")
 
