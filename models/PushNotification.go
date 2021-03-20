@@ -110,7 +110,7 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 	db := getDB()
 
 	if p.LogoUrl == "" {
-		p.LogoUrl = fmt.Sprintf("/public/assets/sed.png")
+		p.LogoUrl = fmt.Sprintf("/public/src/images/dalalfavicon.png")
 	}
 
 	var subscriptions []UserSubscription
