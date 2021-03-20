@@ -42,9 +42,10 @@ type UserSubscription struct {
 
 // PushNotification the message format for the notification
 type PushNotification struct {
-	Title   string
-	Message string
-	LogoUrl string
+	Title    string
+	Message  string
+	LogoUrl  string
+	ImageUrl string
 }
 
 // TableName returns UserSubscription table name
