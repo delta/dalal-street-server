@@ -484,6 +484,12 @@ func SetBankruptcy(stockId uint32, isBankrupt bool) error {
 	}
 	gameStateStream.SendGameStateUpdate(g.ToProto())
 
+	SendPushNotification(0, PushNotification{
+		Title:   "Message from Dalal Street! A company just went bankrupt.",
+		Message: fmt.Sprintf("%v has declared bankruptcy !! Click here to know more.", stock.FullName),
+		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
+	})
+
 	return nil
 }
 

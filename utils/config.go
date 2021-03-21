@@ -81,6 +81,8 @@ type Config struct {
 	PushNotificationVAPIDPrivateKey string
 	// notification email needed for push notification
 	PushNotificationEmail string
+	// url of frontend asset files for push notification
+	FrontEndUrl string
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
@@ -104,32 +106,33 @@ var allConfigurations = struct {
 // config.json won't get loaded correctly unless specified by flags
 // that gets painful when running individual tests
 var config = &Config{
-	Stage:              "test",
-	EventId:            "1",
-	EventSecret:        "be3653b77836f84ab0c1ba3f18abf36e878c5e84",
-	LogFileName:        "stdout",
-	LogMaxSize:         50,
-	LogLevel:           "debug",
-	DbUser:             "root",
-	DbPassword:         "",
-	DbHost:             "",
-	DbName:             "dalalstreet_test",
-	ServerPort:         ":8000",
-	TLSCert:            "./tls_keys/test/server.crt",
-	TLSKey:             "./tls_keys/test/server.key",
-	CacheSize:          1000,
-	BotSecret:          "hellobots",
-	PlivoAuthId:        "",
-	PlivoAuthToken:     "",
-	SendgridKey:        "",
-	MaxOTPRequestCount: 100,
-	OTPExpiryTime:      5,
-	MaxBlockCount:      3,
-	ReferralCashReward: 2000,
-	TotalMarketDays:    7,
-	PushNotificationVAPIDPublicKey: "",
+	Stage:                           "test",
+	EventId:                         "1",
+	EventSecret:                     "be3653b77836f84ab0c1ba3f18abf36e878c5e84",
+	LogFileName:                     "stdout",
+	LogMaxSize:                      50,
+	LogLevel:                        "debug",
+	DbUser:                          "root",
+	DbPassword:                      "",
+	DbHost:                          "",
+	DbName:                          "dalalstreet_test",
+	ServerPort:                      ":8000",
+	TLSCert:                         "./tls_keys/test/server.crt",
+	TLSKey:                          "./tls_keys/test/server.key",
+	CacheSize:                       1000,
+	BotSecret:                       "hellobots",
+	PlivoAuthId:                     "",
+	PlivoAuthToken:                  "",
+	SendgridKey:                     "",
+	MaxOTPRequestCount:              100,
+	OTPExpiryTime:                   5,
+	MaxBlockCount:                   3,
+	ReferralCashReward:              2000,
+	TotalMarketDays:                 7,
+	PushNotificationVAPIDPublicKey:  "",
 	PushNotificationVAPIDPrivateKey: "",
-	PushNotificationEmail: "",
+	PushNotificationEmail:           "",
+	FrontEndUrl:                     "",
 }
 
 var configFileName *string

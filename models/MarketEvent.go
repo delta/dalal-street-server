@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -134,6 +135,13 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 		ImagePath: basename,
 		CreatedAt: utils.GetCurrentTimeISO8601(),
 	}
+
+	SendPushNotification(0, PushNotification{
+		Title:    fmt.Sprintf("Message from dalal street, something interesting just happened."),
+		Message:  fmt.Sprintf("%v. Click here to know more.", headline),
+		LogoUrl:  "",
+		ImageUrl: imageURL,
+	})
 
 	if err = db.Save(me).Error; err != nil {
 		l.Error(err)
