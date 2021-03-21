@@ -529,6 +529,31 @@ func getSingleStockCount(u *User, stockId uint32) (int64, error) {
 	return stockCount.Sc, nil
 }
 
+//getTotalSingleStockCount returns total stocks a user owns including reserved stocks
+func getTotalSingleStockCount(u *User, stockId uint32) (int64, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "getTotalSingleStockCount",
+		"param_u":       fmt.Sprintf("%+v", u),
+		"param_stockId": stockId,
+	})
+
+	l.Debugf("Attempting")
+
+	db := getDB()
+
+	var stockCount = struct{ Tsc int64 }{0}
+
+	sql := "Select sum(StockQuantity) + sum(ReservedStockQuantity) as tsc from Transactions where UserId=? and StockId=?"
+	if err := db.Raw(sql, u.Id, stockId).Scan(&stockCount).Error; err != nil {
+		l.Error(err)
+		return 0, err
+	}
+
+	l.Debugf("Got %d", stockCount.Tsc)
+
+	return stockCount.Tsc, nil
+}
+
 //
 // Public interface
 //
