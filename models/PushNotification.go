@@ -42,8 +42,10 @@ type UserSubscription struct {
 
 // PushNotification the message format for the notification
 type PushNotification struct {
-	Title   string
-	Message string
+	Title    string
+	Message  string
+	LogoUrl  string
+	ImageUrl string
 }
 
 // TableName returns UserSubscription table name
@@ -108,6 +110,10 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 
 	db := getDB()
 
+	if p.LogoUrl == "" {
+		p.LogoUrl = fmt.Sprintf("/public/src/images/dalalfavicon.png")
+	}
+
 	var subscriptions []UserSubscription
 
 	if userID == 0 {
@@ -151,7 +157,6 @@ func SendPushNotification(userID uint32, p PushNotification) error {
 
 /**
 WEB PUSH LOGIC
-Written with help of https://github.com/SherClockHolmes/webpush-go
 */
 
 const maxRecordSize uint32 = 4096

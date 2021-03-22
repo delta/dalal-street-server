@@ -30,7 +30,8 @@
       "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
-      "PushNotificationEmail": "mailto:example@example.com"
+      "PushNotificationEmail": "mailto:example@example.com",
+      "FrontEndUrl": ""
    },
 
    "Docker": {
@@ -67,7 +68,8 @@
       "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
-      "PushNotificationEmail": "mailto:example@example.com"
+      "PushNotificationEmail": "mailto:example@example.com",
+      "FrontEndUrl": ""
    },
 
    "Prod": {
@@ -101,7 +103,8 @@
       "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
-      "PushNotificationEmail": "mailto:example@example.com"
+      "PushNotificationEmail": "mailto:example@example.com",
+      "FrontEndUrl": ""
  },
 
    "Test": {
@@ -135,6 +138,7 @@
       "TotalMarketDays":7,
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
-      "PushNotificationEmail": "mailto:example@example.com"
+      "PushNotificationEmail": "mailto:example@example.com",
+      "FrontEndUrl": ""
  }
 }

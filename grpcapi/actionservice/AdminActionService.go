@@ -138,6 +138,11 @@ func (d *dalalActionService) SendNotifications(ctx context.Context, req *actions
 		return makeError(actions_pb.SendNotificationsResponse_InternalServerError, "Cannot send Global Notification to Non Zero Id")
 	}
 
+	models.SendPushNotification(req.UserId, models.PushNotification{
+		Title:   "Message from Dalal Street!",
+		Message: fmt.Sprintf(req.Text),
+		LogoUrl: "",
+	})
 	err := models.SendNotification(req.UserId, req.Text, req.IsGlobal)
 
 	if err != nil {
