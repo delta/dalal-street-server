@@ -7,6 +7,7 @@ services:
             context: ./frontend
         volumes:
             - ./frontend/conf:/etc/nginx/conf.d
+            - ./frontend:/var/www/dalalstreet
         ports:
             - "8080:80"
     dalalserver:
@@ -15,8 +16,9 @@ services:
         restart: always
         volumes:
             - ./docker/logs:/go/src/github.com/delta/dalal-street-server/logs
-        #    - ${GOPATH}:/go
-        #    - ./:/go/src/github.com/delta/dalal-street-server
+            #    - ${GOPATH}:/go
+            #    - ./:/go/src/github.com/delta/dalal-street-server
+            - ./frontend:/go/src/github.com/delta/dalal-street-server/frontend
         ports:
             - "8000:8000"
         depends_on:
