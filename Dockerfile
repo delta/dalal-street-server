@@ -1,4 +1,4 @@
-FROM golang:1.10
+FROM golang:1.13
 
 RUN apt-get update && \
     apt-get install -y apt-utils \
@@ -8,7 +8,16 @@ RUN apt-get update && \
     curl \
     netcat
 
-WORKDIR  /go/src/github.com/delta/dalal-street-server 
+ENV PATH $PATH:/root/protobuf/bin
+
+RUN mkdir -p /go/src/github.com/delta/dalal-street-server
+
+WORKDIR  /go/src/github.com/delta/dalal-street-server
+
+RUN mkdir logs
+
 COPY . .
+
+RUN bash docker-build.sh
 
 CMD ["./docker-entry.sh"]

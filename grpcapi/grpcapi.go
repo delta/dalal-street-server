@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -192,7 +193,7 @@ func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm 
 	creds, err := credentials.NewServerTLSFromFile(config.TLSCert, config.TLSKey)
 	if err != nil {
 		log.Fatalf("Failed while obtaining TLS certificates. Error: %+v", err)
-	}
+	 }
 
 	grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
@@ -220,7 +221,8 @@ func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm 
 // Checks the request type and calls the appropriate handler
 func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
 	if wrappedServer.IsGrpcWebRequest(req) {
-		log.Printf("Got grpc web request")
+		now := time.Now()
+		log.Printf("Got grpc web request at %s",now)
 		wrappedServer.ServeHTTP(resp, req)
 	} else {
 		grpcServer.ServeHTTP(resp, req)
