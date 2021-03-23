@@ -329,7 +329,7 @@ func updateUserState(marketday uint32) error {
 				userStateEntry.IsCompleted = true
 			}
 
-			userStateEntry.FinalValue = int64(user.Cash)
+			userStateEntry.FinalValue = int64(user.Cash + user.ReservedCash)
 
 			if err := tx.Table("UserState").Select("FinalValue", "IsCompleted").Save(userStateEntry).Error; err != nil {
 				l.Errorf("failed saving userState cash Challenge type %+e", err)
@@ -385,7 +385,7 @@ func updateUserState(marketday uint32) error {
 			}
 			l.Debugf("Acquired")
 
-			stockQuantity, err := getSingleStockCount(user, q.StockId)
+			stockQuantity, err := getTotalSingleStockCount(user, q.StockId)
 
 			if err != nil {
 				l.Error(err)
@@ -603,14 +603,7 @@ func getSpecificStocksEntry(stockId uint32, tx *gorm.DB) ([]specificStockUserEnt
 
 	var results []specificStockUserEntry
 
-	query := fmt.Sprintf(`SELECT
-    U.id AS user_id,
-    IFNULL(
-        (
-            SUM(T.stockQuantity) + SUM(T.reservedStockQuantity)
-        ),
-        0
-    ) AS stock_quantity FROM  Users U LEFT JOIN Transactions T ON U.id = T.userId LEFT JOIN Stocks S ON T.stockId = %d WHERE U.blockCount < %d GROUP BY U.id;`, stockId, config.MaxBlockCount)
+	query := fmt.Sprintf(`SELECT U.id AS user_id, IFNULL( ( SUM(T.stockQuantity) + SUM(T.reservedStockQuantity) ), 0 ) AS stock_quantity FROM Users U LEFT JOIN( SELECT userId, stockId, stockQuantity, reservedStockQuantity FROM Transactions WHERE stockId = %d ) T ON T.userId = U.id WHERE U.blockCount < %d GROUP BY U.id`, stockId, config.MaxBlockCount)
 
 	if err := tx.Raw(query).Scan(&results).Error; err != nil {
 		l.Errorf("failed fetching SpecificStockEntry %+e", err)
