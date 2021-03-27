@@ -494,6 +494,7 @@ func (d *dalalActionService) BlockUser(ctx context.Context, req *actions_pb.Bloc
 	l.Infof("Block User Requested")
 
 	userId := req.GetUserId()
+	penalty := req.Penalty
 
 	resp := &actions_pb.BlockUserResponse{}
 	makeError := func(st actions_pb.BlockUserResponse_StatusCode, msg string) (*actions_pb.BlockUserResponse, error) {
@@ -507,7 +508,7 @@ func (d *dalalActionService) BlockUser(ctx context.Context, req *actions_pb.Bloc
 		return makeError(actions_pb.BlockUserResponse_NotAdminUserError, "User is not admin")
 	}
 
-	err := models.SetBlockUser(userId, true)
+	err := models.SetBlockUser(userId, true, penalty)
 
 	if err == models.InternalServerError {
 		return makeError(actions_pb.BlockUserResponse_InternalServerError, getInternalErrorMessage(err))
@@ -541,7 +542,7 @@ func (d *dalalActionService) UnBlockUser(ctx context.Context, req *actions_pb.Un
 		return makeError(actions_pb.UnblockUserResponse_NotAdminUserError, "User is not admin")
 	}
 
-	err := models.SetBlockUser(userId, false)
+	err := models.SetBlockUser(userId, false, 0)
 
 	if err == models.InternalServerError {
 		return makeError(actions_pb.UnblockUserResponse_InternalServerError, getInternalErrorMessage(err))

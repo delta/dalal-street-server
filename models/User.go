@@ -2363,7 +2363,7 @@ func GetUserBlockCount(userId uint32) int64 {
 	return userLocks.m[userId].user.BlockCount
 }
 
-func SetBlockUser(userId uint32, isBlocked bool) error {
+func SetBlockUser(userId uint32, isBlocked bool, penalty uint64) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":          "SetBlockUser",
 		"param_userId":    userId,
@@ -2403,10 +2403,17 @@ func SetBlockUser(userId uint32, isBlocked bool) error {
 		}
 	}
 
+	
+	oldCash := user.Cash
+
+	//Penalty added while blocking user
+	user.Cash -= penalty
+
 	if err := db.Save(&user).Error; err != nil {
 		l.Errorf("Error saving user. Failing. %+v", err)
 		user.IsBlocked = oldIsBlocked
 		user.BlockCount = oldBlockCount
+		user.Cash = oldCash
 		return InternalServerError
 	}
 
@@ -2415,6 +2422,7 @@ func SetBlockUser(userId uint32, isBlocked bool) error {
 		UserID: userId,
 		Ub: &UserBlockState{
 			IsBlocked: isBlocked,
+			Cash:user.Cash,
 		},
 		GsType: UserBlockStateUpdate,
 	}
@@ -2422,7 +2430,7 @@ func SetBlockUser(userId uint32, isBlocked bool) error {
 
 	SendPushNotification(userId, PushNotification{
 		Title:   "Message from Dalal Street!",
-		Message: "Your account has been blocked for violating the game's code of conduct, visit the site to appeal the ban.",
+		Message: "Your account has been blocked for violating the game's code of conduct and a penalty has been deducted from your cash, visit the site to appeal the ban.",
 		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
 	})
 
