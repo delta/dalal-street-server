@@ -2,7 +2,10 @@ package models
 
 import (
 	"errors"
+	"fmt"
 
+	"github.com/delta/dalal-street-server/templates"
+	"github.com/delta/dalal-street-server/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -58,4 +61,33 @@ func VerifyAccount(verificationKey string) error {
 		}
 		return nil
 	}
+}
+
+func ResendVerificationEmail(email string) error {
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":      "Resending verification email",
+		"param_email": email,
+	})
+	db := getDB()
+	var registration = Registration{
+		Email: email,
+	}
+	if err := db.Table("Registrations").Where("email = ?", email).First(&registration).Error; err != nil {
+		l.Errorf("Couldn't find the user in registrations, ", err)
+		return UserNotFoundError
+	}
+
+	verificationKey := registration.VerificationKey
+	l.Debugf("Sending verification email to %s", email)
+	verificationURL := fmt.Sprintf("https://dalal.pragyan.org/api/verify?key=%s", verificationKey)
+	htmlContent := fmt.Sprintf(`%s
+							%s
+							%s`, templates.HtmlEmailVerificationTemplateHead, verificationURL, templates.HtmlEmailVerificationTemplateTail)
+	plainContent := fmt.Sprintf(templates.PlainEmailVerificationTemplate, verificationURL)
+	if err := utils.SendEmail("noreply@dalalstreet.com", "Account Verification", email, plainContent, htmlContent); err != nil {
+		l.Errorf("Error while sending verification email to player %s", err)
+		return InternalServerError
+	}
+	return nil
 }

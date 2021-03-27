@@ -178,7 +178,7 @@ func Login(email, password string) (User, error) {
 	}
 
 	// Check if user has been verified or not only on docker
-	if config.Stage == "docker" && registeredUser.IsVerified == false {
+	if config.Stage == "dev" && registeredUser.IsVerified == false {
 		l.Errorf("User (%s) attempted login before verification", email)
 		return User{}, UnverifiedUserError
 	}
