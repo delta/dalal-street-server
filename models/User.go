@@ -178,7 +178,7 @@ func Login(email, password string) (User, error) {
 	}
 
 	// Check if user has been verified or not only on docker
-	if config.Stage == "docker" && registeredUser.IsVerified == false {
+	if config.Stage == "dev" && registeredUser.IsVerified == false {
 		l.Errorf("User (%s) attempted login before verification", email)
 		return User{}, UnverifiedUserError
 	}
@@ -249,12 +249,13 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 	password, _ = hashPassword(password)
 	verificationKey, _ := getVerificationKey(email)
 	register := &Registration{
-		Email:           email,
-		Password:        password,
-		IsPragyan:       false,
-		IsVerified:      false,
-		Name:            fullName,
-		VerificationKey: verificationKey,
+		Email:                  email,
+		Password:               password,
+		IsPragyan:              false,
+		IsVerified:             false,
+		Name:                   fullName,
+		VerificationKey:        verificationKey,
+		VerificationEmailCount: 1,
 	}
 
 	if referralCode != "" {

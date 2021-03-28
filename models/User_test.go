@@ -98,14 +98,15 @@ func Test_Regsiter(t *testing.T) {
 
 	expectedKey, _ := getVerificationKey("test@testname.com")
 	expectedUser := &Registration{
-		Id:              registeredTestUser.Id,
-		UserId:          registeredTestUser.UserId,
-		Email:           "test@testname.com",
-		Password:        registeredTestUser.Password,
-		Name:            "FullName",
-		IsPragyan:       false,
-		IsVerified:      false,
-		VerificationKey: expectedKey,
+		Id:                     registeredTestUser.Id,
+		UserId:                 registeredTestUser.UserId,
+		Email:                  "test@testname.com",
+		Password:               registeredTestUser.Password,
+		Name:                   "FullName",
+		IsPragyan:              false,
+		IsVerified:             false,
+		VerificationKey:        expectedKey,
+		VerificationEmailCount: 1,
 	}
 	if !testutils.AssertEqual(t, expectedUser, registeredTestUser) {
 		t.Fatalf("Expected %+v but got %+v", expectedUser, registeredTestUser)

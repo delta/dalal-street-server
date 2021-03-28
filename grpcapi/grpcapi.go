@@ -153,7 +153,16 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		}
 		ctx = context.WithValue(ctx, "session", newSess)
 		return handler(ctx, req)
-
+	case *actions_pb.ResendVerificationEmailRequest:
+		newSess, err := session.Fake()
+		if err != nil {
+			if config.Stage == "Dev" || config.Stage == "Test" || config.Stage == "Docker" {
+				return nil, status.Errorf(codes.Internal, "Internal error occurred: %+v", err)
+			}
+			return nil, status.Errorf(codes.Internal, "Internal error occurred")
+		}
+		ctx = context.WithValue(ctx, "session", newSess)
+		return handler(ctx, req)
 	}
 
 	newCtx, err := authFunc(ctx)

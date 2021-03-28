@@ -31,7 +31,8 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": ""
+      "FrontEndUrl": "",
+      "MaxVerificationEmailRequestCount": 5
    },
 
    "Docker": {
@@ -66,7 +67,8 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": ""
+      "FrontEndUrl": "",
+      "MaxVerificationEmailRequestCount": 5
    },
 
    "Prod": {
@@ -101,7 +103,8 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": ""
+      "FrontEndUrl": "",
+      "MaxVerificationEmailRequestCount": 5
  },
 
    "Test": {
@@ -136,6 +139,7 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": ""
+      "FrontEndUrl": "",
+      "MaxVerificationEmailRequestCount": 5
  }
 }

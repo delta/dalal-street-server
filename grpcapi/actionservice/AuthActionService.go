@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/models"
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/session"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -187,7 +187,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		IsMarketOpen:             models.IsMarketOpen(),
 		MarketIsClosedHackyNotif: models.MARKET_IS_CLOSED_HACKY_NOTIF,
 		MarketIsOpenHackyNotif:   models.MARKET_IS_OPEN_HACKY_NOTIF,
-		VapidPublicKey: 					utils.GetConfiguration().PushNotificationVAPIDPublicKey,
+		VapidPublicKey:           utils.GetConfiguration().PushNotificationVAPIDPublicKey,
 		ReservedStocksOwned:      reservedStocksOwned,
 	}
 
@@ -213,6 +213,36 @@ func (d *dalalActionService) Logout(ctx context.Context, req *actions_pb.LogoutR
 	l.Infof("Request completed successfully")
 
 	return &actions_pb.LogoutResponse{}, nil
+}
+
+func (d *dalalActionService) ResendVerificationEmail(ctx context.Context, req *actions_pb.ResendVerificationEmailRequest) (*actions_pb.ResendVerificationEmailResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "ResendVerificationEmail",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("Resned verification email requested")
+
+	resp := &actions_pb.ResendVerificationEmailResponse{}
+	makeError := func(st actions_pb.ResendVerificationEmailResponse_StatusCode, msg string) (*actions_pb.ResendVerificationEmailResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	if err := models.ResendVerificationEmail(req.GetEmail()); err != nil {
+		l.Errorf("Got the error : %s", err)
+		if err == models.MaximumEmailCountReached {
+			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Maximum email limits reached")
+		} else if err == models.UserNotFoundError {
+			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Please check your email")
+		} else {
+			return makeError(actions_pb.ResendVerificationEmailResponse_InternalServerError, getInternalErrorMessage(err))
+		}
+	}
+
+	return &actions_pb.ResendVerificationEmailResponse{}, nil
 }
 
 func (d *dalalActionService) AddPhone(ctx context.Context, req *actions_pb.AddPhoneRequest) (*actions_pb.AddPhoneResponse, error) {
@@ -291,11 +321,11 @@ func (d *dalalActionService) VerifyPhone(ctx context.Context, req *actions_pb.Ve
 		return makeError(actions_pb.VerifyOTPResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
-	if userCash, err := models.AddExtraCredit(userId);err != nil{
+	if userCash, err := models.AddExtraCredit(userId); err != nil {
 		// Already verified referral when registering, so only internal-error possible
 		return makeError(actions_pb.VerifyOTPResponse_InternalServerError, getInternalErrorMessage(err))
 	} else {
-		resp.UserCash = userCash;
+		resp.UserCash = userCash
 	}
 
 	return makeError(actions_pb.VerifyOTPResponse_OK, "OTP verification successful.")
