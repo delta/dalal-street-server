@@ -29,6 +29,7 @@ type StockBankruptState struct {
 
 type UserBlockState struct {
 	IsBlocked bool
+	Cash      uint64
 }
 
 type UserReferredCredit struct {
@@ -114,6 +115,7 @@ func (g *GameState) ToProto() *models_pb.GameState {
 		pGameState.Type = models_pb.GameStateUpdateType_UserBlockStateUpdate
 		pGameState.UserBlockState = &models_pb.UserBlockState{
 			IsBlocked: g.Ub.IsBlocked,
+			Cash: g.Ub.Cash,
 		}
 	} else if g.GsType == UserReferredCreditUpdate {
 		pGameState.Type = models_pb.GameStateUpdateType_UserReferredCreditUpdate
