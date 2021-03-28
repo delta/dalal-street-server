@@ -76,7 +76,7 @@ func ResendVerificationEmail(email string) error {
 		Email: email,
 	}
 	if err := db.Table("Registrations").Where("email = ?", email).First(&registration).Error; err != nil {
-		l.Errorf("Couldn't find the user in registrations, ", err)
+		l.Errorf("Couldn't find the user in registrations, %v", err)
 		return UserNotFoundError
 	}
 
