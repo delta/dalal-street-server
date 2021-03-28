@@ -249,12 +249,13 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 	password, _ = hashPassword(password)
 	verificationKey, _ := getVerificationKey(email)
 	register := &Registration{
-		Email:           email,
-		Password:        password,
-		IsPragyan:       false,
-		IsVerified:      false,
-		Name:            fullName,
-		VerificationKey: verificationKey,
+		Email:                  email,
+		Password:               password,
+		IsPragyan:              false,
+		IsVerified:             false,
+		Name:                   fullName,
+		VerificationKey:        verificationKey,
+		VerificationEmailCount: 1,
 	}
 
 	if referralCode != "" {

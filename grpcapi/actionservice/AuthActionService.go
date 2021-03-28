@@ -215,16 +215,32 @@ func (d *dalalActionService) Logout(ctx context.Context, req *actions_pb.LogoutR
 	return &actions_pb.LogoutResponse{}, nil
 }
 
-func (d *dalalActionService) ResendVerificationEmai(ctx context.Context, req *actions_pb.ResendVerificationEmailRequest) (*actions_pb.ResendVerificationEmailResponse, error) {
+func (d *dalalActionService) ResendVerificationEmail(ctx context.Context, req *actions_pb.ResendVerificationEmailRequest) (*actions_pb.ResendVerificationEmailResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "ResendVerificationEmail",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
 		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
-	l.Infof("Logout requested")
+	l.Infof("Resned verification email requested")
 
-	models.ResendVerificationEmail(req.GetEmail())
+	resp := &actions_pb.ResendVerificationEmailResponse{}
+	makeError := func(st actions_pb.ResendVerificationEmailResponse_StatusCode, msg string) (*actions_pb.ResendVerificationEmailResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	if err := models.ResendVerificationEmail(req.GetEmail()); err != nil {
+		l.Errorf("Got the error : %s", err)
+		if err == models.MaximumEmailCountReached {
+			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Maximum email limits reached")
+		} else if err == models.UserNotFoundError {
+			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Please check your email")
+		} else {
+			return makeError(actions_pb.ResendVerificationEmailResponse_InternalServerError, getInternalErrorMessage(err))
+		}
+	}
 
 	return &actions_pb.ResendVerificationEmailResponse{}, nil
 }
