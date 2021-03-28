@@ -80,9 +80,6 @@ func ResendVerificationEmail(email string) error {
 		return UserNotFoundError
 	}
 
-	l.Debugf("Got the user %+v", registration)
-	l.Debugf("max count %v", config.MaxVerificationEmailRequestCount)
-
 	if registration.VerificationEmailCount >= config.MaxVerificationEmailRequestCount {
 		return MaximumEmailCountReached
 	}
