@@ -178,7 +178,7 @@ func Login(email, password string) (User, error) {
 	}
 
 	// Check if user has been verified or not only on docker
-	if config.Stage == "dev" && registeredUser.IsVerified == false {
+	if config.Stage == "docker" && registeredUser.IsVerified == false {
 		l.Errorf("User (%s) attempted login before verification", email)
 		return User{}, UnverifiedUserError
 	}
@@ -434,7 +434,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	}
 
 	l.Debugf("Attempting login to Pragyan")
-	resp, err := http.PostForm("https://api.pragyan.org/20/event/login", form)
+	resp, err := http.PostForm("https://api.pragyan.org/21/event/login", form)
 	if err != nil {
 		l.Errorf("Pragyan API call failed: '%s'", err)
 		return pragyanUser{}, err
@@ -2404,7 +2404,6 @@ func SetBlockUser(userId uint32, isBlocked bool, penalty uint64) error {
 		}
 	}
 
-	
 	oldCash := user.Cash
 
 	//Penalty added while blocking user
@@ -2423,7 +2422,7 @@ func SetBlockUser(userId uint32, isBlocked bool, penalty uint64) error {
 		UserID: userId,
 		Ub: &UserBlockState{
 			IsBlocked: isBlocked,
-			Cash:user.Cash,
+			Cash:      user.Cash,
 		},
 		GsType: UserBlockStateUpdate,
 	}
