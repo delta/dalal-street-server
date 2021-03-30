@@ -11,7 +11,6 @@ import (
 	"github.com/delta/dalal-street-server/matchingengine"
 	"github.com/delta/dalal-street-server/models"
 	"github.com/delta/dalal-street-server/session"
-	"github.com/delta/dalal-street-server/socketapi"
 	"github.com/delta/dalal-street-server/utils"
 )
 
@@ -32,7 +31,6 @@ func RealMain() {
 	datastreams.Init(config)
 	matchingengine.Init(config)
 	session.Init(config)
-	socketapi.Init(config)
 
 	// handle streams
 	datastreamsManager := datastreams.GetManager()
@@ -72,8 +70,6 @@ func RealMain() {
 				}
 				if utils.IsGrpcRequest(req) {
 					grpcapi.GrpcHandlerFunc(resp, req)
-				} else if req.URL.Path == "/ws" {
-					socketapi.Handle(resp, req)
 				} else if req.URL.Path == "/verify" {
 					if err := httpapi.HandleVerification(req); err != nil {
 						respText := fmt.Sprintf("%s", err.Error())

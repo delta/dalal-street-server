@@ -2,8 +2,8 @@
    "Dev": {
       "Stage": "dev",
 
-      "EventId": "19",
-      "EventSecret": "5881add25851d3051e96a6b0be4bcaf1",
+      "EventId": "3",
+      "EventSecret": "a7b20fc00eca79eeced4790b79a9177a",
 
       "LogFileName": "stdout",
       "LogMaxSize": 50,
@@ -38,8 +38,8 @@
    "Docker": {
       "Stage": "docker",
 
-      "EventId": "19",
-      "EventSecret": "5881add25851d3051e96a6b0be4bcaf1",
+      "EventId": "3",
+      "EventSecret": "a7b20fc00eca79eeced4790b79a9177a",
 
       "LogFileName": "./dalalstreet_docker.log",
       "LogMaxSize": 50,
@@ -74,8 +74,8 @@
    "Prod": {
       "Stage": "prod",
 
-      "EventId": "19",
-      "EventSecret": "5881add25851d3051e96a6b0be4bcaf1",
+      "EventId": "3",
+      "EventSecret": "a7b20fc00eca79eeced4790b79a9177a",
 
       "LogFileName": "./dalalstreet.log",
       "LogMaxSize": 50,
@@ -110,8 +110,8 @@
    "Test": {
       "Stage": "test",
 
-      "EventId": "19",
-      "EventSecret": "5881add25851d3051e96a6b0be4bcaf1",
+      "EventId": "3",
+      "EventSecret": "a7b20fc00eca79eeced4790b79a9177a",
 
       "LogFileName": "stdout",
       "LogMaxSize": 50,
