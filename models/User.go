@@ -293,7 +293,7 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 							%s
 							%s`, templates.HtmlEmailVerificationTemplateHead, verificationURL, templates.HtmlEmailVerificationTemplateTail)
 		plainContent := fmt.Sprintf(templates.PlainEmailVerificationTemplate, verificationURL)
-		err = utils.SendEmail("noreply@dalalstreet.com", "Account Verification", email, plainContent, htmlContent)
+		err = utils.SendEmail("noreply@dalal.pragyan.org", "Account Verification", email, plainContent, htmlContent)
 		if err != nil {
 			l.Errorf("Error while sending verification email to player %s", err)
 			return err
@@ -605,6 +605,18 @@ type NotEnoughStocksError struct {
 
 func (e NotEnoughStocksError) Error() string {
 	return fmt.Sprintf("Not have enough stocks to place this order. Current maximum Ask size: %d stocks", e.currentAllowedQty)
+}
+
+// NotEnoughActualWorth is generated when an Ask's StockQuantity is such that
+// deducting those many stocks will mean that with the current stock worth
+// multiplied by number of stocks being short sold is more than the cash in
+// hand and stock worth of the user
+type NotEnoughActualWorthError struct {
+	actualWorth int64
+}
+
+func (e NotEnoughActualWorthError) Error() string {
+	return fmt.Sprintf("Not have actual networh to place this order. Cash in hand plus stock worth should be atleast: %d", e.actualWorth)
 }
 
 // NotEnoughCashError is generated when a Bid's StockQuantity*Price is such that
@@ -964,22 +976,71 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	}
 
 	l.Debugf("Check2: Passed.")
+
+
+	
+	var shortSellMin = numStocksLeft*int64(ask.Price)
+	var stockWorth int64 = 0
+
+	db := getDB()
+
+	sql := "Select stockId, sum(stockQuantity) as stockQuantity from Transactions where userId=? group by stockId"
+	rows, err := db.Raw(sql, userId).Rows()
+	if err != nil {
+		l.Error(err)
+		return 0, err
+	}
+	defer rows.Close()
+
+	stocksOwned := make(map[uint32]int64)
+	for rows.Next() {
+		var stockId uint32
+		var stockQty int64
+		rows.Scan(&stockId, &stockQty)
+
+		stocksOwned[stockId] = stockQty
+	}
+
+
+	// Find Stock worth of user
+	for id, number := range stocksOwned{
+		allStocks.m[id].RLock()
+		stockWorth = stockWorth + int64(allStocks.m[id].stock.CurrentPrice)*number
+		allStocks.m[ask.StockId].RUnlock()
+	}
+
+	//Actual worth of user includes only
+	//Stock worth and cash
+	//Does not include reserved cash and stocks
+	var actualWorth = int64(user.Cash) + stockWorth
+
+	l.Debugf("Check3: Current stocks: %d. Stocks after trade: %d. User Actual Worth(Cash in hand + Stock Worth) %d", numStocks, numStocksLeft, user.Total)
+
+	//Check if networth of user is more than the number of stocks 
+	//which are short sold
+	if numStocksLeft < 0 && -(actualWorth) > shortSellMin {
+		l.Debugf("Check3: Failed. Not enough actual worth to short sell.")	
+		return 0, NotEnoughActualWorthError{shortSellMin}
+	}
+
+	l.Debugf("Check3: Passed.")
+
 	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
 	orderFee := getOrderFee(ask.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(orderFee)
 
-	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
+	l.Debugf("Check4: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debugf("Check3: Failed. Not enough cash.")
+		l.Debugf("Check4: Failed. Not enough cash.")
 		return 0, NotEnoughCashError{}
 	}
 
-	l.Debugf("Check3: Passed. Creating Ask.")
+	l.Debugf("Check4: Passed. Creating Ask.")
 
 	oldCash := user.Cash
 
-	db := getDB()
+	db = getDB()
 	tx := db.Begin()
 
 	var errorHelper = func(format string, args ...interface{}) (uint32, error) {

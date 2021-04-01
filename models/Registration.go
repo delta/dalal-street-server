@@ -91,7 +91,7 @@ func ResendVerificationEmail(email string) error {
 							%s
 							%s`, templates.HtmlEmailVerificationTemplateHead, verificationURL, templates.HtmlEmailVerificationTemplateTail)
 	plainContent := fmt.Sprintf(templates.PlainEmailVerificationTemplate, verificationURL)
-	if err := utils.SendEmail("noreply@dalalstreet.com", "Account Verification", email, plainContent, htmlContent); err != nil {
+	if err := utils.SendEmail("noreply@dalal.pragyan.org", "Account Verification", email, plainContent, htmlContent); err != nil {
 		l.Errorf("Error while sending verification email to player %s", err)
 		return err
 	}

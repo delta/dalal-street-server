@@ -60,7 +60,7 @@ func PasswordReset(email string) (string, error) {
 							%s`, templates.HtmlPasswordResetTemplateHead, tempPass, templates.HtmlPasswordResetTemplateTail)
 		plainContent := fmt.Sprintf(templates.PlainPasswordResetTemplate, tempPass)
 
-		err = utils.SendEmail("noreply@dalalstreet.com", "Password Reset", email, plainContent, htmlContent)
+		err = utils.SendEmail("noreply@dalal.pragyan.org", "Password Reset", email, plainContent, htmlContent)
 
 		if err != nil {
 			l.Errorf("Error while sending password reset email to player %s", err)
