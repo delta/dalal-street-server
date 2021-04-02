@@ -163,8 +163,8 @@ func Test_PlaceAskOrder(t *testing.T) {
 
 	transactions := []*Transaction{
 		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, 0, -10, 200, 0, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, 0, -10, 200, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
 	}
 
 	testcases := []struct {
