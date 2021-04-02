@@ -113,7 +113,6 @@ func Login(email, password string) (User, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "Login",
 		"param_email":    email,
-		"param_password": password,
 	})
 
 	l.Infof("Attempting to login user")
@@ -219,7 +218,6 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":         "Register",
 		"param_email":    email,
-		"param_password": password,
 	})
 	l.Debugf("Attempting to register user")
 
@@ -423,7 +421,6 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":      "postLoginToPragyan",
 		"param_email": email,
-		"param_name":  password,
 	})
 
 	form := url.Values{
