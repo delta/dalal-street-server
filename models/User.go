@@ -1003,7 +1003,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	for id, number := range stocksOwned{
 		allStocks.m[id].RLock()
 		stockWorth = stockWorth + int64(allStocks.m[id].stock.CurrentPrice)*number
-		allStocks.m[ask.StockId].RUnlock()
+		allStocks.m[id].RUnlock()
 	}
 
 	//Actual worth of user includes only
@@ -1017,7 +1017,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	//which are short sold
 	if numStocksLeft < 0 && -(actualWorth) > shortSellMin {
 		l.Debugf("Check3: Failed. Not enough actual worth to short sell.")	
-		return 0, NotEnoughActualWorthError{shortSellMin}
+		return 0, NotEnoughActualWorthError{-shortSellMin}
 	}
 
 	l.Debugf("Check3: Passed.")
