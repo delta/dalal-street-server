@@ -83,43 +83,6 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 		"param_imageURL": imageURL,
 	})
 
-	// l.Infof("Attempting")
-
-	// // Try downloading image first
-	// response, err := http.Get(imageURL)
-	// if err != nil || response.StatusCode != http.StatusOK {
-	// 	l.Errorf("Error : %v, StatusCode : %d", err, response.StatusCode)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return errors.New("NOT OK status code")
-	// }
-	// defer response.Body.Close()
-
-	// // Extract filename
-	// var basename = imageURL[strings.LastIndex(imageURL, "/")+1:]
-	// var getParamStartIndex = strings.Index(basename, "?")
-	// if getParamStartIndex != -1 {
-	// 	basename = basename[:getParamStartIndex]
-	// }
-	// l.Debugf("ImageURL : %s Basename : %s", imageURL, basename)
-
-	// // open file for saving image
-	// file, err := os.Create(utils.GetImageBasePath() + basename)
-
-	// if err != nil {
-	// 	l.Error(err)
-	// 	return err
-	// }
-	// defer file.Close()
-
-	// // copy image to file
-	// _, err = io.Copy(file, response.Body)
-	// if err != nil {
-	// 	l.Error(err)
-	// 	return err
-	// }
-
 	db := getDB()
 
 	me := &MarketEvent{
