@@ -81,6 +81,10 @@ func (d *dalalActionService) GetMarketEvents(ctx context.Context, req *actions_p
 	}
 
 	resp.MoreExists = moreExists
+
+	var config = utils.GetConfiguration()
+	resp.NewsBasePath = config.AppNewsBasePath
+
 	for _, marketEvent := range marketEvents {
 		resp.MarketEvents = append(resp.MarketEvents, marketEvent.ToProto())
 	}
@@ -469,7 +473,7 @@ func (d *dalalActionService) GetDailyChallengeConfig(ctx context.Context, req *a
 
 	return res, nil
 }
-func (d *dalalActionService) AddUserSubscription(ctx context.Context,req *actions_pb.AddUserSubscriptionRequest) (*actions_pb.AddUserSubscriptionResponse,error) {
+func (d *dalalActionService) AddUserSubscription(ctx context.Context, req *actions_pb.AddUserSubscriptionRequest) (*actions_pb.AddUserSubscriptionResponse, error) {
 
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "AddUserSubscription",
@@ -480,9 +484,9 @@ func (d *dalalActionService) AddUserSubscription(ctx context.Context,req *action
 
 	resp := &actions_pb.AddUserSubscriptionResponse{}
 
-	makeError := func(st actions_pb.AddUserSubscriptionResponse_StatusCode, msg string) (*actions_pb.AddUserSubscriptionResponse,error) {
-		resp.StatusCode = st;
-		resp.StatusMessage = msg;
+	makeError := func(st actions_pb.AddUserSubscriptionResponse_StatusCode, msg string) (*actions_pb.AddUserSubscriptionResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
 		return resp, nil
 	}
 
@@ -490,15 +494,15 @@ func (d *dalalActionService) AddUserSubscription(ctx context.Context,req *action
 	// data contains endpoint and keys in string format
 	data := req.Data
 
-	err := models.AddUserSubscription(userID,data) 
+	err := models.AddUserSubscription(userID, data)
 
-	switch  {
+	switch {
 	case err == models.UserNotFoundError:
-		return makeError(actions_pb.AddUserSubscriptionResponse_InvalidUserError , "User does not exist")
+		return makeError(actions_pb.AddUserSubscriptionResponse_InvalidUserError, "User does not exist")
 	case err != nil:
 		l.Errorf("Request failed due to : %v\n", err)
 		return makeError(actions_pb.AddUserSubscriptionResponse_InternalServerError, getInternalErrorMessage(err))
-	}	
-	return resp,nil;
+	}
+	return resp, nil
 
 }
