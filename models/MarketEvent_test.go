@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	testutils "github.com/delta/dalal-street-server/utils/test"
+	"github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestMarketEventToProto(t *testing.T) {
@@ -14,7 +14,7 @@ func TestMarketEventToProto(t *testing.T) {
 		Text:         "Hello World",
 		IsGlobal:     true,
 		EmotionScore: -54,
-		ImagePath:    "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg",
+		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
 	}
 
@@ -33,7 +33,7 @@ func Test_GetMarketEvents(t *testing.T) {
 		Text:         "Hello World",
 		IsGlobal:     true,
 		EmotionScore: -54,
-		ImagePath:    "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg",
+		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
 	}
 	db := getDB()
@@ -78,7 +78,7 @@ func Test_AddMarketEvent(t *testing.T) {
 		Headline:  "Hello",
 		Text:      "Hello World",
 		IsGlobal:  true,
-		ImagePath: "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg",
+		ImagePath: "bitcoin_1516197589.jpg",
 	}
 	db := getDB()
 	defer func() {
