@@ -49,7 +49,6 @@ func (d *dalalActionService) Register(ctx context.Context, req *actions_pb.Regis
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Register",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
-		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
 	l.Infof("Register requested")
@@ -81,7 +80,6 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "Login",
 		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
-		"param_req":     fmt.Sprintf("%+v", req),
 	})
 
 	l.Infof("Login requested")
