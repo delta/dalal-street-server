@@ -111,8 +111,8 @@ func (User) TableName() string {
 // and the user doesn't exist in our database.
 func Login(email, password string) (User, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":         "Login",
-		"param_email":    email,
+		"method":      "Login",
+		"param_email": email,
 	})
 
 	l.Infof("Attempting to login user")
@@ -216,8 +216,8 @@ func Login(email, password string) (User, error) {
 // RegisterUser is called when a user tries to sign up in our site
 func RegisterUser(email, password, fullName, referralCode string) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":         "Register",
-		"param_email":    email,
+		"method":      "Register",
+		"param_email": email,
 	})
 	l.Debugf("Attempting to register user")
 
@@ -973,71 +973,22 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	}
 
 	l.Debugf("Check2: Passed.")
-
-
-	
-	var shortSellMin = numStocksLeft*int64(ask.Price)
-	var stockWorth int64 = 0
-
-	db := getDB()
-
-	sql := "Select stockId, sum(stockQuantity) as stockQuantity from Transactions where userId=? group by stockId"
-	rows, err := db.Raw(sql, userId).Rows()
-	if err != nil {
-		l.Error(err)
-		return 0, err
-	}
-	defer rows.Close()
-
-	stocksOwned := make(map[uint32]int64)
-	for rows.Next() {
-		var stockId uint32
-		var stockQty int64
-		rows.Scan(&stockId, &stockQty)
-
-		stocksOwned[stockId] = stockQty
-	}
-
-
-	// Find Stock worth of user
-	for id, number := range stocksOwned{
-		allStocks.m[id].RLock()
-		stockWorth = stockWorth + int64(allStocks.m[id].stock.CurrentPrice)*number
-		allStocks.m[id].RUnlock()
-	}
-
-	//Actual worth of user includes only
-	//Stock worth and cash
-	//Does not include reserved cash and stocks
-	var actualWorth = int64(user.Cash) + stockWorth
-
-	l.Debugf("Check3: Current stocks: %d. Stocks after trade: %d. User Actual Worth(Cash in hand + Stock Worth) %d", numStocks, numStocksLeft, user.Total)
-
-	//Check if networth of user is more than the number of stocks 
-	//which are short sold
-	if numStocksLeft < 0 && -(actualWorth) > shortSellMin {
-		l.Debugf("Check3: Failed. Not enough actual worth to short sell.")	
-		return 0, NotEnoughActualWorthError{-shortSellMin}
-	}
-
-	l.Debugf("Check3: Passed.")
-
 	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
 	orderFee := getOrderFee(ask.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(orderFee)
 
-	l.Debugf("Check4: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
+	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debugf("Check4: Failed. Not enough cash.")
+		l.Debugf("Check3: Failed. Not enough cash.")
 		return 0, NotEnoughCashError{}
 	}
 
-	l.Debugf("Check4: Passed. Creating Ask.")
+	l.Debugf("Check3: Passed. Creating Ask.")
 
 	oldCash := user.Cash
 
-	db = getDB()
+	db := getDB()
 	tx := db.Begin()
 
 	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
