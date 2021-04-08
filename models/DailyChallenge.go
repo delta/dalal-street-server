@@ -63,7 +63,7 @@ type updateUserStateQueryData struct {
 type getMyRewardQueryData struct {
 	Id              uint32
 	UserId          uint32
-	FinalValue      uint32
+	FinalValue      int64
 	IsCompleted     bool
 	IsRewardClaimed bool
 	Marketday       uint32
