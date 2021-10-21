@@ -3,11 +3,14 @@
 rm -rf proto_build
 mkdir -p proto_build/
 cp -R proto/* proto_build/
-cd proto_build/
-protoc --go_out=plugins=grpc,import_prefix=github.com/delta/dalal-street-server/proto_build/,import_path=pb:. *.proto
-protoc --go_out=import_prefix=github.com/delta/dalal-street-server/proto_build/,import_path=actions_pb:. actions/*.proto
-protoc --go_out=import_prefix=github.com/delta/dalal-street-server/proto_build/,import_path=models_pb:. models/*.proto
-protoc --go_out=import_prefix=github.com/delta/dalal-street-server/proto_build/,import_path=datastreams_pb:. datastreams/*.proto
+
+protoc -I=proto/ --go_out=proto_build --go_opt=paths=source_relative \
+--go-grpc_out=proto_build --go-grpc_opt=require_unimplemented_servers=false --go-grpc_opt=paths=source_relative proto/*.proto
+protoc -I=proto/ --go_out=proto_build --go_opt=paths=source_relative proto/actions/*.proto
+protoc -I=proto/ --go_out=proto_build --go_opt=paths=source_relative proto/models/*.proto
+protoc -I=proto/ --go_out=proto_build --go_opt=paths=source_relative proto/datastreams/*.proto
+
+cd proto_build
 grep -rl "proto_build" . | grep -v ".sh" | xargs sed -E -i.bak 's|github.com/delta/dalal-street-server/proto_build/(google\|golang\|github\|context)|\1|g'
 find . -type f -name "*.bak" -exec rm {} \;
 find . -type f -name "*.proto" -exec rm {} \;
