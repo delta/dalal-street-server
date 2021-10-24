@@ -29,6 +29,6 @@ go test -race -v -p=1 -run="^(Test|Benchmark)_(.*)" ./... -args -config="$(pwd)/
 code=$?
 
 # Tear down database
-migrate -path "./migrations" -database "mysql://root:$dbPass@/dalalstreet_test" down
+migrate -path "./migrations" -database "mysql://root:$dbPass@/dalalstreet_test" drop -f
 
 exit $code
