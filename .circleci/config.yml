@@ -42,6 +42,9 @@ jobs:
       - run:
           name: Run unit and integration tests
           command: |
+            export PATH=$PATH:/go/bin/
+            export PATH=$PATH:/usr/local/go/bin
+            go get -tags 'mysql' -u github.com/golang-migrate/migrate/v4/cmd/migrate/
             go get
             cp config.json.example config.json
             ./test.sh
