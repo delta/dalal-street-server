@@ -22,13 +22,13 @@ dbPass=$(egrep "Test|DbPassword" config.json \
 	| awk '{print substr($2,2,length($2)-3)}')
 
 # Set up database
-migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations up
+migrate -path "./migrations" -database "mysql://root:$dbPass@/dalalstreet_test" up
 
 # Any test that DOES contain a "_" in its name is considered an integration test.
 go test -race -v -p=1 -run="^(Test|Benchmark)_(.*)" ./... -args -config="$(pwd)/config.json"
 code=$?
 
 # Tear down database
-migrate -url mysql://root:$dbPass@/dalalstreet_test -path ./migrations down 
+migrate -path "./migrations" -database "mysql://root:$dbPass@/dalalstreet_test" down
 
 exit $code
