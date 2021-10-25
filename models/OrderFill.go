@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/delta/dalal-street-server/proto_build/models"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 )
 
 type OrderFill struct {

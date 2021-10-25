@@ -5,8 +5,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/delta/dalal-street-server/proto_build/datastreams"
-	"github.com/delta/dalal-street-server/proto_build/models"
+	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
+	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
 )
 

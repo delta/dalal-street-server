@@ -3,40 +3,19 @@
 
 # Server for Dalal Street
 
-## Prerequisites
-- Go 1.13 [Download link](https://golang.org/dl/#go1.13)
-- Protocol buffers [Download link](https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip)
-- MySQL
 
-## Check prerequisites
-- Check the go version installed.
-```
-go version
-```
-- Check protobuf installation.
-```
-protoc --help
-```
-- Setup ```SECRET_KEY``` environment variable to some string
+## Prerequisites
+- Go 1.16
+- Protocol buffers 
+- MySQL
 
 ## Build instructions
 
-- Download the repository and `cd` into it.
-```
-go get github.com/delta/dalal-street-server
-cd $GOPATH/src/github.com/delta/dalal-street-server
-```
-- Install dependencies
-```
-cd ../
-go get -v github.com/gemnasium/migrate
-go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
-cd $GOPATH/src/github.com/golang/protobuf/protoc-gen-go/
-git reset --hard ed6926b37a637426117ccab59282c3839528a700
-go install github.com/golang/protobuf/protoc-gen-go
-cd $GOPATH/src/github.com/delta/dalal-street-server/
-go get
-```
+- Setting up server
+
+Refer [Setup Wiki](https://github.com/delta/dalal-street-server/wiki/Setup-Docs) for setting up Dalal-Street-Server 
+
+
 - Setup submodules
 ```
 git submodule init
@@ -45,7 +24,7 @@ git submodule update --recursive
 - Create databases and run migrations
 ```
 mysql -u root -p -e "CREATE DATABASE dalalstreet_dev; CREATE DATABASE dalalstreet_test;"
-migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./migrations up
+migrate -path "./migrations" -database "mysql://root:YOUR_MYSQL_PASSWORD@/dalalstreet_dev" up
 ```
 - Generate proto files
 ```
@@ -57,7 +36,7 @@ migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./mi
 
 ## Create Migrations
 ```
-migrate -url "mysql://root:YOUR_MYSQL_ROOT_PASSWORD@/dalalstreet_dev" -path ./migrations create migration_file_xyz
+migrate create -ext sql -dir ./migrations MIGRATION_NAME
 ```
 
 ## Tests

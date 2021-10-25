@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/delta/dalal-street-server
     docker:
-      - image: circleci/golang:1.13
+      - image: circleci/golang:1.16
       - image: circleci/mysql:5.7
 
     steps:
@@ -12,19 +12,10 @@ jobs:
       - run:
           name: Setup protobuf
           command: |
-            wget -q https://github.com/google/protobuf/releases/download/v3.2.0rc2/protoc-3.2.0rc2-linux-x86_64.zip
-            unzip -qq protoc-3.2.0rc2-linux-x86_64.zip
-            cd ../
-            go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
-            cd $GOPATH/src/github.com/golang/protobuf/protoc-gen-go/
-            git reset --hard ed6926b37a637426117ccab59282c3839528a700
-            go install github.com/golang/protobuf/protoc-gen-go
-
-      - run:
-          name: Install Go dependecies
-          command: |
-            cd ../
-            go get -v github.com/gemnasium/migrate
+            wget -q https://github.com/protocolbuffers/protobuf/releases/download/v3.18.1/protoc-3.18.1-linux-x86_64.zip
+            unzip -qq protoc-3.18.1-linux-x86_64.zip
+            go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+            go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
 
       - run:
           name: Update submodules
@@ -36,7 +27,10 @@ jobs:
           name: Run protobuf tests
           command: |
             export PATH=$PATH:$(pwd)/bin
+            export PATH=$PATH:/go/bin/
+            export PATH=$PATH:/usr/local/go/bin
             ./build_proto.sh
+
 
       - run:
           name: Setup MySQL
@@ -48,6 +42,9 @@ jobs:
       - run:
           name: Run unit and integration tests
           command: |
+            export PATH=$PATH:/go/bin/
+            export PATH=$PATH:/usr/local/go/bin
+            go get -tags 'mysql' -u github.com/golang-migrate/migrate/v4/cmd/migrate/
             go get
             cp config.json.example config.json
             ./test.sh
