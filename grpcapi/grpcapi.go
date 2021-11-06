@@ -24,7 +24,6 @@ import (
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
 	"github.com/delta/dalal-street-server/session"
 	"github.com/delta/dalal-street-server/utils"
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
 )
 
 var (
@@ -32,7 +31,6 @@ var (
 	logger *logrus.Entry
 
 	grpcServer    *grpc.Server
-	wrappedServer *grpcweb.WrappedGrpcServer
 )
 
 func authFunc(ctx context.Context) (context.Context, error) {
@@ -42,7 +40,7 @@ func authFunc(ctx context.Context) (context.Context, error) {
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return nil, grpc.Errorf(codes.Unauthenticated, "Missing context metadata")
+		return nil, status.Errorf(codes.Unauthenticated, "Missing context metadata")
 	}
 	// handle bot related request specially - create a fake session, since we don't
 	// want bot requests to pollute the sessions database. The bots will make stateless
@@ -52,7 +50,7 @@ func authFunc(ctx context.Context) (context.Context, error) {
 			sess, err := session.Fake()
 			if err != nil {
 				l.Errorf("Unable to create session for bot")
-				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
+				return nil, status.Errorf(codes.Unauthenticated, "Invalid session id")
 			}
 
 			sess.Set("userId", md["bot_user_id"][0])
@@ -61,17 +59,17 @@ func authFunc(ctx context.Context) (context.Context, error) {
 		}
 
 		l.Warnf("Invalid bot request. Got %+v", md)
-		return nil, grpc.Errorf(codes.Unauthenticated, "bot secret not set")
+		return nil, status.Errorf(codes.Unauthenticated, "bot secret not set")
 	}
 
 	// regular requests
 	if len(md["sessionid"]) != 1 {
-		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
+		return nil, status.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
 
 	sess, err := session.Load(md["sessionid"][0])
 	if err != nil {
-		return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
+		return nil, status.Errorf(codes.Unauthenticated, "Invalid session id")
 	}
 	err = sess.Touch() // ignore the error here.
 	if err != nil {
@@ -111,7 +109,7 @@ func unaryAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 		} else {
 			sess, err = session.Load(md["sessionid"][0])
 			if err != nil {
-				return nil, grpc.Errorf(codes.Unauthenticated, "Invalid session id")
+				return nil, status.Errorf(codes.Unauthenticated, "Invalid session id")
 			}
 
 			err2 := sess.Touch() // ignore the error here.
@@ -217,21 +215,9 @@ func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm 
 
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService(dsm))
-
-	wrappedServer = grpcweb.WrapServer(grpcServer,
-		grpcweb.WithOriginFunc(func(origin string) bool {
-			return true
-		}),
-	)
 }
 
 // Handler func to handle incoming grpc requests
-// Checks the request type and calls the appropriate handler
 func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
-	if wrappedServer.IsGrpcWebRequest(req) {
-		log.Printf("Got grpc web request")
-		wrappedServer.ServeHTTP(resp, req)
-	} else {
-		grpcServer.ServeHTTP(resp, req)
-	}
+	grpcServer.ServeHTTP(resp, req)
 }

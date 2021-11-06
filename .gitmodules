@@ -1,9 +1,3 @@
 [submodule "socketapi/proto"]
 	path = proto
 	url = git@github.com:delta/dalal-street-proto
-[submodule "frontend"]
-	path = frontend
-	url = git@github.com:delta/dalal-street-web.git
-[submodule "bots"]
-	path = bots
-	url = git@github.com:delta/dalal-street-bots
