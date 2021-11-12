@@ -3,8 +3,8 @@ package models
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils/test"
+	"github.com/sirupsen/logrus"
 )
 
 func TestBidToProto(t *testing.T) {

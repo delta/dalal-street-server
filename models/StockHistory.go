@@ -3,8 +3,8 @@ package models
 import (
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 
 	actions_pb "github.com/delta/dalal-street-server/proto_build/actions"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
