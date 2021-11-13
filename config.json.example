@@ -31,9 +31,8 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": "",
+      "BackendUrl": "",
       "MaxVerificationEmailRequestCount": 5,
-      "AppNewsBasePath": ""
    },
 
    "Docker": {
@@ -68,9 +67,8 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": "",
+      "BackendUrl": "",
       "MaxVerificationEmailRequestCount": 5,
-      "AppNewsBasePath": ""
    },
 
    "Prod": {
@@ -105,9 +103,8 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": "",
+      "BackendUrl": "",
       "MaxVerificationEmailRequestCount": 5,
-      "AppNewsBasePath": ""
  },
 
    "Test": {
@@ -142,8 +139,7 @@
       "PushNotificationVAPIDPublicKey": "",
       "PushNotificationVAPIDPrivateKey": "",
       "PushNotificationEmail": "mailto:example@example.com",
-      "FrontEndUrl": "",
+      "BackendUrl": "",
       "MaxVerificationEmailRequestCount": 5,
-      "AppNewsBasePath": ""
  }
 }

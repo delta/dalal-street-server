@@ -2489,7 +2489,7 @@ func SetBlockUser(userId uint32, isBlocked bool, penalty uint64) error {
 	SendPushNotification(userId, PushNotification{
 		Title:   "Message from Dalal Street!",
 		Message: "Your account has been blocked for violating the game's code of conduct and a penalty has been deducted from your cash, visit the site to appeal the ban.",
-		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
+		LogoUrl: fmt.Sprintf("%v/static/dalalfavicon.png", config.BackendUrl),
 	})
 
 	return nil

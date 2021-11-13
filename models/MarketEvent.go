@@ -42,7 +42,7 @@ func (gMarketEvent *MarketEvent) ToProto() *models_pb.MarketEvent {
 	return pMarketEvent
 }
 
-func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
+func GetMarketEvents(lastId, count, stockId uint32) (bool, []*MarketEvent, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetMarketEvents",
 		"lastId": lastId,
@@ -55,12 +55,19 @@ func GetMarketEvents(lastId, count uint32) (bool, []*MarketEvent, error) {
 
 	var marketEvents []*MarketEvent
 
+	// fetching all the market events of the company
+	// only if stockId is sent in req
+	if stockId != 0 {
+		if err := db.Find(&marketEvents,"stockId = ?",stockId).Error; err != nil{
+			return true,nil,err
+		}
+
+		return false, marketEvents,nil
+	}
+
 	//set default value of count if it is zero
-	// set value to 10000 to fetch all news
 	if count == 0 {
 		count = MARKET_EVENT_COUNT
-	} else if count == 10000 { // Setting a large value to get all the news
-		count = 10000
 	} else {
 		count = utils.MinInt32(count, MARKET_EVENT_COUNT)
 	}
@@ -137,7 +144,7 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 	}
 
 	SendPushNotification(0, PushNotification{
-		Title:    fmt.Sprintf("Message from dalal street, something interesting just happened."),
+		Title:    "Message from dalal street, something interesting just happened.",
 		Message:  fmt.Sprintf("%v. Click here to know more.", headline),
 		LogoUrl:  "",
 		ImageUrl: imageURL,

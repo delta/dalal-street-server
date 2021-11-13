@@ -27,7 +27,7 @@ func OpenMarket(updateDayHighAndLow bool) error {
 	SendPushNotification(0, PushNotification{
 		Title:   "Message from Dalal Street! The market just opened.",
 		Message: "The Market just opened! Click here to begin your trading.",
-		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
+		LogoUrl: fmt.Sprintf("%v/static/dalalfavicon.png", config.BackendUrl),
 	})
 
 	if updateDayHighAndLow {

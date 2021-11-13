@@ -81,12 +81,10 @@ type Config struct {
 	PushNotificationVAPIDPrivateKey string
 	// notification email needed for push notification
 	PushNotificationEmail string
-	// url of frontend asset files for push notification
-	FrontEndUrl string
+	// url of asset files for push notification
+	BackendUrl string
 	// Maximum number of verification email requests a user can request
 	MaxVerificationEmailRequestCount uint32
-	// News base path for Dalal App (used in production as app doesnt download frontend public images)
-	AppNewsBasePath string
 }
 
 // Struct to load configurations of all possible modes i.e dev, docker, prod, test
@@ -136,9 +134,8 @@ var config = &Config{
 	PushNotificationVAPIDPublicKey:   "",
 	PushNotificationVAPIDPrivateKey:  "",
 	PushNotificationEmail:            "",
-	FrontEndUrl:                      "",
+	BackendUrl:                      "",
 	MaxVerificationEmailRequestCount: 5,
-	AppNewsBasePath:                  "",
 }
 
 var configFileName *string

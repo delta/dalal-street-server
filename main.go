@@ -31,6 +31,7 @@ func RealMain() {
 	datastreams.Init(config)
 	matchingengine.Init(config)
 	session.Init(config)
+	httpapi.Init()
 
 	// handle streams
 	datastreamsManager := datastreams.GetManager()
@@ -71,21 +72,13 @@ func RealMain() {
 
 				if utils.IsGrpcRequest(req) {
 					grpcapi.GrpcHandlerFunc(resp, req)
-				} else if req.URL.Path == "/verify" {
-					if err := httpapi.HandleVerification(req); err != nil {
-						respText := err.Error()
-						resp.Write([]byte(respText))
-					} else {
-						resp.Write([]byte("Successfully verified account!"))
-					}
-				} else {
-					resp.WriteHeader(http.StatusBadRequest)
-					resp.Write([]byte("Invalid URL requested"))
+				} else{
+					httpapi.HttpMux.ServeHTTP(resp,req)
 				}
 			},
 		),
 	}
-	models.InspectComponents()
+
 	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
 }
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -85,7 +84,7 @@ func GetCurrentTimeISO8601() string {
 }
 
 func GetImageBasePath() string {
-	return os.Getenv("GOPATH") + "/src/github.com/delta/dalal-street-server/frontend/public/src/images/news/"
+	return "../public/news/"
 }
 
 func IsProdEnv() bool {

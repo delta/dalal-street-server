@@ -71,8 +71,9 @@ func (d *dalalActionService) GetMarketEvents(ctx context.Context, req *actions_p
 
 	lastId := req.LastEventId
 	count := req.Count
+	stockId := req.StockId
 
-	moreExists, marketEvents, err := models.GetMarketEvents(lastId, count)
+	moreExists, marketEvents, err := models.GetMarketEvents(lastId, count, stockId)
 	if err != nil {
 		l.Errorf("Request failed due to: %+v", err)
 		resp.StatusCode = actions_pb.GetMarketEventsResponse_InternalServerError
@@ -81,9 +82,6 @@ func (d *dalalActionService) GetMarketEvents(ctx context.Context, req *actions_p
 	}
 
 	resp.MoreExists = moreExists
-
-	var config = utils.GetConfiguration()
-	resp.NewsBasePath = config.AppNewsBasePath
 
 	for _, marketEvent := range marketEvents {
 		resp.MarketEvents = append(resp.MarketEvents, marketEvent.ToProto())

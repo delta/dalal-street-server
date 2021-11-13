@@ -191,7 +191,7 @@ func AddExtraCredit(userID uint32) (uint64, error) {
 	SendPushNotification(codeProvider.Id, PushNotification{
 		Title:   "Message from Dalal Street! You just received a referral-code reward.",
 		Message: "A user just used your referral-code to register. Click here to claim your reward.",
-		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
+		LogoUrl: fmt.Sprintf("%v/static/dalalfavicon.png", config.BackendUrl),
 	})
 
 	return codeUser.Cash, tx.Commit().Error
