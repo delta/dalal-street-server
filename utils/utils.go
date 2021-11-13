@@ -84,7 +84,7 @@ func GetCurrentTimeISO8601() string {
 }
 
 func GetImageBasePath() string {
-	return "../public/news/"
+	return "../public/"
 }
 
 func IsProdEnv() bool {
