@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/utils"
 )

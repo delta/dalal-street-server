@@ -20,19 +20,18 @@ var (
 func handleVerification(w http.ResponseWriter, r *http.Request) {
 	verificationKey := r.URL.Query().Get("key")
 
-
 	if verificationKey == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(ErrorInvalidParamter.Error()))
 		return
 	}
 
-	if err := models.VerifyAccount(verificationKey); err != nil{
+	if err := models.VerifyAccount(verificationKey); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Successfully verified account!"))
 }

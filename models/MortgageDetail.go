@@ -1,9 +1,9 @@
 package models
 
 import (
-	"github.com/sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 )
 
 // MortgageQueryData stores stocks in bank of a given stockid

@@ -38,7 +38,7 @@ migrate -path "./migrations" -database "mysql://root:YOUR_MYSQL_PASSWORD@/dalals
 - Run `cp config.json.example config.json`
 - Fill in the database credentials in the `Dev` section of **config.json**.
 - Run the server
-  - development - Install (air)[https://github.com/cosmtrek/air] for live reload
+  - development - Install [air](https://github.com/cosmtrek/air) for live reload
     ```bash
     air
     ```

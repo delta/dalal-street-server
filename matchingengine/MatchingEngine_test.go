@@ -3,8 +3,8 @@ package matchingengine
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/golang/mock/gomock"
+	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/datastreams"
 	"github.com/delta/dalal-street-server/mocks"

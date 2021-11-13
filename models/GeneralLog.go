@@ -1,8 +1,8 @@
 package models
 
 import (
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // AddToGeneralLog adds entries to the GeneralLogs table

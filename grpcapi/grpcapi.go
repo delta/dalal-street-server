@@ -30,7 +30,7 @@ var (
 	config *utils.Config
 	logger *logrus.Entry
 
-	grpcServer    *grpc.Server
+	grpcServer *grpc.Server
 )
 
 func authFunc(ctx context.Context) (context.Context, error) {

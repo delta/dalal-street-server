@@ -9,10 +9,10 @@ import (
 
 func TestTransactionToProto(t *testing.T) {
 	tr := &Transaction{
-		Id:      2,
-		UserId:  20,
-		StockId: 12,
-		Type:    OrderFillTransaction,
+		Id:                    2,
+		UserId:                20,
+		StockId:               12,
+		Type:                  OrderFillTransaction,
 		ReservedStockQuantity: 10,
 		StockQuantity:         -20,
 		Price:                 300,

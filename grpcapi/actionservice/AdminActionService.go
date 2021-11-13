@@ -745,7 +745,7 @@ func (d *dalalActionService) InspectUserDegree(ctx context.Context, req *actions
 	}
 
 	var resDetails models.InspectDegreeDetails
-	resDetails, err := models.InspectUserDegree(); 
+	resDetails, err := models.InspectUserDegree()
 	if err != nil {
 		l.Errorf("failed to set market day %+e", err)
 		return makeError(actions_pb.InspectDegreeResponse_InternalServerError, getInternalErrorMessage(err))
@@ -776,24 +776,22 @@ func (d *dalalActionService) InspectConnectedComponents(ctx context.Context, req
 		return res, nil
 	}
 
-
-	componentResults, err := models.InspectComponents(); 
+	componentResults, err := models.InspectComponents()
 
 	if err != nil {
 		l.Errorf("failed to set market day %+e", err)
 		return makeError(actions_pb.InspectComponentsResponse_InternalServerError, getInternalErrorMessage(err))
 	}
 
-	var protoClusters[] *models_pb.Cluster
+	var protoClusters []*models_pb.Cluster
 
-	for i := 0;i < len(componentResults);i++{
+	for i := 0; i < len(componentResults); i++ {
 		protoClusters = append(protoClusters, componentResults[i].ToProto())
 	}
 
 	res.StatusCode = actions_pb.InspectComponentsResponse_OK
 	res.StatusMessage = "Done"
 	res.Clusters = protoClusters
-
 
 	return res, nil
 

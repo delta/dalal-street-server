@@ -47,7 +47,7 @@ func Test_GetMarketEvents(t *testing.T) {
 	}
 	var lastId uint32 = 0
 	for hasMore := true; hasMore; {
-		dbHasMore, retrievedEvents, err := GetMarketEvents(lastId, 13,0)
+		dbHasMore, retrievedEvents, err := GetMarketEvents(lastId, 13, 0)
 		if err != nil {
 			t.Fatalf("GetMarketEvents returned an error %v", err)
 		}

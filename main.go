@@ -72,8 +72,8 @@ func RealMain() {
 
 				if utils.IsGrpcRequest(req) {
 					grpcapi.GrpcHandlerFunc(resp, req)
-				} else{
-					httpapi.HttpMux.ServeHTTP(resp,req)
+				} else {
+					httpapi.HttpMux.ServeHTTP(resp, req)
 				}
 			},
 		),

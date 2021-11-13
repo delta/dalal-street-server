@@ -4,9 +4,9 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type TransactionType uint8
@@ -180,9 +180,9 @@ func GetAskTransactionsForStock(stockID, count uint32) ([]*Transaction, error) {
 // GetTransactionRef creates and returns a reference of a Transaction
 func GetTransactionRef(userID, stockID uint32, ttype TransactionType, reservedStockQuantity int64, stockQuantity int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
 	return &Transaction{
-		UserId:  userID,
-		StockId: stockID,
-		Type:    ttype,
+		UserId:                userID,
+		StockId:               stockID,
+		Type:                  ttype,
 		ReservedStockQuantity: reservedStockQuantity,
 		StockQuantity:         stockQuantity,
 		Price:                 price,

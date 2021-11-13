@@ -111,8 +111,8 @@ func (User) TableName() string {
 // and the user doesn't exist in our database.
 func Login(email, password string) (User, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method":         "Login",
-		"param_email":    email,
+		"method":      "Login",
+		"param_email": email,
 	})
 
 	l.Infof("Attempting to login user")
@@ -216,8 +216,8 @@ func Login(email, password string) (User, error) {
 // RegisterUser is called when a user tries to sign up in our site
 func RegisterUser(email, password, fullName, referralCode string) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":         "Register",
-		"param_email":    email,
+		"method":      "Register",
+		"param_email": email,
 	})
 	l.Debugf("Attempting to register user")
 
@@ -974,9 +974,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Check2: Passed.")
 
-
-	
-	var shortSellMin = numStocksLeft*int64(ask.Price)
+	var shortSellMin = numStocksLeft * int64(ask.Price)
 	var stockWorth int64 = 0
 
 	db := getDB()
@@ -998,9 +996,8 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		stocksOwned[stockId] = stockQty
 	}
 
-
 	// Find Stock worth of user
-	for id, number := range stocksOwned{
+	for id, number := range stocksOwned {
 		allStocks.m[id].RLock()
 		stockWorth = stockWorth + int64(allStocks.m[id].stock.CurrentPrice)*number
 		allStocks.m[id].RUnlock()
@@ -1013,10 +1010,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Check3: Current stocks: %d. Stocks after trade: %d. User Actual Worth(Cash in hand + Stock Worth) %d", numStocks, numStocksLeft, user.Total)
 
-	//Check if networth of user is more than the number of stocks 
+	//Check if networth of user is more than the number of stocks
 	//which are short sold
 	if numStocksLeft < 0 && -(actualWorth) > shortSellMin {
-		l.Debugf("Check3: Failed. Not enough actual worth to short sell.")	
+		l.Debugf("Check3: Failed. Not enough actual worth to short sell.")
 		return 0, NotEnoughActualWorthError{-shortSellMin}
 	}
 

@@ -58,11 +58,11 @@ func GetMarketEvents(lastId, count, stockId uint32) (bool, []*MarketEvent, error
 	// fetching all the market events of the company
 	// only if stockId is sent in req
 	if stockId != 0 {
-		if err := db.Find(&marketEvents,"stockId = ?",stockId).Error; err != nil{
-			return true,nil,err
+		if err := db.Find(&marketEvents, "stockId = ?", stockId).Error; err != nil {
+			return true, nil, err
 		}
 
-		return false, marketEvents,nil
+		return false, marketEvents, nil
 	}
 
 	//set default value of count if it is zero

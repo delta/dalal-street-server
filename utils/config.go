@@ -134,7 +134,7 @@ var config = &Config{
 	PushNotificationVAPIDPublicKey:   "",
 	PushNotificationVAPIDPrivateKey:  "",
 	PushNotificationEmail:            "",
-	BackendUrl:                      "",
+	BackendUrl:                       "",
 	MaxVerificationEmailRequestCount: 5,
 }
 
