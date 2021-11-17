@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/denisenkom/go-mssqldb v0.11.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
-	github.com/golang-jwt/jwt/v4 v4.1.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.1.0
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
