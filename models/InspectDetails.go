@@ -1,8 +1,8 @@
 package models
 
 import (
-	"github.com/sirupsen/logrus"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
+	"github.com/sirupsen/logrus"
 )
 
 func (l *InspectDetails) ToProto() *models_pb.InspectDetails {

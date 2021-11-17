@@ -3,8 +3,8 @@ package datastreams
 import (
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // MulticastStream represents an object that provides methods for handling multiple groups in

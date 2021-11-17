@@ -8,17 +8,30 @@ import (
 )
 
 var (
-	InvalidParamterError = errors.New("Invalid parameters passed")
+	ErrorInvalidParamter = errors.New("invalid parameters passed")
 )
 
 // HandleVerification is the view for the /verify route
-func HandleVerification(req *http.Request) error {
-	verificationKey := req.URL.Query().Get("key")
+/*
+	TODO
+	render html, with redirection to app and website
+	after successfull verification
+*/
+func handleVerification(w http.ResponseWriter, r *http.Request) {
+	verificationKey := r.URL.Query().Get("key")
 
 	if verificationKey == "" {
-		return InvalidParamterError
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(ErrorInvalidParamter.Error()))
+		return
 	}
 
-	err := models.VerifyAccount(verificationKey)
-	return err
+	if err := models.VerifyAccount(verificationKey); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Successfully verified account!"))
 }

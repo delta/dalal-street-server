@@ -14,7 +14,7 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
-func RealMain() {
+func main() {
 	config := utils.GetConfiguration()
 	defer func() {
 		if r := recover(); r != nil {
@@ -31,6 +31,7 @@ func RealMain() {
 	datastreams.Init(config)
 	matchingengine.Init(config)
 	session.Init(config)
+	httpapi.Init()
 
 	// handle streams
 	datastreamsManager := datastreams.GetManager()
@@ -53,7 +54,7 @@ func RealMain() {
 			func(resp http.ResponseWriter, req *http.Request) {
 				start := time.Now()
 				defer func() {
-					diff := time.Now().Sub(start).Seconds()
+					diff := time.Since(start).Seconds()
 					if r := recover(); r != nil {
 						utils.Logger.Errorf("[%.3f] %s %s Error: %+v", diff, req.Method, req.URL.Path, r)
 					}
@@ -68,28 +69,15 @@ func RealMain() {
 					resp.Write([]byte("OK"))
 					return
 				}
+
 				if utils.IsGrpcRequest(req) {
 					grpcapi.GrpcHandlerFunc(resp, req)
-				} else if req.URL.Path == "/verify" {
-					if err := httpapi.HandleVerification(req); err != nil {
-						respText := fmt.Sprintf("%s", err.Error())
-						resp.Write([]byte(respText))
-					} else {
-						resp.Write([]byte("Successfully verified account!"))
-					}
 				} else {
-					resp.WriteHeader(http.StatusBadRequest)
-					resp.Write([]byte("Invalid URL requested"))
+					httpapi.HttpMux.ServeHTTP(resp, req)
 				}
 			},
 		),
 	}
-	models.InspectComponents()
-	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
-}
 
-func main() {
-	for {
-		RealMain()
-	}
+	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
 }

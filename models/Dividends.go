@@ -177,7 +177,7 @@ func SendDividendsTransactionsAndNotifications(transactions []*Transaction, bene
 	SendPushNotification(0, PushNotification{
 		Title:   "Message from Dalal Street! A Company just sent our dividends.",
 		Message: fmt.Sprintf("Company %+v has sent out dividends. Visit the site to claim your reward.", stockDetails.FullName),
-		LogoUrl: fmt.Sprintf("%v/public/src/images/dalalfavicon.png", config.FrontEndUrl),
+		LogoUrl: fmt.Sprintf("%v/static/dalalfavicon.png", config.BackendUrl),
 	})
 	SendNotification(0, fmt.Sprintf("Company %+v has sent out dividends.", stockDetails.FullName), true)
 	return nil

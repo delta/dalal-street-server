@@ -3,9 +3,9 @@ package models
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils"
 	testutils "github.com/delta/dalal-street-server/utils/test"
+	"github.com/sirupsen/logrus"
 )
 
 func TestLeaderboardRowToProto(t *testing.T) {

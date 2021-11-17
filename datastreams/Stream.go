@@ -3,8 +3,8 @@ package datastreams
 import (
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -source Stream.go -destination ../mocks/mock_Stream.go -package mocks

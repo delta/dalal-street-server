@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/hkdf"
 
 	"github.com/sirupsen/logrus"

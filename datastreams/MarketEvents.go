@@ -39,8 +39,7 @@ func (mes *marketEventsStream) SendMarketEvent(me *models_pb.MarketEvent) {
 	})
 
 	meUpdate := &datastreams_pb.MarketEventUpdate{
-		MarketEvent:  me,
-		NewsBasePath: utils.GetConfiguration().AppNewsBasePath,
+		MarketEvent: me,
 	}
 	mes.broadcastStream.BroadcastUpdate(meUpdate)
 

@@ -47,3 +47,13 @@ mocks/
 sendgrid.env
 sendgrid.env
 
+tmp
+
+*.jpg
+*.jpeg
+*.jpe
+*.jif
+*.jfif
+*.jfi
+*.png
+*.svg

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
 	pb "github.com/delta/dalal-street-server/proto_build"
 	datastreams_pb "github.com/delta/dalal-street-server/proto_build/datastreams"
+	"github.com/sirupsen/logrus"
 )
 
 func (d *dalalStreamService) GetStockHistoryUpdates(req *datastreams_pb.SubscriptionId, stream pb.DalalStreamService_GetStockHistoryUpdatesServer) error {

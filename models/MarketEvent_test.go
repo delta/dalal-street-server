@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	"github.com/delta/dalal-street-server/utils/test"
+	testutils "github.com/delta/dalal-street-server/utils/test"
 )
 
 func TestMarketEventToProto(t *testing.T) {
@@ -47,7 +47,7 @@ func Test_GetMarketEvents(t *testing.T) {
 	}
 	var lastId uint32 = 0
 	for hasMore := true; hasMore; {
-		dbHasMore, retrievedEvents, err := GetMarketEvents(lastId, 13)
+		dbHasMore, retrievedEvents, err := GetMarketEvents(lastId, 13, 0)
 		if err != nil {
 			t.Fatalf("GetMarketEvents returned an error %v", err)
 		}
@@ -58,7 +58,7 @@ func Test_GetMarketEvents(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("Inserted and Recovered events not equal. Added-Received = %v", count)
 	}
-	_, single, err := GetMarketEvents(2, 1)
+	_, single, err := GetMarketEvents(2, 1, 0)
 	if len(single) != 1 {
 		t.Fatalf("More than 1 Event Obtained")
 	}

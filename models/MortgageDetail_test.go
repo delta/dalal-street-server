@@ -3,8 +3,8 @@ package models
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // func TestMortgageDetailToProto(t *testing.T) {

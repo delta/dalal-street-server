@@ -6,11 +6,11 @@ import (
 
 	"github.com/delta/dalal-street-server/datastreams"
 
-	"github.com/sirupsen/logrus"
 	"github.com/delta/dalal-street-server/mocks"
 	"github.com/delta/dalal-street-server/models"
 	"github.com/delta/dalal-street-server/utils"
 	"github.com/golang/mock/gomock"
+	"github.com/sirupsen/logrus"
 )
 
 func getMockObjects(t *testing.T) (
