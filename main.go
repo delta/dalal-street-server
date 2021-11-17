@@ -14,7 +14,7 @@ import (
 	"github.com/delta/dalal-street-server/utils"
 )
 
-func RealMain() {
+func main() {
 	config := utils.GetConfiguration()
 	defer func() {
 		if r := recover(); r != nil {
@@ -80,10 +80,4 @@ func RealMain() {
 	}
 
 	utils.Logger.Fatal(httpServer.ListenAndServeTLS(config.TLSCert, config.TLSKey))
-}
-
-func main() {
-	for {
-		RealMain()
-	}
 }
