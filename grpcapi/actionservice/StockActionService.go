@@ -121,3 +121,31 @@ func (d *dalalActionService) GetCompanyProfile(ctx context.Context, req *actions
 
 	return resp, nil
 }
+
+func (d *dalalActionService) GetStockList(ctx context.Context, req *actions_pb.GetStockListRequest) (*actions_pb.GetStockListResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetStockList",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("GetStockList requested")
+
+	resp := &actions_pb.GetStockListResponse{}
+
+	stockList := models.GetAllStocks()
+	stockListProto := make(map[uint32]*models_pb.Stock)
+
+	for stockId, stock := range stockList {
+		stockListProto[stockId] = stock.ToProto()
+	}
+
+	resp.StockList = stockListProto
+
+	resp.StatusCode = actions_pb.GetStockListResponse_OK
+	resp.StatusMessage = "Success"
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}

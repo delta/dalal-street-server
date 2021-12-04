@@ -111,7 +111,7 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		alreadyLoggedIn = true
 		userIdInt, err := strconv.ParseUint(userId, 10, 32)
 		if err == nil {
-			user, err = models.GetUserCopy(uint32(userIdInt))
+			user, _ = models.GetUserCopy(uint32(userIdInt))
 		}
 	}
 
@@ -137,12 +137,6 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 	writeUserDetailsToLog(ctx)
 
 	l.Debugf("Session successfully set. UserId: %+v, Session id: %+v", user.Id, sess.GetID())
-
-	stocksOwned, err := models.GetStocksOwned(user.Id)
-	if err != nil {
-		l.Errorf("Request failed due to %+v", err)
-		return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
-	}
 
 	stockList := models.GetAllStocks()
 	stockListProto := make(map[uint32]*models_pb.Stock)
@@ -170,23 +164,14 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		"ORDER_FEE_PERCENT":       models.ORDER_FEE_PERCENT,
 	}
 
-	reservedStocksOwned, err := models.GetReservedStocksOwned(user.Id)
-	if err != nil {
-		l.Errorf("Unable to get Reserved Stocks for User Id. Error: %+v", err)
-		return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
-	}
-
 	resp = &actions_pb.LoginResponse{
 		SessionId:                sess.GetID(),
 		User:                     user.ToProto(),
-		StocksOwned:              stocksOwned,
-		StockList:                stockListProto,
 		Constants:                constantsMap,
 		IsMarketOpen:             models.IsMarketOpen(),
 		MarketIsClosedHackyNotif: models.MARKET_IS_CLOSED_HACKY_NOTIF,
 		MarketIsOpenHackyNotif:   models.MARKET_IS_OPEN_HACKY_NOTIF,
 		VapidPublicKey:           utils.GetConfiguration().PushNotificationVAPIDPublicKey,
-		ReservedStocksOwned:      reservedStocksOwned,
 	}
 
 	l.Infof("Request completed successfully")
