@@ -165,13 +165,11 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 	}
 
 	resp = &actions_pb.LoginResponse{
-		SessionId:                sess.GetID(),
-		User:                     user.ToProto(),
-		Constants:                constantsMap,
-		IsMarketOpen:             models.IsMarketOpen(),
-		MarketIsClosedHackyNotif: models.MARKET_IS_CLOSED_HACKY_NOTIF,
-		MarketIsOpenHackyNotif:   models.MARKET_IS_OPEN_HACKY_NOTIF,
-		VapidPublicKey:           utils.GetConfiguration().PushNotificationVAPIDPublicKey,
+		SessionId:      sess.GetID(),
+		User:           user.ToProto(),
+		Constants:      constantsMap,
+		IsMarketOpen:   models.IsMarketOpen(),
+		VapidPublicKey: utils.GetConfiguration().PushNotificationVAPIDPublicKey,
 	}
 
 	l.Infof("Request completed successfully")
