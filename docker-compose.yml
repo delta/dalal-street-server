@@ -1,0 +1,54 @@
+version: '3'
+services:
+    
+    dalalserver:
+        container_name: dalalstreet-server
+        build: .
+        volumes: 
+            - ./dalalstreet_docker.log:/dalal-street-server/dalalstreet_docker.log
+        ports:
+            - "${SERVER_PORT}:8000"
+        depends_on:
+            - db
+        env_file:
+            - .env
+        environment:
+            MYSQL_DATABASE: ${DB_NAME}
+            DALAL_ENV: Docker
+            MYSQL_ROOT_PASSWORD: ${DB_PASS}
+            MYSQL_PORT: ${MYSQL_PORT}
+        restart: always
+
+    db:
+        container_name: dalalstreet-db
+        image: mysql:5.7
+        volumes:
+            - ./docker/mysql:/var/lib/mysql
+        env_file:
+            - .env
+        ports:
+            - "${MYSQL_PORT}:3306"
+        environment:
+            MYSQL_DATABASE: ${DB_NAME}
+            MYSQL_ROOT_PASSWORD: ${DB_PASS}
+    
+    phpmyadmin:
+        container_name: dalalstreet-pma
+        image: phpmyadmin/phpmyadmin
+        env_file:
+            - .env
+        ports:
+            - "${PMA_PORT}:80"
+        depends_on:
+            - db
+        environment:
+            PMA_HOST: db
+
+
+    dalalenvoy:
+        container_name: dalalstreet-envoy
+        build: 
+            context: ./dalal-envoy-proxy/
+            dockerfile: dockerfiles/Dockerfile.dev
+        ports:
+            - "${ENVOY_PORT}:3000"
