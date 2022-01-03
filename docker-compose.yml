@@ -21,16 +21,20 @@ services:
 
     db:
         container_name: dalalstreet-db
-        image: mysql:5.7
+        image: mysql:8.0.27
         volumes:
             - ./docker/mysql:/var/lib/mysql
         env_file:
             - .env
         ports:
-            - "${MYSQL_PORT}:3306"
+            - "3306:3306"
+        expose:
+            - "3306" 
         environment:
             MYSQL_DATABASE: ${DB_NAME}
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
+        cap_add:
+            - SYS_NICE
     
     phpmyadmin:
         container_name: dalalstreet-pma
@@ -41,8 +45,8 @@ services:
             - "${PMA_PORT}:80"
         depends_on:
             - db
-        environment:
-            PMA_HOST: db
+        # environment:
+        #     PMA_HOST: db
 
 
     dalalenvoy:
