@@ -9,6 +9,9 @@ RUN apt-get update && \
     netcat \
     git
 
+
+ENV PATH $PATH:/root/protobuf/bin
+
 WORKDIR  /dalal-street-server 
 
 COPY server-setup.sh ./

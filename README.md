@@ -96,7 +96,7 @@ docker-compose up
 docker ps
 ```
 
-- Server logs are present in ./dalalstreet_docker.log
+- Server logs are present in ./docker/logs/dalalstreet_docker.log
 
 
 
