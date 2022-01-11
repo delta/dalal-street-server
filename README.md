@@ -32,7 +32,7 @@ migrate -path "./migrations" -database "mysql://root:YOUR_MYSQL_PASSWORD@/dalals
 - Generate proto files
 
 ```
-./build_proto.sh
+./scripts/build_proto.sh
 ```
 
 - Run `cp config.json.example config.json`
@@ -58,7 +58,7 @@ migrate create -ext sql -dir ./migrations MIGRATION_NAME
 - Run the test script locally before pushing commits.
 
 ```
-./test.sh
+./scripts/test.sh
 ```
 
 ## Docker usage instructions
@@ -96,23 +96,7 @@ docker-compose up
 docker ps
 ```
 
-- Server logs are present in ./docker/logs/dalalstreet_docker.log
-
-
-
-### Docker build process break-down
-
-
-#### server-setup.sh
- - Installs and sets up Protoc Buffer
- - Fetches partial go dependencies (the remaining are installed by ```go mod download```)
-
-#### docker-entry.sh
- - Setup git submodules
- - ```build_proto.sh``` (Generate proto files - Proto files have to be built and converted to .pb.go)
- - Run migrations
- - ```go run main.go``` (Runs the main server)
-
+- Server logs are present in ./docker/logs/
 
 
 ## GoMock usage instructions

@@ -4,18 +4,16 @@ RUN apt-get update && \
     apt-get install -y apt-utils \
     zip \
     unzip \
-    vim \
     curl \
-    netcat \
-    git
+    netcat 
 
 
 ENV PATH $PATH:/root/protobuf/bin
 
 WORKDIR  /dalal-street-server 
 
-COPY server-setup.sh ./
-RUN "./server-setup.sh"
+COPY ./scripts/server-setup.sh ./scripts/
+RUN "./scripts/server-setup.sh"
 
 
 COPY go.mod go.sum ./
@@ -27,4 +25,4 @@ RUN go mod download
 
 COPY . .
 
-CMD ["./docker-entry.sh"]
+CMD ["./scripts/docker-entry.sh"]

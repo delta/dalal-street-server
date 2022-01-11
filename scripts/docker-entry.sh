@@ -3,13 +3,8 @@
 set -x
 
 
-echo "######## Git Submodules ##########"
-git submodule init
-git submodule update --recursive
-
-
 echo "########## Building proto files ###########"
-bash build_proto.sh
+bash ./scripts/build_proto.sh
 
 
 echo "################## Waiting for mysql to accept incoming connections ##################"

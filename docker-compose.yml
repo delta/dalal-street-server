@@ -7,7 +7,7 @@ services:
         build: .
         restart: always
         volumes: 
-            - ./docker/logs/dalalstreet_docker.log:/dalal-street-server/dalalstreet_docker.log
+            - ./docker/logs/:/dalal-street-server/logs/
         ports:
             - "${SERVER_PORT}:8000"
         depends_on:
@@ -18,7 +18,6 @@ services:
             MYSQL_DATABASE: ${DB_NAME}
             DALAL_ENV: Docker
             MYSQL_ROOT_PASSWORD: ${DB_PASS}
-            MYSQL_PORT: ${MYSQL_PORT}
         
 
     db:

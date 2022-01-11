@@ -30,6 +30,7 @@ dalal-street-server
 
 # volume mapping for mysql
 docker/
+dumps/
 
 # env file for docker-compose
 .env
