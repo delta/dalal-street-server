@@ -29,7 +29,7 @@ jobs:
             export PATH=$PATH:$(pwd)/bin
             export PATH=$PATH:/go/bin/
             export PATH=$PATH:/usr/local/go/bin
-            ./build_proto.sh
+            ./scripts/build_proto.sh
 
 
       - run:
@@ -47,4 +47,4 @@ jobs:
             go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
             go get
             cp config.json.example config.json
-            ./test.sh
+            ./scripts/test.sh
