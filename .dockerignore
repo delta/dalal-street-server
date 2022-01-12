@@ -1,0 +1,16 @@
+# Volume mount and dumps
+dumps/
+docker/
+
+# git stuff
+.git
+.gitignore
+.gitmodules 
+
+# unnecessary files
+.env
+.env.example
+config.json.example
+README.md
+docker-compose.yml
+dockerfile
