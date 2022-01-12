@@ -11,7 +11,5 @@ protoc -I=proto/ --go_out=proto_build --go_opt=paths=source_relative proto/model
 protoc -I=proto/ --go_out=proto_build --go_opt=paths=source_relative proto/datastreams/*.proto
 
 cd proto_build
-grep -rl "proto_build" . | grep -v ".sh" | xargs sed -E -i.bak 's|github.com/delta/dalal-street-server/proto_build/(google\|golang\|github\|context)|\1|g'
-find . -type f -name "*.bak" -exec rm {} \;
 find . -type f -name "*.proto" -exec rm {} \;
 go build
