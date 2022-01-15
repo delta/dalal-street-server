@@ -8,9 +8,8 @@ docker/
 .gitmodules 
 
 # unnecessary files
-.env
 .env.example
 config.json.example
 README.md
 docker-compose.yml
-dockerfile
+Dockerfile
