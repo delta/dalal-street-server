@@ -1,3 +1,6 @@
 [submodule "socketapi/proto"]
 	path = proto
 	url = git@github.com:delta/dalal-street-proto
+[submodule "dalal-envoy-proxy"]
+	path = dalal-envoy-proxy
+	url = git@github.com:delta/dalal-envoy-proxy.git

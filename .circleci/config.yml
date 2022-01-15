@@ -12,8 +12,8 @@ jobs:
       - run:
           name: Setup protobuf
           command: |
-            wget -q https://github.com/protocolbuffers/protobuf/releases/download/v3.18.1/protoc-3.18.1-linux-x86_64.zip
-            unzip -qq protoc-3.18.1-linux-x86_64.zip
+            curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip
+            unzip protoc-3.15.8-linux-x86_64.zip
             go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
             go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
 
@@ -29,7 +29,7 @@ jobs:
             export PATH=$PATH:$(pwd)/bin
             export PATH=$PATH:/go/bin/
             export PATH=$PATH:/usr/local/go/bin
-            ./build_proto.sh
+            ./scripts/build_proto.sh
 
 
       - run:
@@ -44,7 +44,7 @@ jobs:
           command: |
             export PATH=$PATH:/go/bin/
             export PATH=$PATH:/usr/local/go/bin
-            go get -tags 'mysql' -u github.com/golang-migrate/migrate/v4/cmd/migrate/
+            go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
             go get
             cp config.json.example config.json
-            ./test.sh
+            ./scripts/test.sh

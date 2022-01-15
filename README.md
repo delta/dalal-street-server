@@ -32,7 +32,7 @@ migrate -path "./migrations" -database "mysql://root:YOUR_MYSQL_PASSWORD@/dalals
 - Generate proto files
 
 ```
-./build_proto.sh
+./scripts/build_proto.sh
 ```
 
 - Run `cp config.json.example config.json`
@@ -58,20 +58,46 @@ migrate create -ext sql -dir ./migrations MIGRATION_NAME
 - Run the test script locally before pushing commits.
 
 ```
-./test.sh
+./scripts/test.sh
 ```
 
 ## Docker usage instructions
 
 - Install [docker](https://docs.docker.com/engine/installation) and [docker-compose](https://docs.docker.com/compose/install).
-- Run `cp .env.example .env`. Fill in the _DB_NAME_ and _DB_PASS_ in _.env_. These are the credentials for the database container.
-- Use the same credentials in `Docker` section _config.json_ (_DbName_ and _DbPassword_) and _docker-entry.sh_ (in the `migrate` command).
-- Run `docker-compose up`.
+
+- Run ```cp .env.example .env``` and ```cp config.json.example config.json```. 
+- Fill in the  **DB_PASS** in **.env** and make any additional changes if necessary.
+- Use the same credentials in **Docker** section **config.json** (**DbPassword**) 
+
+
+- Running server
+
+```
+docker-compose up
+```
 - Once the containers are up, you can get shell access by using
 
 ```
-docker exec -it <CONTAINER_ID> bash
+docker exec -it <CONTAINER_NAME> bash
 ```
+
+- To access phpMyAdmin, visit http://localhost:{PMA_PORT}/ (or http://localhost:9040/ by default)
+
+- If changes are made to the server files, rebuild image and run server with
+```
+docker-compose build
+docker-compose up
+```
+(might require sudo, depending on permissions of volume mount './docker/' )
+
+
+- To view all running docker containers:
+```
+docker ps
+```
+
+- Server logs are present in ./docker/logs/
+
 
 ## GoMock usage instructions
 

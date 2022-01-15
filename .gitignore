@@ -30,6 +30,7 @@ dalal-street-server
 
 # volume mapping for mysql
 docker/
+dumps/
 
 # env file for docker-compose
 .env
@@ -40,6 +41,7 @@ protoc-3.2.0rc2-linux-x86_64.zip*
 protobuf/
 
 tls_keys/prod/*
+tls_keys/docker/*
 
 # config.json contains database credentials
 config.json
