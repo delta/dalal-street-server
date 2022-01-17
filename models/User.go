@@ -2357,6 +2357,49 @@ func GetReservedStocksOwned(userId uint32) (map[uint32]int64, error) {
 	return reservedStocksOwned, nil
 }
 
+func GetCashSpent(userId uint32) (map[uint32]int64, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetCashSpent",
+		"userId": userId,
+	})
+
+	l.Info("GetCashSpent requested")
+
+	l.Debugf("Acquiring lock on user")
+
+	ch, _, err := getUserExclusively(userId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return nil, err
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released lock on user")
+	}()
+
+	db := getDB()
+
+	sql := "Select stockId, sum(total) as total from Transactions where userId=? and total<0 group by stockId"
+	rows, err := db.Raw(sql, userId).Rows()
+	if err != nil {
+		l.Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	cashSpent := make(map[uint32]int64)
+	for rows.Next() {
+		var stockId uint32
+		var cash int64
+		rows.Scan(&stockId, &cash)
+
+		cashSpent[stockId] = cash
+	}
+
+	return cashSpent, nil
+}
+
 // savePlaceOrderTransaction saves PlaceOrderTransaction and creates a mapping between orderId and
 func savePlaceOrderTransaction(orderID uint32, placeOrderTransaction *Transaction, isAsk bool, tx *gorm.DB) error {
 	if err := tx.Save(placeOrderTransaction).Error; err != nil {
