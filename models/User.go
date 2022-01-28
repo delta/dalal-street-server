@@ -2367,7 +2367,7 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 
 	db := getDB()
 
-	sql := "Select stockId, sum(reservedStockQuantity*-1) as soldstockstotal from Transactions where userId=102 and stockQuantity=0 and type='OrderFillTransaction' group by stockId"
+	sql := "Select stockId, sum(reservedStockQuantity*-1) as soldstockstotal from Transactions where userId=? and stockQuantity=0 and type='OrderFillTransaction' group by stockId"
 	rows, err := db.Raw(sql, userId).Rows()
 	if err != nil {
 		l.Error(err)
@@ -2384,7 +2384,7 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 		soldStocksTotal[stockId]=soldstocks
 	}
 
-	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and type='OrderFillTransaction' order by stockId;"
+	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and type='OrderFillTransaction' or type='FromExchangeTransaction' order by stockId;"
 	rows1, err := db.Raw(sql1, userId).Rows()
 	if err != nil {
 		l.Error(err)
@@ -2408,22 +2408,6 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 				cashSpent[stockId]+=buyStocks*int64(buyPrice)
 			}
 		}else {cashSpent[stockId]+=buyStocks*int64(buyPrice)}
-	}
-
-	sql2 := "Select stockId, sum(total*-1) from Transactions where userId=? and type='FromExchangeTransaction' group by StockId;"
-	rows2, err := db.Raw(sql2, userId).Rows()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer rows2.Close()
-
-	for rows2.Next(){
-		var stockId uint32
-		var fromExchangeTotal int64
-		rows1.Scan(&stockId, &fromExchangeTotal)
-
-		cashSpent[stockId]+=fromExchangeTotal
 	}
 
 	return cashSpent, nil
