@@ -2365,19 +2365,6 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 
 	l.Info("GetCashSpent requested")
 
-	l.Debugf("Acquiring lock on user")
-
-	ch, _, err := getUserExclusively(userId)
-	if err != nil {
-		l.Errorf("Errored: %+v", err)
-		return nil, err
-	}
-	l.Debugf("Acquired")
-	defer func() {
-		close(ch)
-		l.Debugf("Released lock on user")
-	}()
-
 	db := getDB()
 
 	sql := "Select stockId, sum(reservedStockQuantity*-1) as soldstockstotal from Transactions where userId=? and stockQuantity=0 and type='OrderFillTransaction' group by stockId"
