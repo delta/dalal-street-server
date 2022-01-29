@@ -2365,6 +2365,19 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 
 	l.Info("GetCashSpent requested")
 
+	l.Debugf("Acquiring lock on user")
+
+	ch, _, err := getUserExclusively(userId)
+	if err != nil {
+		l.Errorf("Errored: %+v", err)
+		return nil, err
+	}
+	l.Debugf("Acquired")
+	defer func() {
+		close(ch)
+		l.Debugf("Released lock on user")
+	}()
+
 	db := getDB()
 
 	sql := "Select stockId, sum(reservedStockQuantity*-1) as soldstockstotal from Transactions where userId=? and stockQuantity=0 and type='OrderFillTransaction' group by stockId"
@@ -2376,15 +2389,15 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 	defer rows.Close()
 
 	soldStocksTotal := make(map[uint32]int64)
-	for rows.Next(){
+	for rows.Next() {
 		var stockId uint32
 		var soldstocks int64
 		rows.Scan(&stockId, &soldstocks)
 
-		soldStocksTotal[stockId]=soldstocks
+		soldStocksTotal[stockId] = soldstocks
 	}
 
-	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and type='OrderFillTransaction' or type='FromExchangeTransaction' order by stockId;"
+	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and (type='OrderFillTransaction' or type='FromExchangeTransaction') order by stockId;"
 	rows1, err := db.Raw(sql1, userId).Rows()
 	if err != nil {
 		l.Error(err)
@@ -2393,21 +2406,23 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 	defer rows1.Close()
 
 	cashSpent := make(map[uint32]int64)
-	for rows1.Next(){
+	for rows1.Next() {
 		var stockId uint32
 		var buyStocks int64
 		var buyPrice uint64
 		rows1.Scan(&stockId, &buyStocks, &buyPrice)
 
-		if soldStocksTotal[stockId]>0{
-			if soldStocksTotal[stockId]>buyStocks{
-				soldStocksTotal[stockId]=soldStocksTotal[stockId]-buyStocks
-			}else{
-				buyStocks=buyStocks-soldStocksTotal[stockId]
-				soldStocksTotal[stockId]=0
-				cashSpent[stockId]+=buyStocks*int64(buyPrice)
+		if soldStocksTotal[stockId] > 0 {
+			if soldStocksTotal[stockId] > buyStocks {
+				soldStocksTotal[stockId] = soldStocksTotal[stockId] - buyStocks
+			} else {
+				buyStocks = buyStocks - soldStocksTotal[stockId]
+				soldStocksTotal[stockId] = 0
+				cashSpent[stockId] += buyStocks * int64(buyPrice)
 			}
-		}else {cashSpent[stockId]+=buyStocks*int64(buyPrice)}
+		} else {
+			cashSpent[stockId] += buyStocks * int64(buyPrice)
+		}
 	}
 
 	return cashSpent, nil
