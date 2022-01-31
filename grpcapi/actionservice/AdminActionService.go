@@ -302,7 +302,7 @@ func (d *dalalActionService) AddMarketEvent(ctx context.Context, req *actions_pb
 		return makeError(actions_pb.AddMarketEventResponse_InternalServerError, "Cannot send Global Notification to Non Zero Stock Id")
 	}
 
-	err := models.AddMarketEvent(req.StockId, req.Headline, req.Text, req.IsGlobal, req.ImageUrl)
+	err := models.AddMarketEvent(req.StockId, 0, req.Headline, req.Text, req.IsGlobal, req.ImageUrl)
 
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)

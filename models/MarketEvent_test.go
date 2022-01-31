@@ -16,6 +16,7 @@ func TestMarketEventToProto(t *testing.T) {
 		EmotionScore: -54,
 		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
+		OldNewsId:    0,
 	}
 
 	oProto := o.ToProto()
@@ -35,6 +36,7 @@ func Test_GetMarketEvents(t *testing.T) {
 		EmotionScore: -54,
 		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
+		OldNewsId:    0,
 	}
 	db := getDB()
 	defer func() {
@@ -79,13 +81,14 @@ func Test_AddMarketEvent(t *testing.T) {
 		Text:      "Hello World",
 		IsGlobal:  true,
 		ImagePath: "bitcoin_1516197589.jpg",
+		OldNewsId: 0,
 	}
 	db := getDB()
 	defer func() {
 		db.Exec("DELETE FROM MarketEvents")
 	}()
 
-	err := AddMarketEvent(3, "Hello", "Hello World", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	err := AddMarketEvent(3, 0, "Hello", "Hello World", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
 	if err != nil {
 		t.Fatalf("AddMarketEvent failed with error: %+v", err)
 	}
