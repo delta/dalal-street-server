@@ -51,10 +51,17 @@ func (d *dalalActionService) GetPortfolio(ctx context.Context, req *actions_pb.G
 		return makeError(actions_pb.GetPortfolioResponse_InternalServerError, "")
 	}
 
+	cashSpent, err := models.GetCashSpent(user.Id)
+	if err != nil {
+		l.Errorf("Unable to get Cash Spent for User Id. Error: %+v", err)
+		return makeError(actions_pb.GetPortfolioResponse_InternalServerError, "")
+	}
+
 	resp.SessionId = sess.GetID()
 	resp.User = user.ToProto()
 	resp.StocksOwned = stocksOwned
 	resp.ReservedStocksOwned = reservedStocksOwned
+	resp.CashSpent= cashSpent
 
 	return resp, nil
 }

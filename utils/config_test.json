@@ -10,7 +10,7 @@
    "LogLevel": "debug",
 
    "DbUser": "root",
-   "DbPassword": "",
+   "DbPassword": "12345abAB",
    "DbHost": "",
    "DbName": "dalalstreet_test",
 

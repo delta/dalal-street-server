@@ -490,6 +490,110 @@ func Test_CancelOrder(t *testing.T) {
 
 }
 
+func Test_GetCashSpent(t *testing.T) {
+	var makeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
+		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
+	}
+
+	users := []*User{
+		{Id: 2, Email: "a@b.com", Cash: 2000},
+		{Id: 3, Email: "c@d.com", Cash: 1000},
+		{Id: 4, Email: "e@f.com", Cash: 5000},
+	}
+
+	stocks := []*Stock{
+		{Id: 1},
+		{Id: 2},
+		{Id: 3},
+	}
+
+	transactions := []*Transaction{
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 2, 0, 2000),
+		makeTrans(2, 2, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(3, 1, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(3, 3, FromExchangeTransaction, 0, 10, 2, 0, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 0, 10, 2, 0, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(4, 2, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(4, 3, FromExchangeTransaction, 0, 10, 1, 0, 2000),
+		makeTrans(3, 1, OrderFillTransaction, -20, 0, 2000, 0, 2000),
+		makeTrans(4, 2, OrderFillTransaction, -5, 0, 200, 0, 2000),
+		makeTrans(3, 1, OrderFillTransaction, 0, 10, 1000, 0, 2000),
+		makeTrans(4, 2, OrderFillTransaction, 0, 3, 500, 0, 2000),
+		makeTrans(4, 3, OrderFillTransaction, 0, 2, 200, 0, 2000),
+	}
+
+	testcases := []struct {
+		userId   uint32
+		expected map[uint32]int32
+	}{
+		{userId: 2, expected: map[uint32]int32{1: 30, 2: 10}},
+		{userId: 3, expected: map[uint32]int32{1: 0, 3: 20}},
+		{userId: 4, expected: map[uint32]int32{2: 1530, 3: 410}},
+	}
+
+	db := getDB()
+	defer func() {
+		for _, tr := range transactions {
+			if err := db.Delete(tr).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		db.Exec("DELETE FROM StockHistory")
+		for _, stock := range stocks {
+			if err := db.Delete(stock).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, user := range users {
+			if err := db.Delete(user).Error; err != nil {
+				t.Fatal(err)
+			}
+			delete(userLocks.m, user.Id)
+		}
+	}()
+
+	for _, user := range users {
+		if err := db.Create(user).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tr := range transactions {
+		if err := db.Create(tr).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	wg := sync.WaitGroup{}
+	fm := sync.Mutex{}
+
+	for _, tc := range testcases {
+		tc := tc
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ret, err := GetCashSpent(tc.userId)
+			fm.Lock()
+			defer fm.Unlock()
+
+			if err != nil {
+				t.Fatalf("Did not expect error. Got %+v", err)
+			}
+			if !testutils.AssertEqual(t, tc.expected, ret) {
+				t.Fatalf("Got %+v; want %+v", ret, tc.expected)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
 func Test_GetStocksOwned(t *testing.T) {
 	var makeTrans = func(userId, stockId uint32, transType TransactionType, reservedStockQuantity int64, stockQty int64, price uint64, reservedCashTotal int64, total int64) *Transaction {
 		return GetTransactionRef(userId, stockId, transType, reservedStockQuantity, stockQty, price, reservedCashTotal, total)
