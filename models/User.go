@@ -2367,6 +2367,7 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 
 	db := getDB()
 
+	//Getting the total number of stocks sold for each stockId
 	sql := "Select stockId, sum(reservedStockQuantity*-1) as soldstockstotal from Transactions where userId=? and stockQuantity=0 and type='OrderFillTransaction' group by stockId"
 	rows, err := db.Raw(sql, userId).Rows()
 	if err != nil {
@@ -2384,7 +2385,9 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 		soldStocksTotal[stockId] = soldstocks
 	}
 
-	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and (type='OrderFillTransaction' or type='FromExchangeTransaction') order by stockId;"
+	//Getting the stockquantity and price of the stocks bought to calculate cash spent on each stack
+	//using fifo algorithm, table entries are already sorted according to time
+	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and (type='OrderFillTransaction' or type='FromExchangeTransaction') order by createdAt;"
 	rows1, err := db.Raw(sql1, userId).Rows()
 	if err != nil {
 		l.Error(err)
@@ -2399,6 +2402,8 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 		var buyPrice uint64
 		rows1.Scan(&stockId, &buyStocks, &buyPrice)
 
+		//subtracting the number of stocks sold from the number of stocks bought
+		//so as to nullify their effect in the total cash spent on a particular stock
 		if soldStocksTotal[stockId] > 0 {
 			if soldStocksTotal[stockId] > buyStocks {
 				soldStocksTotal[stockId] = soldStocksTotal[stockId] - buyStocks
