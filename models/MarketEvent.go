@@ -22,7 +22,6 @@ type MarketEvent struct {
 	IsGlobal     bool   `gorm:"column:isGlobal" json:"is_global"`
 	ImagePath    string `gorm:"column:imagePath" json:"image_path"`
 	CreatedAt    string `gorm:"column:createdAt;not null" json:"created_at"`
-	OldNewsId    uint32 `gorm:"column:oldNewsId" json:"old_news_id"`
 }
 
 func (MarketEvent) TableName() string {
@@ -39,7 +38,6 @@ func (gMarketEvent *MarketEvent) ToProto() *models_pb.MarketEvent {
 		IsGlobal:     gMarketEvent.IsGlobal,
 		ImagePath:    gMarketEvent.ImagePath,
 		CreatedAt:    gMarketEvent.CreatedAt,
-		// OldNewsId:    gMarketEvent.OldNewsId,
 	}
 	return pMarketEvent
 }
@@ -87,29 +85,17 @@ func GetMarketEvents(lastId, count, stockId uint32) (bool, []*MarketEvent, error
 	return moreExists, marketEvents, nil
 }
 
-func AddMarketEvent(stockId, oldNewsId uint32, headline, text string, isGlobal bool, imageURL string) error {
+func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageURL string) error {
 	var l = logger.WithFields(logrus.Fields{
-		"method":          "AddMarketEvent",
-		"param_stockId":   stockId,
-		"param_headline":  headline,
-		"param_text":      text,
-		"param_isGlobal":  isGlobal,
-		"param_imageURL":  imageURL,
-		"param_oldNewsId": oldNewsId,
+		"method":         "AddMarketEvent",
+		"param_stockId":  stockId,
+		"param_headline": headline,
+		"param_text":     text,
+		"param_isGlobal": isGlobal,
+		"param_imageURL": imageURL,
 	})
 
-	db := getDB()
-
-	if oldNewsId != 0 {
-		l.Infof("Attempting to update existing market event")
-		if err := db.Delete(&MarketEvent{}, oldNewsId).Error; err != nil {
-			l.Error(err)
-			return err
-		}
-		// Delete from DB and add a fresh Market Event
-	} else {
-		l.Infof("Attempting to add market event")
-	}
+	l.Infof("Attempting")
 
 	// Try downloading image first
 	response, err := http.Get(imageURL)
@@ -145,6 +131,8 @@ func AddMarketEvent(stockId, oldNewsId uint32, headline, text string, isGlobal b
 		l.Error(err)
 		return err
 	}
+
+	db := getDB()
 
 	me := &MarketEvent{
 		StockId:   stockId,
