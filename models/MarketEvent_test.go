@@ -16,7 +16,6 @@ func TestMarketEventToProto(t *testing.T) {
 		EmotionScore: -54,
 		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
-		OldNewsId:    0,
 	}
 
 	oProto := o.ToProto()
@@ -36,7 +35,6 @@ func Test_GetMarketEvents(t *testing.T) {
 		EmotionScore: -54,
 		ImagePath:    "bitcoin_1516197589.jpg",
 		CreatedAt:    "2017-02-09T00:00:00",
-		OldNewsId:    0,
 	}
 	db := getDB()
 	defer func() {
@@ -81,14 +79,13 @@ func Test_AddMarketEvent(t *testing.T) {
 		Text:      "Hello World",
 		IsGlobal:  true,
 		ImagePath: "bitcoin_1516197589.jpg",
-		OldNewsId: 0,
 	}
 	db := getDB()
 	defer func() {
 		db.Exec("DELETE FROM MarketEvents")
 	}()
 
-	err := AddMarketEvent(3, 0, "Hello", "Hello World", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	err := AddMarketEvent(3, "Hello", "Hello World", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
 	if err != nil {
 		t.Fatalf("AddMarketEvent failed with error: %+v", err)
 	}
@@ -97,6 +94,45 @@ func Test_AddMarketEvent(t *testing.T) {
 	db.First(retrievedEvent)
 	if retrievedEvent == nil {
 		t.Fatalf("Added Event Not Found")
+	}
+	marketEvent.CreatedAt = retrievedEvent.CreatedAt
+	marketEvent.Id = retrievedEvent.Id
+	if !testutils.AssertEqual(t, retrievedEvent, marketEvent) {
+		t.Fatalf("Expected %v but got %v", marketEvent, retrievedEvent)
+	}
+}
+
+func Test_UpdateMarketEvent(t *testing.T) {
+	marketEvent := &MarketEvent{
+		Id:        1,
+		StockId:   3,
+		Headline:  "Hello_new",
+		Text:      "Hello World_new",
+		IsGlobal:  true,
+		ImagePath: "bitcoin_1516197589.jpg",
+	}
+
+	db := getDB()
+	defer func() {
+		db.Exec("DELETE FROM MarketEvents")
+	}()
+
+	// Add a market event with an "incorrect" set of details
+	err := AddMarketEvent(2, "Hello_old", "Hello World_old", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	if err != nil {
+		t.Fatalf("AddMarketEvent failed with error (in Test_UpdateMarketEvent): %+v", err)
+	}
+
+	// Update the market event with the "correct" set of details
+	err = UpdateMarketEvent(3, 1, "Hello_new", "Hello World_new", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	if err != nil {
+		t.Fatalf("Update MarketEvent failed with error: %+v", err)
+	}
+
+	retrievedEvent := &MarketEvent{}
+	db.First(retrievedEvent)
+	if retrievedEvent == nil {
+		t.Fatalf("Added/Updated Event Not Found")
 	}
 	marketEvent.CreatedAt = retrievedEvent.CreatedAt
 	marketEvent.Id = retrievedEvent.Id
