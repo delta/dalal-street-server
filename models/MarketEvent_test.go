@@ -103,14 +103,6 @@ func Test_AddMarketEvent(t *testing.T) {
 }
 
 func Test_UpdateMarketEvent(t *testing.T) {
-	marketEvent := &MarketEvent{
-		Id:        2,
-		StockId:   3,
-		Headline:  "Hello_new",
-		Text:      "Hello World_new",
-		IsGlobal:  true,
-		ImagePath: "bitcoin_1516197589.jpg",
-	}
 
 	db := getDB()
 	defer func() {
@@ -123,20 +115,36 @@ func Test_UpdateMarketEvent(t *testing.T) {
 		t.Fatalf("AddMarketEvent failed with error (in Test_UpdateMarketEvent): %+v", err)
 	}
 
-	// Update the market event with the "correct" set of details
-	err = UpdateMarketEvent(3, 2, "Hello_new", "Hello World_new", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
-	if err != nil {
-		t.Fatalf("Update MarketEvent failed with error: %+v", err)
+	marketEvent := &MarketEvent{
+		Id:        2,
+		StockId:   3,
+		Headline:  "Hello_new",
+		Text:      "Hello World_new",
+		IsGlobal:  true,
+		ImagePath: "bitcoin_1516197589.jpg",
 	}
-	// Second argument (oldNewsId) might have to be changed on local version of test.sh.
-	//Find the Id with a fmt.printf of Id of db.First on MarketEvent.go.
-	// This value will increment by 2 on every run of this test.sh (as 2 new marketevents are added, in each run)
+
+	OldEvent := &MarketEvent{}
+	db.First(OldEvent)
+	if OldEvent == nil {
+		t.Fatalf("Added Event Not Found")
+	}
+
+	// oldNewsId can't be predicted, so we'll have to get the Id of the newest MarketEvent for test purposes alone
+	oldNewsId := OldEvent.Id
+
+	// Update the market event with the "correct" set of details
+	err = UpdateMarketEvent(3, oldNewsId, "Hello_new", "Hello World_new", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	if err != nil {
+		t.Fatalf("UpdateMarketEvent failed with error: %+v", err)
+	}
 
 	retrievedEvent := &MarketEvent{}
 	db.First(retrievedEvent)
 	if retrievedEvent == nil {
-		t.Fatalf("Added/Updated Event Not Found")
+		t.Fatalf("Updated Event Not Found")
 	}
+
 	marketEvent.CreatedAt = retrievedEvent.CreatedAt
 	marketEvent.Id = retrievedEvent.Id
 	if !testutils.AssertEqual(t, retrievedEvent, marketEvent) {

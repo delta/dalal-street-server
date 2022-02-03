@@ -224,14 +224,6 @@ func UpdateMarketEvent(stockId, oldNewsId uint32, headline, text string, isGloba
 
 		l.Infof("Attempting to update existing market event ")
 
-		OldEvent1 := &MarketEvent{}
-
-		if err = db.First(OldEvent1).Error; err != nil {
-			l.Error(err)
-			return err
-		}
-		fmt.Printf("           OldEvent1.Id = %v            ", OldEvent1.Id)
-
 		OldEvent := &MarketEvent{}
 		if err = db.First(OldEvent, oldNewsId).Error; err != nil {
 			l.Error(err)
