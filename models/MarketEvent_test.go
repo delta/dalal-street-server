@@ -104,7 +104,7 @@ func Test_AddMarketEvent(t *testing.T) {
 
 func Test_UpdateMarketEvent(t *testing.T) {
 	marketEvent := &MarketEvent{
-		Id:        1,
+		Id:        2,
 		StockId:   3,
 		Headline:  "Hello_new",
 		Text:      "Hello World_new",
@@ -124,10 +124,13 @@ func Test_UpdateMarketEvent(t *testing.T) {
 	}
 
 	// Update the market event with the "correct" set of details
-	err = UpdateMarketEvent(3, 1, "Hello_new", "Hello World_new", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	err = UpdateMarketEvent(3, 2, "Hello_new", "Hello World_new", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
 	if err != nil {
 		t.Fatalf("Update MarketEvent failed with error: %+v", err)
 	}
+	// Second argument (oldNewsId) might have to be changed on local version of test.sh.
+	//Find the Id with a fmt.printf of Id of db.First on MarketEvent.go.
+	// This value will increment by 2 on every run of this test.sh (as 2 new marketevents are added, in each run)
 
 	retrievedEvent := &MarketEvent{}
 	db.First(retrievedEvent)
