@@ -110,7 +110,7 @@ func Test_UpdateMarketEvent(t *testing.T) {
 	}()
 
 	// Add a market event with an "incorrect" set of details
-	err := AddMarketEvent(2, "Hello_old", "Hello World_old", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	err := AddMarketEvent(2, "Hello_old", "Hello World_old", true, "http://sm.pcmag.com/t/pcmag_in/review/g/google-pho/google-photos_ayfg.1920.jpg")
 	if err != nil {
 		t.Fatalf("AddMarketEvent failed with error (in Test_UpdateMarketEvent): %+v", err)
 	}
