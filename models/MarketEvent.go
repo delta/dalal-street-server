@@ -1,12 +1,8 @@
 package models
 
 import (
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"strings"
 
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
@@ -97,40 +93,12 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 
 	l.Infof("Attempting")
 
-	// Try downloading image first
-	response, err := http.Get(imageURL)
-	if err != nil || response.StatusCode != http.StatusOK {
-		l.Errorf("Error : %v, StatusCode : %d", err, response.StatusCode)
-		if err != nil {
-			return err
-		}
-		return errors.New("NOT OK status code")
-	}
-	defer response.Body.Close()
-
-	// Extract filename
-	var basename = imageURL[strings.LastIndex(imageURL, "/")+1:]
-	var getParamStartIndex = strings.Index(basename, "?")
-	if getParamStartIndex != -1 {
-		basename = basename[:getParamStartIndex]
-	}
-	l.Debugf("ImageURL : %s Basename : %s", imageURL, basename)
-
-	// open file for saving image
-	file, err := os.Create(utils.GetImageBasePath() + basename)
-
+	err := utils.DownloadImage(imageURL)
 	if err != nil {
 		l.Error(err)
 		return err
 	}
-	defer file.Close()
-
-	// copy image to file
-	_, err = io.Copy(file, response.Body)
-	if err != nil {
-		l.Error(err)
-		return err
-	}
+	var basename = utils.GetImageBasename(imageURL)
 
 	db := getDB()
 
@@ -160,5 +128,71 @@ func AddMarketEvent(stockId uint32, headline, text string, isGlobal bool, imageU
 	marketEventsStream := datastreamsManager.GetMarketEventsStream()
 	marketEventsStream.SendMarketEvent(me.ToProto())
 
+	return nil
+}
+
+func UpdateMarketEvent(stockId, oldNewsId uint32, headline, text string, isGlobal bool, imageURL string) error {
+
+	if oldNewsId != 0 {
+
+		var l = logger.WithFields(logrus.Fields{
+			"method":          "UpdateMarketEvent",
+			"param_stockId":   stockId,
+			"param_headline":  headline,
+			"param_text":      text,
+			"param_isGlobal":  isGlobal,
+			"param_imageURL":  imageURL,
+			"param_oldNewsId": oldNewsId,
+		})
+
+		var basename = utils.GetImageBasename(imageURL)
+
+		me := &MarketEvent{
+			StockId:   stockId,
+			Headline:  headline,
+			Text:      text,
+			IsGlobal:  isGlobal,
+			ImagePath: basename,
+		}
+
+		db := getDB()
+
+		l.Infof("Attempting to update existing market event ")
+
+		OldEvent := &MarketEvent{}
+		if err := db.First(OldEvent, oldNewsId).Error; err != nil {
+			l.Error(err)
+			return err
+		}
+
+		// If Image has to be changed
+		if OldEvent.ImagePath != basename {
+			// Delete old Image
+			err := os.Remove(utils.GetImageBasePath() + OldEvent.ImagePath)
+			if err != nil {
+				l.Error(err)
+				return err
+			}
+
+			// Download new image
+			err = utils.DownloadImage(imageURL)
+			if err != nil {
+				l.Error(err)
+				return err
+			}
+		}
+
+		if err := db.Model(&OldEvent).Updates(me).Error; err != nil {
+			l.Error(err)
+			return err
+		}
+		// Update DB with new MarketEvent
+
+		l.Infof("Done")
+
+		marketEventsStream := datastreamsManager.GetMarketEventsStream()
+		marketEventsStream.SendMarketEvent(me.ToProto())
+
+	}
 	return nil
 }

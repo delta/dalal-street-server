@@ -2,8 +2,10 @@ package utils
 
 import (
 	"errors"
+	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -120,4 +122,46 @@ func SendSMS(toPhoneNumber, content string) error {
 		Text: content,
 	})
 	return nil
+}
+
+func DownloadImage(imageURL string) error {
+
+	// Try downloading image first
+	response, err := http.Get(imageURL)
+	if err != nil || response.StatusCode != http.StatusOK {
+		if err != nil {
+			return err
+		}
+		return errors.New("NOT OK status code")
+	}
+	defer response.Body.Close()
+
+	var basename = GetImageBasename(imageURL)
+
+	// open file for saving image
+	file, err := os.Create(GetImageBasePath() + basename)
+
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// copy image to file
+	_, err = io.Copy(file, response.Body)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func GetImageBasename(imageURL string) string {
+
+	// Extract filename
+	var basename = imageURL[strings.LastIndex(imageURL, "/")+1:]
+	var getParamStartIndex = strings.Index(basename, "?")
+	if getParamStartIndex != -1 {
+		basename = basename[:getParamStartIndex]
+	}
+	return basename
 }

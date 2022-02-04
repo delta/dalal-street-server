@@ -101,3 +101,53 @@ func Test_AddMarketEvent(t *testing.T) {
 		t.Fatalf("Expected %v but got %v", marketEvent, retrievedEvent)
 	}
 }
+
+func Test_UpdateMarketEvent(t *testing.T) {
+
+	db := getDB()
+	defer func() {
+		db.Exec("DELETE FROM MarketEvents")
+	}()
+
+	// Add a market event with an "incorrect" set of details
+	err := AddMarketEvent(2, "Hello_old", "Hello World_old", true, "http://sm.pcmag.com/t/pcmag_in/review/g/google-pho/google-photos_ayfg.1920.jpg")
+	if err != nil {
+		t.Fatalf("AddMarketEvent failed with error (in Test_UpdateMarketEvent): %+v", err)
+	}
+
+	marketEvent := &MarketEvent{
+		Id:        2,
+		StockId:   3,
+		Headline:  "Hello_new",
+		Text:      "Hello World_new",
+		IsGlobal:  true,
+		ImagePath: "bitcoin_1516197589.jpg",
+	}
+
+	OldEvent := &MarketEvent{}
+	db.First(OldEvent)
+	if OldEvent == nil {
+		t.Fatalf("Added Event Not Found")
+	}
+
+	// oldNewsId can't be predicted, so we'll have to get the Id of the newest MarketEvent for test purposes alone
+	oldNewsId := OldEvent.Id
+
+	// Update the market event with the "correct" set of details
+	err = UpdateMarketEvent(3, oldNewsId, "Hello_new", "Hello World_new", true, "http://www.valuewalk.com/wp-content/uploads/2018/01/bitcoin_1516197589.jpg")
+	if err != nil {
+		t.Fatalf("UpdateMarketEvent failed with error: %+v", err)
+	}
+
+	retrievedEvent := &MarketEvent{}
+	db.First(retrievedEvent)
+	if retrievedEvent == nil {
+		t.Fatalf("Updated Event Not Found")
+	}
+
+	marketEvent.CreatedAt = retrievedEvent.CreatedAt
+	marketEvent.Id = retrievedEvent.Id
+	if !testutils.AssertEqual(t, retrievedEvent, marketEvent) {
+		t.Fatalf("Expected %v but got %v", marketEvent, retrievedEvent)
+	}
+}

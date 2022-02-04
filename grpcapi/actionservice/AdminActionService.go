@@ -314,6 +314,52 @@ func (d *dalalActionService) AddMarketEvent(ctx context.Context, req *actions_pb
 	return resp, nil
 }
 
+func (d *dalalActionService) UpdateMarketEvent(ctx context.Context, req *actions_pb.UpdateMarketEventRequest) (*actions_pb.UpdateMarketEventResponse, error) {
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "UpdateMarketEvent",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	resp := &actions_pb.UpdateMarketEventResponse{}
+
+	makeError := func(st actions_pb.UpdateMarketEventResponse_StatusCode, msg string) (*actions_pb.UpdateMarketEventResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.UpdateMarketEventResponse_NotAdminUserError, "User is not admin")
+	}
+
+	if req.StockId != 0 {
+		stock, err := models.GetStockCopy(req.StockId)
+		l.Debugf("Updating Market Event for %s", stock.FullName)
+		if err != nil {
+			l.Errorf("Request failed due to %+v: ", err)
+			return makeError(actions_pb.UpdateMarketEventResponse_InternalServerError, getInternalErrorMessage(err))
+		}
+	}
+
+	if req.IsGlobal && req.StockId != 0 {
+		l.Errorf("Cannot send Global Notification to Non Zero Stock Id")
+		return makeError(actions_pb.UpdateMarketEventResponse_InternalServerError, "Cannot send Global Notification to Non Zero Stock Id")
+	}
+
+	err := models.UpdateMarketEvent(req.StockId, req.OldNewsId, req.Headline, req.Text, req.IsGlobal, req.ImageUrl)
+
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.UpdateMarketEventResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	resp.StatusMessage = "Done"
+	resp.StatusCode = actions_pb.UpdateMarketEventResponse_OK
+	return resp, nil
+}
+
 func (d *dalalActionService) SendDividends(ctx context.Context, req *actions_pb.SendDividendsRequest) (*actions_pb.SendDividendsResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":        "SendDividends",
