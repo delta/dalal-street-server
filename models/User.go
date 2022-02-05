@@ -974,24 +974,41 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Debugf("Check2: Passed.")
 
-	db := getDB()
+	// -(numStocksLeft) is the total number of stocks user wish to short sell
+	// this check3 happens only if numStocksLeft is negative
+	if numStocksLeft < 0 {
+		// check if stocks is available for lending which will be used for shorting
+		availableStocks, err := getAvailableLendStocks(ask.StockId)
+
+		l.Debugf("Check3: available stocks for shorting %d vs ask shorting stocks %d", availableStocks, numStocksLeft)
+		if err != nil {
+			return 0, err
+		}
+
+		if numStocksLeft > int64(availableStocks) {
+			l.Debug("Check3: failed, not enough stock for lending")
+			return 0, NotEnoughStocksError{int64(availableStocks)}
+		}
+
+		l.Debug("Check3: Passed")
+	}
 
 	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
 	orderFee := getOrderFee(ask.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(orderFee)
 
-	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
+	l.Debugf("Check4: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
 		l.Debugf("Check3: Failed. Not enough cash.")
 		return 0, NotEnoughCashError{}
 	}
 
-	l.Debugf("Check3: Passed. Creating Ask.")
+	l.Debugf("Check4: Passed. Creating Ask.")
 
 	oldCash := user.Cash
 
-	db = getDB()
+	db := getDB()
 	tx := db.Begin()
 
 	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
@@ -1028,6 +1045,23 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Saved OrderFeeTransaction for bid %d", ask.Id)
 
+	// lend transaction only happens while shorting
+	if numStocksLeft < 0 {
+		allStocks.m[ask.StockId].RLock()
+		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
+		allStocks.m[ask.StockId].RUnlock()
+
+		lendStocksTransaction := GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, -numStocksLeft, currentPrice, 0, (-numStocksLeft)*int64(currentPrice))
+
+		l.Infof("Saving ShortSellTransaction for bid %d", ask.Id)
+
+		if err := saveLendStockTransaction(lendStocksTransaction, tx); err != nil {
+			return errorHelper("Error lending stocks, Rolling back Error: %+v", err)
+		}
+
+		l.Infof("%d Stocks transferred to user for the bid %d ", -numStocksLeft, ask.Id)
+	}
+
 	// Going to reserve stocks for this order
 	placeOrderTransaction := GetTransactionRef(
 		userId,
@@ -1050,7 +1084,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
 
-	l.Infof("Commited successfully for bid %d", ask.Id)
+	l.Infof("Committed successfully for bid %d", ask.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(ask *Ask, orderFeeTransaction, placeOrderTransaction *Transaction) {

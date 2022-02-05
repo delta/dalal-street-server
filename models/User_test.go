@@ -160,6 +160,11 @@ func Test_PlaceAskOrder(t *testing.T) {
 
 	var user = &User{Id: 2}
 	var stock = &Stock{Id: 1, CurrentPrice: 200}
+	// TODO add cases for shortselling
+	ssb := &ShortSellBank{
+		StockId:         1,
+		AvailableStocks: 10,
+	}
 
 	transactions := []*Transaction{
 		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
@@ -174,10 +179,12 @@ func Test_PlaceAskOrder(t *testing.T) {
 		{makeAsk(2, 1, Limit, 5, 200), true},
 		{makeAsk(2, 1, Limit, 2, 200), true},
 		{makeAsk(2, 1, Limit, 3, 200), true},
+		{makeAsk(2, 1, Limit, 21, 200), true},
 		{makeAsk(2, 1, Limit, 11, 200), false},
 		{makeAsk(2, 1, Limit, 11, 2000), false}, // too high a price won't be allowed
 		{makeAsk(2, 1, Limit, 10, 2000), false}, // with transaction fee, not enough cash
 		{makeAsk(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
+		{makeAsk(2, 1, Limit, 30, 200), false},  // short sell fails here, not enough stock to lend
 	}
 
 	db := getDB()
@@ -191,6 +198,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		db.Exec("DELETE FROM OrderDepositTransactions")
 		db.Exec("DELETE FROM Transactions") // Because we create additional OrderFee Transactions
 		db.Exec("DELETE FROM StockHistory")
+		db.Delete(ssb)
 		db.Delete(stock)
 		db.Delete(user)
 
@@ -201,6 +209,9 @@ func Test_PlaceAskOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(ssb).Error; err != nil {
 		t.Fatal(err)
 	}
 	LoadStocks()
@@ -241,14 +252,19 @@ func Test_PlaceAskOrder(t *testing.T) {
 
 	wg.Wait()
 
-	tid, terr := PlaceAskOrder(2, testcases[len(testcases)-2].ask)
+	tid, terr := PlaceAskOrder(2, testcases[len(testcases)-3].ask)
 	if terr == nil {
 		t.Fatalf("Did not expect success. Failing %+v %+v", tid, terr)
 	}
 
-	id, err := PlaceAskOrder(2, testcases[len(testcases)-1].ask)
+	id, err := PlaceAskOrder(2, testcases[len(testcases)-2].ask)
 	if err == nil {
 		t.Fatalf("Did not expect success. Failing %+v %+v", id, err)
+	}
+
+	sid, serr := PlaceAskOrder(2, testcases[len(testcases)-1].ask)
+	if err == nil {
+		t.Fatalf("Did not expect success. Failing %+v %+v", sid, serr)
 	}
 }
 
@@ -394,6 +410,11 @@ func Test_CancelOrder(t *testing.T) {
 	var user = &User{Id: 2, Cash: 3000, ReservedCash: 0}
 	var stock = &Stock{Id: 1}
 
+	ssb := ShortSellBank{
+		StockId:         1,
+		AvailableStocks: 7,
+	}
+
 	var bids = []*Bid{
 		makeBid(2, 150, 1, Limit, 5, 200),
 		makeBid(2, 160, 1, Limit, 2, 200),
@@ -430,6 +451,7 @@ func Test_CancelOrder(t *testing.T) {
 		db.Exec("DELETE FROM OrderDepositTransactions")
 		db.Exec("DELETE FROM Transactions")
 		db.Exec("DELETE FROM StockHistory")
+		db.Delete(ssb)
 		db.Delete(stock)
 		db.Delete(user)
 
@@ -440,6 +462,9 @@ func Test_CancelOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(ssb).Error; err != nil {
 		t.Fatal(err)
 	}
 
