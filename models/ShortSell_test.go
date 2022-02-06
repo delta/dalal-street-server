@@ -94,3 +94,82 @@ func Test_SaveLendStockTransaction(t *testing.T) {
 		t.Fatalf("Expected %+v but got %+v", expectedSsl, savedSsl)
 	}
 }
+
+func Test_SquareOffLends(t *testing.T) {
+	makeAsk := func(userId uint32, stockId uint32, ot OrderType, stockQty uint64, price uint64) *Ask {
+		return &Ask{
+			UserId:        userId,
+			StockId:       stockId,
+			OrderType:     ot,
+			StockQuantity: stockQty,
+			Price:         price,
+		}
+	}
+
+	user := &User{Id: 2, Cash: 2000}
+
+	stocks := []*Stock{
+		{Id: 1, CurrentPrice: 200},
+		{Id: 2, CurrentPrice: 200},
+	}
+
+	ssbs := []*ShortSellBank{
+		{
+			StockId:         1,
+			AvailableStocks: 100,
+		},
+		{
+			StockId:         2,
+			AvailableStocks: 100,
+		},
+	}
+
+	db := getDB()
+
+	defer func() {
+		db.Exec("DELETE FROM OrderDepositTransactions")
+		db.Exec("DELETE FROM Transactions")
+		db.Exec("DELETE FROM ShortSellLends")
+		db.Exec("DELETE FROM ShortSellBank")
+		db.Exec("DELETE FROM Asks")
+		db.Delete(ssbs)
+		db.Delete(user)
+		db.Delete(stocks)
+	}()
+
+	testCases := []*Ask{
+		makeAsk(2, 1, Limit, 5, 200),
+		makeAsk(2, 1, Limit, 5, 200),
+		makeAsk(2, 1, Limit, 5, 200),
+		makeAsk(2, 1, Limit, 5, 200),
+		makeAsk(2, 2, Limit, 5, 200),
+		makeAsk(2, 2, Limit, 5, 200),
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	for _, stock := range stocks {
+		if err := db.Create(stock).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	LoadStocks()
+
+	for _, ssb := range ssbs {
+		if err := db.Create(ssb).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, ask := range testCases {
+		if _, err := PlaceAskOrder(2, ask); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := squareOffLends(); err != nil {
+		t.Fatal(err)
+	}
+}

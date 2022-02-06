@@ -92,9 +92,8 @@ func updateShortSellBank(stockId uint32, stockQuantity uint32, tx *gorm.DB) erro
 }
 
 func createShortSellLend(stockId, userId, stockQuantity uint32, tx *gorm.DB) error {
-	fmt.Println("userId", userId)
 	l := logger.WithFields(logrus.Fields{
-		"method":  "getAvailableLendStocks",
+		"method":  "createShortSellLend",
 		"stockId": stockId,
 	})
 
@@ -110,6 +109,45 @@ func createShortSellLend(stockId, userId, stockQuantity uint32, tx *gorm.DB) err
 	if err := tx.Create(ssl).Error; err != nil {
 		l.Errorf("error creating short sell lends %+v", err)
 		return err
+	}
+
+	return nil
+}
+
+/*
+squareOffLends square off the active intra day lends
+- takes back the stocks given to the user on that day
+- if the user doesn't have the stocks to return back (cash (cash worth) will be taken)
+
+**must be called after market is closed**
+
+case 1 : if lend number of stocks <= owned (stock + reserved)
+		- remove it from the user portfolio and it back to short sell bank
+		- priority will be owned stocks, owned reserved stocks
+
+case 2 : if lend number of stocks > owned(stock + reserved)
+		- remove the maximum number of stocks from user portfolio
+		- cash of remaining stock worth will be deducted from user account (todo: have to do something if user doesn't have enough cash)
+*/
+func squareOffLends() error {
+	l := logger.WithFields(logrus.Fields{
+		"method": "squareOffLends",
+	})
+
+	l.Debug("Attempting to square off active lends")
+
+	query := fmt.Sprintf("SELECT stockId, userId, SUM(stockQuantity) AS stockQuantity, isSquaredOff FROM ShortSellLends Where isSquaredOff = %d GROUP BY stockId, userId", 0)
+
+	db := getDB()
+	var shortSellActiveLends []ShortSellLends
+
+	if err := db.Raw(query).Scan(&shortSellActiveLends).Error; err != nil {
+		l.Errorf("error fetching active lends from db Error : %+v", err)
+		return err
+	}
+
+	for _, lend := range shortSellActiveLends {
+		fmt.Println(lend)
 	}
 
 	return nil
