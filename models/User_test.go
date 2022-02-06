@@ -160,7 +160,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 
 	var user = &User{Id: 2}
 	var stock = &Stock{Id: 1, CurrentPrice: 200}
-	// TODO add cases for shortselling
+
 	ssb := &ShortSellBank{
 		StockId:         1,
 		AvailableStocks: 10,
@@ -198,6 +198,7 @@ func Test_PlaceAskOrder(t *testing.T) {
 		db.Exec("DELETE FROM OrderDepositTransactions")
 		db.Exec("DELETE FROM Transactions") // Because we create additional OrderFee Transactions
 		db.Exec("DELETE FROM StockHistory")
+		db.Exec("DELETE FROM ShortSellLends")
 		db.Delete(ssb)
 		db.Delete(stock)
 		db.Delete(user)
@@ -451,6 +452,7 @@ func Test_CancelOrder(t *testing.T) {
 		db.Exec("DELETE FROM OrderDepositTransactions")
 		db.Exec("DELETE FROM Transactions")
 		db.Exec("DELETE FROM StockHistory")
+		db.Exec("DELETE FROM ShortSellLends")
 		db.Delete(ssb)
 		db.Delete(stock)
 		db.Delete(user)
