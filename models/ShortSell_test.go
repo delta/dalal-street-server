@@ -34,7 +34,7 @@ func Test_GetAvailableLendStocks(t *testing.T) {
 	}
 }
 
-func Test_SaveLendStockTransaction(t *testing.T) {
+func Test_SaveShortSellLendTransaction(t *testing.T) {
 	stock := &Stock{Id: 1, CurrentPrice: 1000, StocksInMarket: 123, StocksInExchange: 234}
 	ssb := &ShortSellBank{StockId: 1, AvailableStocks: 10}
 	user := &User{Id: 1}
@@ -63,7 +63,7 @@ func Test_SaveLendStockTransaction(t *testing.T) {
 
 	transaction := GetTransactionRef(1, 1, ShortSellTransaction, 0, 5, 1000, 0, 5000)
 
-	if err := saveLendStockTransaction(transaction, db); err != nil {
+	if err := saveShortSellLendTransaction(transaction, db); err != nil {
 		t.Fatalf("error saving lend stock transaction %+v", err)
 	}
 
@@ -78,6 +78,7 @@ func Test_SaveLendStockTransaction(t *testing.T) {
 	}
 
 	expectedSsl := &ShortSellLends{
+		Id:            1,
 		StockId:       1,
 		UserId:        1,
 		StockQuantity: 5,
@@ -171,5 +172,31 @@ func Test_SquareOffLends(t *testing.T) {
 
 	if err := squareOffLends(); err != nil {
 		t.Fatal(err)
+	}
+
+	stockOwned, err := GetStocksOwned(user.Id)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if stockOwned[stocks[0].Id] != -20 {
+		t.Fatalf("expected -20 got %d", stockOwned[stocks[0].Id])
+	}
+
+	if stockOwned[stocks[1].Id] != -10 {
+		t.Fatalf("expected -10 got %d", stockOwned[stocks[1].Id])
+	}
+
+	for _, ssb := range ssbs {
+		availableStocks, err := getAvailableLendStocks(ssb.StockId)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if availableStocks != 100 {
+			t.Fatalf("expected 100 got %d", availableStocks)
+		}
 	}
 }

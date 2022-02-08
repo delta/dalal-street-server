@@ -1,8 +1,6 @@
 package models
 
 import (
-	"fmt"
-
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 )
@@ -17,6 +15,7 @@ type ShortSellBank struct {
 // short sell lends stores all the stock lends to a user
 // this will be used to square-off at EOD
 type ShortSellLends struct {
+	Id            uint32 `gorm:"column:id;" json:"id"`
 	StockId       uint32 `gorm:"column:stockId;" json:"stockId"`
 	UserId        uint32 `gorm:"column:userId;" json:"userId"`
 	StockQuantity uint32 `gorm:"column:stockQuantity;" json:"stockQuantity"`
@@ -31,6 +30,7 @@ func (ShortSellLends) TableName() string {
 	return "ShortSellLends"
 }
 
+// returns available stocks to lend for a stock
 func getAvailableLendStocks(stockId uint32) (uint32, error) {
 	l := logger.WithFields(logrus.Fields{
 		"method":  "getAvailableLendStocks",
@@ -51,13 +51,15 @@ func getAvailableLendStocks(stockId uint32) (uint32, error) {
 	return shortSellBank.AvailableStocks, nil
 }
 
-func saveLendStockTransaction(lendStocksTransaction *Transaction, tx *gorm.DB) error {
+// updates available stocks for lend, saves shortsell transaction and creates shortsell lend later squareOff
+// utility func, called inside placeAskOrder func
+func saveShortSellLendTransaction(lendStocksTransaction *Transaction, tx *gorm.DB) error {
 	// subtracting available stocks before saving lending transaction
 	if err := updateShortSellBank(lendStocksTransaction.StockId, -uint32(lendStocksTransaction.StockQuantity), tx); err != nil {
 		return err
 	}
 
-	// creating transaction
+	// saving transaction
 	if err := tx.Save(lendStocksTransaction).Error; err != nil {
 		return err
 	}
@@ -70,6 +72,7 @@ func saveLendStockTransaction(lendStocksTransaction *Transaction, tx *gorm.DB) e
 	return nil
 }
 
+// update available stocks for shorting for a stock
 func updateShortSellBank(stockId uint32, stockQuantity uint32, tx *gorm.DB) error {
 
 	availableStocks, err := getAvailableLendStocks(stockId)
@@ -91,6 +94,7 @@ func updateShortSellBank(stockId uint32, stockQuantity uint32, tx *gorm.DB) erro
 	return nil
 }
 
+// creates a short sell lend for short selling order
 func createShortSellLend(stockId, userId, stockQuantity uint32, tx *gorm.DB) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":  "createShortSellLend",
@@ -116,18 +120,10 @@ func createShortSellLend(stockId, userId, stockQuantity uint32, tx *gorm.DB) err
 
 /*
 squareOffLends square off the active intra day lends
-- takes back the stocks given to the user on that day
-- if the user doesn't have the stocks to return back (cash (cash worth) will be taken)
+- takes back the stocks given to the user(from stocks they owns) on that day
+- the difference in the worth is the profit/loss the user made in shorting
 
 **must be called after market is closed**
-
-case 1 : if lend number of stocks <= owned (stock + reserved)
-		- remove it from the user portfolio and it back to short sell bank
-		- priority will be owned stocks, owned reserved stocks
-
-case 2 : if lend number of stocks > owned(stock + reserved)
-		- remove the maximum number of stocks from user portfolio
-		- cash of remaining stock worth will be deducted from user account (todo: have to do something if user doesn't have enough cash)
 */
 func squareOffLends() error {
 	l := logger.WithFields(logrus.Fields{
@@ -136,19 +132,54 @@ func squareOffLends() error {
 
 	l.Debug("Attempting to square off active lends")
 
-	query := fmt.Sprintf("SELECT stockId, userId, SUM(stockQuantity) AS stockQuantity, isSquaredOff FROM ShortSellLends Where isSquaredOff = %d GROUP BY stockId, userId", 0)
-
 	db := getDB()
+
 	var shortSellActiveLends []ShortSellLends
 
-	if err := db.Raw(query).Scan(&shortSellActiveLends).Error; err != nil {
+	if err := db.Find(&shortSellActiveLends).Error; err != nil {
 		l.Errorf("error fetching active lends from db Error : %+v", err)
 		return err
 	}
 
 	for _, lend := range shortSellActiveLends {
-		fmt.Println(lend)
+		tx := db.Begin() // begin Transaction
+
+		allStocks.m[lend.StockId].RLock()
+		currentPrice := allStocks.m[lend.StockId].stock.CurrentPrice
+		allStocks.m[lend.StockId].RUnlock()
+
+		shortSellTransaction := GetTransactionRef(lend.UserId, lend.StockId, ShortSellTransaction, 0, -int64(lend.StockQuantity), currentPrice, 0, 0)
+
+		l.Infof("Saving ShortsellTransaction, stockId : %d, stockQuantity : %d, userId : %d", lend.StockId, lend.StockQuantity, lend.UserId)
+
+		if err := tx.Save(shortSellTransaction).Error; err != nil {
+			l.Errorf("rolling back, error saving shortsell transaction %+v", err)
+			tx.Rollback()
+			return err
+		}
+
+		lend.IsSquaredOff = true
+		if err := tx.Save(lend).Error; err != nil {
+			l.Errorf("rolling back, error updating shortSellLends %+v", err)
+			tx.Rollback()
+			return err
+		}
+
+		// restore the stock quantity back to shortsellbank
+		if err := updateShortSellBank(lend.StockId, lend.StockQuantity, tx); err != nil {
+			l.Errorf("rolling back, error updating shortsellbank %+v", err)
+			tx.Rollback()
+			return err
+		}
+
+		// commit transaction
+		if err := tx.Commit().Error; err != nil {
+			l.Errorf("error commiting the transaction %+v", err)
+			return err
+		}
 	}
+
+	l.Info("squared off all the active short sell lends")
 
 	return nil
 }

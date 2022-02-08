@@ -1051,11 +1051,11 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
 		allStocks.m[ask.StockId].RUnlock()
 
-		lendStocksTransaction := GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, -numStocksLeft, currentPrice, 0, (-numStocksLeft)*int64(currentPrice))
+		shortSellTransaction := GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, -numStocksLeft, currentPrice, 0, (-numStocksLeft)*int64(currentPrice))
 
-		l.Infof("Saving ShortSellTransaction for bid %d", ask.Id)
+		l.Infof("Saving ShortSellTransaction for Ask %d", ask.Id)
 
-		if err := saveLendStockTransaction(lendStocksTransaction, tx); err != nil {
+		if err := saveShortSellLendTransaction(shortSellTransaction, tx); err != nil {
 			return errorHelper("Error lending stocks, Rolling back Error: %+v", err)
 		}
 
