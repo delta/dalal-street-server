@@ -65,7 +65,7 @@ func GetDailyLeaderboard(userId, startingId, count uint32) ([]*DailyLeaderboardR
 	//for storing user's position in leaderboard
 	currentUserDetails := DailyLeaderboardRow{}
 
-	if err := db.Where("id >= ?", startingId).Order("rank asc").Limit(count).Find(&leaderboardDetails).Error; err != nil {
+	if err := db.Where("id >= ?", startingId).Order("`rank` asc").Limit(count).Find(&leaderboardDetails).Error; err != nil {
 		return nil, nil, TotalUserCount, err
 	}
 
