@@ -954,57 +954,65 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	}
 	l.Debugf("Check1: Passed.")
 
-	// Second Check: User should have enough stocks
 	numStocks, err := getSingleStockCount(user, ask.StockId)
 	if err != nil {
 		return 0, err
 	}
-	var numStocksLeft = numStocks - int64(ask.StockQuantity)
+	// stock qty user wish to short sell
+	var shortsellQty int64 = 0
 
-	l.Debugf("Check2: Current stocks: %d. Stocks after trade: %d.", numStocks, numStocksLeft)
-
-	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
-		l.Debugf("Check2: Failed. Not enough stocks.")
-		currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
-		if currentAllowedQty > ASK_LIMIT {
-			currentAllowedQty = ASK_LIMIT
-		}
-		return 0, NotEnoughStocksError{currentAllowedQty}
+	if numStocks >= 0 {
+		shortsellQty = -(numStocks - int64(ask.StockQuantity))
+	} else {
+		shortsellQty = int64(ask.StockQuantity)
 	}
 
-	l.Debugf("Check2: Passed.")
+	if shortsellQty > 0 {
+		l.Debugf("Check2: short sell limit check, ask shortsell quantity : %d ", shortsellQty)
 
-	// -(numStocksLeft) is the total number of stocks user wish to short sell
-	// this check3 happens only if numStocksLeft is negative
-	if numStocksLeft < 0 {
 		// check if stocks is available for lending which will be used for shorting
 		availableStocks, err := getAvailableLendStocks(ask.StockId)
 
-		l.Debugf("Check3: available stocks for shorting %d vs ask shorting stocks %d", availableStocks, numStocksLeft)
+		l.Debugf("Check2: available stocks for shorting %d vs ask shorting stocks %d", availableStocks, shortsellQty)
+
 		if err != nil {
 			return 0, err
 		}
 
-		if numStocksLeft > int64(availableStocks) {
-			l.Debug("Check3: failed, not enough stock for lending")
+		if shortsellQty > int64(availableStocks) {
+			l.Debug("Check2: failed, not enough stock for lending")
 			return 0, NotEnoughStocksError{int64(availableStocks)}
 		}
 
-		l.Debug("Check3: Passed")
+		// checking intra day limit for user
+		lentStocks, err := getUserShortSellStocks(ask.StockId, ask.UserId)
+
+		if err != nil {
+			return 0, err
+		}
+
+		if lentStocks+uint32(shortsellQty) > SHORT_SELL_BORROW_LIMIT {
+			l.Debug("Check2: failed, user crossed intra-day limit")
+			currentAllowedQty := SHORT_SELL_BORROW_LIMIT - int64(lentStocks)
+
+			return 0, NotEnoughStocksError{currentAllowedQty}
+		}
+
+		l.Debug("check2 : passed")
 	}
 
 	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
 	orderFee := getOrderFee(ask.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(orderFee)
 
-	l.Debugf("Check4: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
+	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
 		l.Debugf("Check3: Failed. Not enough cash.")
 		return 0, NotEnoughCashError{}
 	}
 
-	l.Debugf("Check4: Passed. Creating Ask.")
+	l.Debugf("Check3: Passed. Creating Ask.")
 
 	oldCash := user.Cash
 
@@ -1046,12 +1054,12 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	l.Infof("Saved OrderFeeTransaction for bid %d", ask.Id)
 
 	// lend transaction only happens while shorting
-	if numStocksLeft < 0 {
+	if shortsellQty > 0 {
 		allStocks.m[ask.StockId].RLock()
 		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
 		allStocks.m[ask.StockId].RUnlock()
 
-		shortSellTransaction := GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, -numStocksLeft, currentPrice, 0, (-numStocksLeft)*int64(currentPrice))
+		shortSellTransaction := GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, shortsellQty, currentPrice, 0, 0)
 
 		l.Infof("Saving ShortSellTransaction for Ask %d", ask.Id)
 
@@ -1059,7 +1067,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 			return errorHelper("Error lending stocks, Rolling back Error: %+v", err)
 		}
 
-		l.Infof("%d Stocks transferred to user for the bid %d ", -numStocksLeft, ask.Id)
+		l.Infof("%d Stocks transferred to user %d ", shortsellQty, ask.Id)
 	}
 
 	// Going to reserve stocks for this order

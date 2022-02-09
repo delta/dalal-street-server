@@ -183,3 +183,30 @@ func squareOffLends() error {
 
 	return nil
 }
+
+func getUserShortSellStocks(stockId, userId uint32) (uint32, error) {
+	l := logger.WithFields(logrus.Fields{
+		"method":  "getUserShortSellStocks",
+		"stockId": stockId,
+		"userId":  userId,
+	})
+
+	l.Debug("Attempting to fetch user current short sell stocks")
+
+	sql := "SELECT SUM(stockQuantity) AS stockQty FROM ShortSellLends Where isSquaredOff = 0 AND stockId = ? AND userId = ?"
+
+	db := getDB()
+
+	stockQty := struct {
+		StockQuantity uint32 `gorm:"column:stockQty"`
+	}{
+		StockQuantity: 0,
+	}
+
+	if err := db.Raw(sql, stockId, userId).Scan(&stockQty).Error; err != nil {
+		l.Errorf("error fetching data from db %+v", err)
+		return 0, err
+	}
+
+	return stockQty.StockQuantity, nil
+}

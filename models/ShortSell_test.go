@@ -200,3 +200,58 @@ func Test_SquareOffLends(t *testing.T) {
 		}
 	}
 }
+
+func Test_GetUserShortSellStocks(t *testing.T) {
+	noOfStocks, err := getUserShortSellStocks(1, 1)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if noOfStocks != 0 {
+		t.Fatalf("expected 0 got %d", noOfStocks)
+	}
+
+	user := &User{Id: 1}
+	stock := &Stock{Id: 1}
+	db := getDB()
+
+	defer func() {
+		db.Delete(user)
+		db.Delete(stock)
+		db.Exec("DELETE FROM ShortSellLends")
+	}()
+
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	ssl := []*ShortSellLends{
+		{
+			StockId:       1,
+			UserId:        1,
+			StockQuantity: 5,
+		},
+		{
+			StockId:       1,
+			UserId:        1,
+			StockQuantity: 5,
+		},
+	}
+
+	for _, lend := range ssl {
+		if err := db.Save(lend).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	noOfStocks, _ = getUserShortSellStocks(1, 1)
+
+	if noOfStocks != 10 {
+		t.Fatalf("expected 0 got %d", noOfStocks)
+	}
+}
