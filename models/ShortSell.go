@@ -125,7 +125,7 @@ squareOffLends square off the active intra day lends
 
 **must be called after market is closed**
 */
-func squareOffLends() error {
+func SquareOffLends() error {
 	l := logger.WithFields(logrus.Fields{
 		"method": "squareOffLends",
 	})
