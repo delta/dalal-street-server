@@ -170,7 +170,7 @@ func Test_SquareOffLends(t *testing.T) {
 		}
 	}
 
-	if err := squareOffLends(); err != nil {
+	if err := SquareOffLends(); err != nil {
 		t.Fatal(err)
 	}
 
