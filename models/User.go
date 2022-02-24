@@ -2364,59 +2364,29 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 
 	l.Info("GetCashSpent requested")
 
+	cashSpentMap := make(map[uint32]int64)
+
 	db := getDB()
 
-	//Getting the total number of stocks sold for each stockId
-	sql := "Select stockId, sum(reservedStockQuantity*-1) as soldstockstotal from Transactions where userId=? and stockQuantity=0 and type='OrderFillTransaction' group by stockId"
-	rows, err := db.Raw(sql, userId).Rows()
+	query := "SELECT stockId, IFNULL(SUM(cast(price as SIGNED) * cast(reservedStockQuantity as SIGNED) + cast(price as SIGNED) * cast(stockQuantity as SIGNED)),0) AS cashSpent FROM Transactions Where userId = ? GROUP BY stockId;"
+
+	rows, err := db.Raw(query, userId).Rows()
+
 	if err != nil {
 		l.Error(err)
 		return nil, err
 	}
+
 	defer rows.Close()
 
-	soldStocksTotal := make(map[uint32]int64)
 	for rows.Next() {
 		var stockId uint32
-		var soldstocks int64
-		rows.Scan(&stockId, &soldstocks)
+		var cashSpent int64
+		rows.Scan(&stockId, &cashSpent)
 
-		soldStocksTotal[stockId] = soldstocks
+		cashSpentMap[stockId] = cashSpent
 	}
-
-	//Getting the stockquantity and price of the stocks bought to calculate cash spent on each stack
-	//using fifo algorithm, table entries are already sorted according to time
-	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and (type='OrderFillTransaction' or type='FromExchangeTransaction') order by createdAt;"
-	rows1, err := db.Raw(sql1, userId).Rows()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer rows1.Close()
-
-	cashSpent := make(map[uint32]int64)
-	for rows1.Next() {
-		var stockId uint32
-		var buyStocks int64
-		var buyPrice uint64
-		rows1.Scan(&stockId, &buyStocks, &buyPrice)
-
-		//subtracting the number of stocks sold from the number of stocks bought
-		//so as to nullify their effect in the total cash spent on a particular stock
-		if soldStocksTotal[stockId] > 0 {
-			if soldStocksTotal[stockId] > buyStocks {
-				soldStocksTotal[stockId] = soldStocksTotal[stockId] - buyStocks
-			} else {
-				buyStocks = buyStocks - soldStocksTotal[stockId]
-				soldStocksTotal[stockId] = 0
-				cashSpent[stockId] += buyStocks * int64(buyPrice)
-			}
-		} else {
-			cashSpent[stockId] += buyStocks * int64(buyPrice)
-		}
-	}
-
-	return cashSpent, nil
+	return cashSpentMap, nil
 }
 
 // savePlaceOrderTransaction saves PlaceOrderTransaction and creates a mapping between orderId and

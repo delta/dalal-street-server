@@ -218,8 +218,8 @@ func Test_GetUserShortSellStocks(t *testing.T) {
 
 	defer func() {
 		db.Delete(user)
-		db.Delete(stock)
 		db.Exec("DELETE FROM ShortSellLends")
+		db.Delete(stock)
 	}()
 
 	if err := db.Create(user).Error; err != nil {
