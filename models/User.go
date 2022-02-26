@@ -1053,13 +1053,15 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Saved OrderFeeTransaction for bid %d", ask.Id)
 
+	var shortSellTransaction *Transaction
+
 	// lend transaction only happens while shorting
 	if shortsellQty > 0 {
 		allStocks.m[ask.StockId].RLock()
 		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
 		allStocks.m[ask.StockId].RUnlock()
 
-		shortSellTransaction := GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, shortsellQty, currentPrice, 0, 0)
+		shortSellTransaction = GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, shortsellQty, currentPrice, 0, 0)
 
 		l.Infof("Saving ShortSellTransaction for Ask %d", ask.Id)
 
@@ -1108,6 +1110,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 			OrderType:     ask.ToProto().OrderType,
 			StockQuantity: ask.StockQuantity,
 		})
+
+		if shortSellTransaction != nil {
+			transactionsStream.SendTransaction(shortSellTransaction.ToProto())
+		}
 		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
 		transactionsStream.SendTransaction(placeOrderTransaction.ToProto())
 

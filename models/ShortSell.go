@@ -177,6 +177,12 @@ func SquareOffLends() error {
 			l.Errorf("error commiting the transaction %+v", err)
 			return err
 		}
+
+		// Update datastream for short sell transaction
+		go func() {
+			transactionsStream := datastreamsManager.GetTransactionsStream()
+			transactionsStream.SendTransaction(shortSellTransaction.ToProto())
+		}()
 	}
 
 	l.Info("squared off all the active short sell lends")
