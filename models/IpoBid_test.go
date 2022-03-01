@@ -5,6 +5,10 @@ import (
 	"testing"
 
 	testutils "github.com/delta/dalal-street-server/utils/test"
+<<<<<<< HEAD
+=======
+	"github.com/sirupsen/logrus"
+>>>>>>> Added IpoBid_test functions
 )
 
 func TestIpoBidToProto(t *testing.T) {
@@ -28,9 +32,15 @@ func TestIpoBidToProto(t *testing.T) {
 }
 
 func Test_CreateIpoBid(t *testing.T) {
+<<<<<<< HEAD
 	// var l = logger.WithFields(logrus.Fields{
 	// 	"method": "Test_CreateIpoBid",
 	// })
+=======
+	var l = logger.WithFields(logrus.Fields{
+		"method": "Test_CreateIpoBid",
+	})
+>>>>>>> Added IpoBid_test functions
 
 	users := []*User{
 		{Id: 101, Cash: 100000, Email: "101@gmail.com"},
@@ -39,7 +49,11 @@ func Test_CreateIpoBid(t *testing.T) {
 		{Id: 104, Cash: 100000, Email: "104@gmail.com"},
 	}
 
+<<<<<<< HEAD
 	ipoStock := &IpoStock{StocksPerSlot: 20, IsBiddable: true}
+=======
+	ipoStock := &IpoStock{Id: 1, StocksPerSlot: 20}
+>>>>>>> Added IpoBid_test functions
 
 	db := getDB()
 
@@ -61,6 +75,7 @@ func Test_CreateIpoBid(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+<<<<<<< HEAD
 	ipoStockId := ipoStock.Id
 
 	ipoBidId1, err := CreateIpoBid(101, ipoStockId, 1, 10000)
@@ -95,6 +110,28 @@ func Test_CreateIpoBid(t *testing.T) {
 	// Expected Output : CancelIpoBid err =  Order#XX is already closed. Cannot cancel now.
 
 	ipoBidId7, err := CreateIpoBid(103, ipoStockId, 1, 92000) // succeeds because bid is cancelled and has enough cash
+=======
+
+	ipoBidId1, err := CreateIpoBid(101, 1, 1, 10000)
+	ipoBidId2, err := CreateIpoBid(102, 1, 1, 10000)
+	ipoBidId3, err := CreateIpoBid(103, 1, 1, 10000)
+	ipoBidId4, err1 := CreateIpoBid(104, 1, 1, 1000000000) // fails because of not enough cash
+	ipoBidId5, err2 := CreateIpoBid(101, 1, 1, 10000)      // supposed to fail because of >1 bid for same user
+	ipoBidId6, err3 := CreateIpoBid(102, 1, 2, 10000)      // fails because of >1 slotquantity
+
+	if err != nil {
+		l.Errorf("Errored in CreateIpoBid : %+v", err)
+	}
+
+	fmt.Printf("IpoBids ids = %d  %d  %d  %d  %d  %d \n", ipoBidId1, ipoBidId2, ipoBidId3, ipoBidId4, ipoBidId5, ipoBidId6)
+	fmt.Print("err1 = ", err1, " err2 = ", err2, " err3 = ", err3)
+
+	err = CancelIpoBid(ipoBidId3)
+	err = CancelIpoBid(ipoBidId3) // fails because bid is already cancelled
+	fmt.Println("CancelIpoBid err = ", err)
+
+	ipoBidId7, err := CreateIpoBid(103, 1, 1, 92000) // succeeds because bid is cancelled and has enough cash
+>>>>>>> Added IpoBid_test functions
 	fmt.Println("ipoBidId7 = ", ipoBidId7)
 	fmt.Println("err = ", err)
 

@@ -114,6 +114,7 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	if BiddingUser.Cash < SlotPrice {
 		return 0, NotEnoughCashError{}
 	}
+	// ToDo: if user has already made bid on this stock, return error
 
 	IpoStock := &IpoStock{}
 	db.First(IpoStock, IpoStockId)
