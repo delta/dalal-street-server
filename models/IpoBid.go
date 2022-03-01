@@ -14,7 +14,7 @@ type IpoBid struct {
 	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId       uint32 `gorm:"column:userId;not null" json:"user_id"`
 	IpoStockId   uint32 `gorm:"column:ipoStockId;not null" json:"ipo_stock_id"`
-	SlotPrice    uint64 `gorm:"not null" json:"slot_price"`
+	SlotPrice    uint64 `gorm:"column:slotPrice;not null" json:"slot_price"`
 	SlotQuantity uint32 `gorm:"column:slotQuantity;not null" json:"slot_quantity"`
 	IsFulfilled  bool   `gorm:"column:isFulFilled;not null" json:"is_fulfilled"`
 	IsClosed     bool   `gorm:"column:isClosed;not null" json:"is_closed"`
@@ -84,10 +84,6 @@ func getIpoBid(id uint32) (*IpoBid, error) {
 	return ipoBid, nil
 }
 
-// to prevent people from bidding on ipo stocks after window closes (like days 4-5),
-// should we create a new field "isBiddable" in IpoStock, or just delete the IpoStock
-// from the ipostocks table after alloting it ?
-
 func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPrice uint64) (uint32, error) {
 
 	var l = logger.WithFields(logrus.Fields{
@@ -109,6 +105,7 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	if BiddingUser.Cash < SlotPrice {
 		return 0, NotEnoughCashError{}
 	}
+	// ToDo: if user has already made bid on this stock, return error
 
 	NewIpoBid := &IpoBid{
 		UserId:       UserId,
@@ -160,7 +157,7 @@ func CancelIpoBid(IpoBidId uint32) error {
 
 	var IpoBidToCancel IpoBid
 
-	if err := db.First(IpoBidToCancel, IpoBidId).Error; err != nil {
+	if err := db.First(&IpoBidToCancel, IpoBidId).Error; err != nil {
 		return err
 	}
 

@@ -14,7 +14,7 @@ type IpoStock struct {
 	Id             uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	ShortName      string `gorm:"column:shortName;not null" json:"short_name"`
 	FullName       string `gorm:"column:fullName;not null" json:"full_name"`
-	Description    string `gorm:"not null" json:"description"`
+	Description    string `gorm:"column:description;not null" json:"description"`
 	CreatedAt      string `gorm:"column:createdAt;not null" json:"created_at"`
 	UpdatedAt      string `gorm:"column:updatedAt;not null" json:"updated_at"`
 	IsBiddable     bool   `gorm:"column:isBiddable;not null" json:"is_biddable"`
