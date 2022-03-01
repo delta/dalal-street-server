@@ -149,6 +149,108 @@ func (d *dalalActionService) PlaceOrder(ctx context.Context, req *actions_pb.Pla
 	return resp, nil
 }
 
+func (d *dalalActionService) PlaceIpoBid(ctx context.Context, req *actions_pb.PlaceIpoBidRequest) (*actions_pb.PlaceIpoBidResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "PlaceIpoBid",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("PlaceIpoBid requested")
+
+	resp := &actions_pb.PlaceIpoBidResponse{}
+	makeError := func(st actions_pb.PlaceIpoBidResponse_StatusCode, msg string) (*actions_pb.PlaceIpoBidResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	if !models.IsMarketOpen() {
+		return makeError(actions_pb.PlaceIpoBidResponse_MarketClosedError, "Market Is closed. You cannot place bids right now.")
+	}
+
+	userId := getUserId(ctx)
+	if !models.IsUserPhoneVerified(userId) {
+		return makeError(actions_pb.PlaceIpoBidResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
+	if models.IsUserBlocked(userId) {
+		return makeError(actions_pb.PlaceIpoBidResponse_UserBlockedError, "Your account has been blocked due to malpractice.")
+	}
+
+	var IpoBidId uint32
+	var err error
+
+	IpoBidId, err = models.CreateIpoBid(userId, req.StockId, req.SlotQuantity, req.SlotPrice)
+
+	switch e := err.(type) {
+	case models.OrderStockLimitExceeded:
+		return makeError(actions_pb.PlaceIpoBidResponse_SlotQuantityLimitExceededError, e.Error())
+	case models.NotEnoughCashError:
+		return makeError(actions_pb.PlaceIpoBidResponse_NotEnoughCashError, e.Error())
+	}
+
+	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.PlaceIpoBidResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	resp.IpoBidId = IpoBidId
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}
+
+func (d *dalalActionService) CancelIpoBid(ctx context.Context, req *actions_pb.CancelIpoBidRequest) (*actions_pb.CancelIpoBidResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "CancelIpoBid",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("Cancel Ipo Bid requested")
+
+	resp := &actions_pb.CancelIpoBidResponse{}
+	makeError := func(st actions_pb.CancelIpoBidResponse_StatusCode, msg string) (*actions_pb.CancelIpoBidResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	if !models.IsMarketOpen() {
+		return makeError(actions_pb.CancelIpoBidResponse_MarketClosedError, "Market is closed. You cannot cancel Ipo Bid right now.")
+	}
+
+	userId := getUserId(ctx)
+	if !models.IsUserPhoneVerified(userId) {
+		return makeError(actions_pb.CancelIpoBidResponse_UserNotPhoneVerfiedError, "Your phone number has not been verified. Please verify phone number in order to play the game.")
+	}
+
+	if models.IsUserBlocked(userId) {
+		return makeError(actions_pb.CancelIpoBidResponse_UserBlockedError, "Your account has been blocked due to malpractice.")
+	}
+
+	ipoBidId := req.IpoBidId
+
+	err := models.CancelIpoBid(ipoBidId)
+
+	switch err.(type) {
+	case models.InvalidOrderIDError:
+		return makeError(actions_pb.CancelIpoBidResponse_InvalidBidId, "Invalid IPO bid ID. Cannot cancel this bid.")
+	case models.AlreadyClosedError:
+		return makeError(actions_pb.CancelIpoBidResponse_AlreadyCancelledError, "This IPO bid has already been closed")
+	}
+
+	if err != nil {
+		l.Errorf("Request failed due to %+v", err)
+		return makeError(actions_pb.CancelIpoBidResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	l.Infof("Ipo bid cancellation completed successfully")
+
+	return resp, nil
+}
+
 //Returns open asks and open bids
 func (d *dalalActionService) GetMyOpenOrders(ctx context.Context, req *actions_pb.GetMyOpenOrdersRequest) (*actions_pb.GetMyOpenOrdersResponse, error) {
 	var l = logger.WithFields(logrus.Fields{
@@ -264,6 +366,38 @@ func (d *dalalActionService) GetMyClosedBids(ctx context.Context, req *actions_p
 	resp.MoreExists = moreExists
 	for _, bid := range myClosedBidOrders {
 		resp.ClosedBidOrders = append(resp.ClosedBidOrders, bid.ToProto())
+	}
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}
+
+func (d *dalalActionService) GetMyIpoBids(ctx context.Context, req *actions_pb.GetMyIpoBidsRequest) (*actions_pb.GetMyIpoBidsResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetMyIpoBids",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+	l.Infof("GetMyIpoBids requested")
+
+	resp := &actions_pb.GetMyIpoBidsResponse{}
+	makeError := func(st actions_pb.GetMyIpoBidsResponse_StatusCode, msg string) (*actions_pb.GetMyIpoBidsResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	userId := getUserId(ctx)
+
+	myIpoBids, err := models.GetMyIpoBids(userId)
+	if err != nil {
+		l.Errorf("Request failed due to: %+v", err)
+		return makeError(actions_pb.GetMyIpoBidsResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	for _, bid := range myIpoBids {
+		resp.IpoBids = append(resp.IpoBids, bid.ToProto())
 	}
 
 	l.Infof("Request completed successfully")

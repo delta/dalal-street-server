@@ -2,10 +2,8 @@ package models
 
 import (
 	"fmt"
-	"sync"
 
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
-	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/utils"
@@ -13,7 +11,6 @@ import (
 
 // refer models/Bid.go
 type IpoBid struct {
-	sync.Mutex
 	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId       uint32 `gorm:"column:userId;not null" json:"user_id"`
 	IpoStockId   uint32 `gorm:"column:ipoStockId;not null" json:"ipo_stock_id"`
@@ -47,13 +44,12 @@ func (ipoBid *IpoBid) ToProto() *models_pb.IpoBid {
 }
 
 var IpoBidsMap = struct {
-	sync.RWMutex
 	m map[uint32]*IpoBid
 }{
-	sync.RWMutex{},
 	make(map[uint32]*IpoBid),
 }
 
+// Is this function even needed?
 func getIpoBid(id uint32) (*IpoBid, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method":   "getIpoBid",
@@ -62,10 +58,7 @@ func getIpoBid(id uint32) (*IpoBid, error) {
 
 	l.Debugf("Attempting")
 
-	/* Try to see if the ipoBid is there in the map */
-	IpoBidsMap.Lock()
-	defer IpoBidsMap.Unlock()
-
+	/* Check if the ipoBid is there in the map */
 	_, ok := IpoBidsMap.m[id]
 	if ok {
 		l.Debugf("Found ipoBid in IpoBidsMap")
@@ -91,198 +84,136 @@ func getIpoBid(id uint32) (*IpoBid, error) {
 	return ipoBid, nil
 }
 
-func createIpoBid(ipoBid *IpoBid, tx *gorm.DB) error {
+// to prevent people from bidding on ipo stocks after window closes (like days 4-5),
+// should we create a new field "isBiddable" in IpoStock, or just delete the IpoStock
+// from the ipostocks table after alloting it ?
+
+func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPrice uint64) (uint32, error) {
+
 	var l = logger.WithFields(logrus.Fields{
-		"method":       "CreateIpoBid",
-		"param_ipoBid": fmt.Sprintf("%+v", ipoBid),
+		"method":             "CreateIpoBid",
+		"param_userId":       fmt.Sprintf("%+v", UserId),
+		"param_ipoStockId":   fmt.Sprintf("%+v", IpoStockId),
+		"param_slotQuantity": fmt.Sprintf("%+v", SlotQuantity),
 	})
 
 	l.Debugf("Attempting")
 
-	// ToDo: Add Additional details??
-	ipoBid.CreatedAt = utils.GetCurrentTimeISO8601()
-	ipoBid.UpdatedAt = ipoBid.CreatedAt
+	if SlotQuantity > 1 {
+		return 0, OrderStockLimitExceeded{}
+	}
+	db := getDB()
+	BiddingUser := &User{}
+	db.First(BiddingUser, UserId)
 
-	if err := tx.Create(ipoBid).Error; err != nil {
+	if BiddingUser.Cash < SlotPrice {
+		return 0, NotEnoughCashError{}
+	}
+
+	NewIpoBid := &IpoBid{
+		UserId:       UserId,
+		IpoStockId:   IpoStockId,
+		SlotPrice:    SlotPrice,
+		SlotQuantity: SlotQuantity,
+		IsFulfilled:  false,
+		IsClosed:     false,
+	}
+
+	NewIpoBid.CreatedAt = utils.GetCurrentTimeISO8601()
+	NewIpoBid.UpdatedAt = NewIpoBid.CreatedAt
+
+	price := uint64(SlotQuantity) * SlotPrice
+
+	if BiddingUser == nil {
+		l.Errorf("non-existant user tried to create an IpoBid")
+		return 0, fmt.Errorf("Ipo BiddingUser with id %d does not exist", UserId)
+	}
+
+	// // Lock doesnt exist for BiddingUser -- how to ensure
+	// // that values are saved correctly without external interference ?
+	// BiddingUser.lock
+	BiddingUser.Cash = BiddingUser.Cash - price
+	BiddingUser.ReservedCash = BiddingUser.ReservedCash + price
+	// BiddingUser.unlock
+
+	if err := db.Create(NewIpoBid).Error; err != nil {
+		return 0, err
+	}
+
+	IpoBidsMap.m[NewIpoBid.Id] = NewIpoBid
+
+	l.Debugf("Created ipoBid. Id: %d", NewIpoBid.Id)
+	// Will NewIpoBid.Id even be defined since MYSQL determines it??
+
+	return NewIpoBid.Id, nil
+}
+
+func CancelIpoBid(IpoBidId uint32) error {
+	var l = logger.WithFields(logrus.Fields{
+		"method":         "IpoBid.Cancel",
+		"param_ipoBidId": fmt.Sprintf("%+v", IpoBidId),
+	})
+
+	l.Debugf("Attempting")
+
+	db := getDB()
+
+	var IpoBidToCancel IpoBid
+
+	if err := db.First(IpoBidToCancel, IpoBidId).Error; err != nil {
 		return err
 	}
 
-	// ToDo: deduct slotprice from user
-	IpoBidsMap.Lock()
-	IpoBidsMap.m[ipoBid.Id] = ipoBid
-	IpoBidsMap.Unlock()
-
-	l.Debugf("Created ipoBid. Id: %d", ipoBid.Id)
-
-	return nil
-}
-
-func (ipoBid *IpoBid) Close(tx *gorm.DB) error {
-	var l = logger.WithFields(logrus.Fields{
-		"method":       "IpoBid.Close",
-		"param_ipoBid": fmt.Sprintf("%+v", ipoBid),
-	})
-
-	l.Debugf("Attempting")
-
-	ipoBid.Lock()
-	if ipoBid.IsClosed {
-		ipoBid.Unlock()
-		return AlreadyClosedError{ipoBid.Id}
+	if IpoBidToCancel.IsClosed {
+		return AlreadyClosedError{IpoBidToCancel.Id}
 	}
-	ipoBid.IsClosed = true
-	ipoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
-	ipoBid.Unlock()
 
-	if err := tx.Save(ipoBid).Error; err != nil {
+	IpoBidToCancel.IsClosed = true
+	IpoBidToCancel.UpdatedAt = utils.GetCurrentTimeISO8601()
+
+	price := uint64(IpoBidToCancel.SlotQuantity) * IpoBidToCancel.SlotPrice
+
+	CancelBidUser := &User{}
+	db.First(CancelBidUser, IpoBidToCancel.UserId)
+
+	if CancelBidUser == nil {
+		l.Errorf("non-existent user tried to cancel an IpoBid")
+		return fmt.Errorf("User with id %d does not exist", IpoBidToCancel.UserId)
+	}
+
+	// // Lock doesnt exist for CancelBidUser
+	// CancelBidUser.lock
+	CancelBidUser.Cash += price
+	CancelBidUser.ReservedCash -= price
+	// CancelBidUser.unlock
+
+	if err := db.Save(IpoBidToCancel).Error; err != nil {
 		l.Error(err)
 		return err
 	}
 
-	IpoBidsMap.Lock()
-	delete(IpoBidsMap.m, ipoBid.Id)
-	IpoBidsMap.Unlock()
+	delete(IpoBidsMap.m, IpoBidId)
 
 	l.Debugf("Done")
 	return nil
 }
 
-// GetAllOpenIpoBids returns all open ipoBids. This will be called by MatchingEngine while initializing.
-func GetAllOpenIpoBids() ([]*IpoBid, error) {
+func GetMyIpoBids(userId uint32) ([]*IpoBid, error) {
 	var l = logger.WithFields(logrus.Fields{
-		"method": "GetAllOpenIpoBids",
-	})
-
-	l.Infof("Attempting to get all open ipoBid orders")
-
-	db := getDB()
-
-	var openIpoBids []*IpoBid
-
-	//Load open ipoBid orders from database
-	if err := db.Where("isClosed = ?", 0).Find(&openIpoBids).Error; err != nil {
-		panic("Error loading open ipoBid orders in matching engine: " + err.Error())
-	}
-
-	l.Infof("Done")
-
-	IpoBidsMap.Lock()
-	defer IpoBidsMap.Unlock()
-
-	for _, ipoBid := range openIpoBids {
-		IpoBidsMap.m[ipoBid.Id] = ipoBid
-	}
-
-	return openIpoBids, nil
-}
-
-func GetAllUnfulfilledIpoBids() ([]*IpoBid, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "GetAllUnfulfilledIpoBids",
-	})
-
-	l.Infof("Attempting to get all unfulfilled ipoBid orders")
-
-	db := getDB()
-
-	var unfulfilledIpoBids []*IpoBid
-
-	//Load open ipoBid orders from database
-	if err := db.Where("isClosed = ? AND isFulfilled = ?", 0, 0).Find(&unfulfilledIpoBids).Error; err != nil {
-		panic("Error loading open ipoBid orders in matching engine: " + err.Error())
-	}
-
-	l.Infof("Done")
-
-	IpoBidsMap.Lock()
-	defer IpoBidsMap.Unlock()
-
-	for _, ipoBid := range unfulfilledIpoBids {
-		IpoBidsMap.m[ipoBid.Id] = ipoBid
-	}
-
-	return unfulfilledIpoBids, nil
-}
-
-func GetAllFulfilledIpoBids() ([]*IpoBid, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "GetAllFulfilledIpoBids",
-	})
-
-	l.Infof("Attempting to get all fulfilled ipoBid orders")
-
-	db := getDB()
-
-	var fulfilledIpoBids []*IpoBid
-
-	//Load open ipoBid orders from database
-	if err := db.Where("isClosed = ? AND isFulfilled = ?", 0, 1).Find(&fulfilledIpoBids).Error; err != nil {
-		panic("Error loading open ipoBid orders in matching engine: " + err.Error())
-	}
-
-	l.Infof("Done")
-
-	IpoBidsMap.Lock()
-	defer IpoBidsMap.Unlock()
-
-	for _, ipoBid := range fulfilledIpoBids {
-		IpoBidsMap.m[ipoBid.Id] = ipoBid
-	}
-
-	return fulfilledIpoBids, nil
-}
-
-// Combine open and closed ipoBids into a single function??
-func GetMyOpenIpoBids(userId uint32) ([]*IpoBid, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "GetMyOpenIpoBids",
+		"method": "GetMyIpoBids",
 		"userId": userId,
 	})
 
-	l.Infof("Attempting to get open ipoBid orders for userId : %v", userId)
+	l.Infof("Attempting to get ipoBid orders for userId : %v", userId)
 
 	db := getDB()
 
-	var myOpenIpoBids []*IpoBid
+	var myIpoBids []*IpoBid
 
-	if err := db.Where("userId = ? AND isClosed = ?", userId, 0).Find(&myOpenIpoBids).Error; err != nil {
+	if err := db.Where("userId = ?", userId).Find(&myIpoBids).Error; err != nil {
 		return nil, err
 	}
 
-	l.Infof("Successfully fetched open ipoBid orders for userId : %v", userId)
-	return myOpenIpoBids, nil
-}
-
-func GetMyClosedIpoBids(userId, lastId, count uint32) (bool, []*IpoBid, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method": "GetMyClosedIpoBids",
-		"userId": userId,
-		"lastId": lastId,
-		"count":  count,
-	})
-
-	l.Infof("Attempting to get closed ipoBid orders for userId : %v", userId)
-
-	db := getDB()
-
-	var myClosedIpoBids []*IpoBid
-
-	//set default value of count if it is zero
-	if count == 0 {
-		count = MY_BID_COUNT
-	} else {
-		count = utils.MinInt32(count, MY_BID_COUNT)
-	}
-
-	//get latest events if lastId is zero
-	if lastId != 0 {
-		db = db.Where("id <= ?", lastId)
-	}
-	if err := db.Where("userId = ? AND isClosed = ?", userId, 1).Order("id desc").Limit(count).Find(&myClosedIpoBids).Error; err != nil {
-		return true, nil, err
-	}
-
-	var moreExists = len(myClosedIpoBids) >= int(count)
-	l.Infof("Successfully fetched closed ipoBid orders for userId : %v", userId)
-	return moreExists, myClosedIpoBids, nil
+	l.Infof("Successfully fetched ipoBid orders for userId : %v", userId)
+	return myIpoBids, nil
 }
