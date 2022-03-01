@@ -873,6 +873,7 @@ func (d *dalalActionService) SquareOffShortSells(ctx context.Context, req *actio
 	res.StatusMessage = "successfully squared off short sell stocks"
 	return res, nil
 }
+
 func (d *dalalActionService) OpenIpoBidding(ctx context.Context, req *actions_pb.OpenIpoBiddingRequest) (*actions_pb.OpenIpoBiddingResponse, error) {
 
 	var l = logger.WithFields(logrus.Fields{
