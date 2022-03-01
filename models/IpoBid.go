@@ -98,6 +98,7 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	if SlotQuantity > 1 {
 		return 0, OrderStockLimitExceeded{}
 	}
+
 	db := getDB()
 	BiddingUser := &User{}
 	db.First(BiddingUser, UserId)
@@ -105,7 +106,17 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	if BiddingUser.Cash < SlotPrice {
 		return 0, NotEnoughCashError{}
 	}
-	// ToDo: if user has already made bid on this stock, return error
+
+	var OldIpoBids []*IpoBid
+
+	if err := db.Where("userId = ? AND isClosed = ?", UserId, false).Find(&OldIpoBids).Error; err != nil {
+		return 0, err
+	}
+	for _, OldIpoBid := range OldIpoBids {
+		if OldIpoBid.Id != 0 {
+			return 0, OrderStockLimitExceeded{}
+		}
+	} // if user has already made bid on this stock, return error
 
 	NewIpoBid := &IpoBid{
 		UserId:       UserId,
@@ -140,7 +151,6 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	IpoBidsMap.m[NewIpoBid.Id] = NewIpoBid
 
 	l.Debugf("Created ipoBid. Id: %d", NewIpoBid.Id)
-	// Will NewIpoBid.Id even be defined since MYSQL determines it??
 
 	return NewIpoBid.Id, nil
 }
