@@ -5,10 +5,11 @@ CREATE TABLE IF NOT EXISTS IpoStocks (
 	description text NOT NULL,
 	SlotPrice bigint(11) UNSIGNED NOT NULL,
 	StockPrice bigint(11) UNSIGNED NOT NULL,
-	StockPrice bigint(11) UNSIGNED NOT NULL,
+	SlotQuantity bigint(11) UNSIGNED NOT NULL,
 	StocksPerSlot bigint(11) UNSIGNED NOT NULL,
+	IsBiddable BOOLEAN NOT NULL DEFAULT FALSE,
 	GivesDividends BOOLEAN NOT NULL DEFAULT FALSE,
 	createdAt varchar(255) NOT NULL DEFAULT "0000-00-00T00:00:00+05:30",
 	updatedAt varchar(255) NOT NULL DEFAULT "0000-00-00T00:00:00+05:30",
-	PRIMARY KEY (id),
+	PRIMARY KEY (id)
 ) AUTO_INCREMENT=1;
