@@ -11,7 +11,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/improbable-eng/grpc-web v0.15.0 // indirect
+	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/jarcoal/httpmock v1.0.7
 	github.com/jinzhu/gorm v1.9.16
 	github.com/jinzhu/now v1.1.1 // indirect
