@@ -136,7 +136,7 @@ func SquareOffLends() error {
 
 	var shortSellActiveLends []ShortSellLends
 
-	if err := db.Find(&shortSellActiveLends).Error; err != nil {
+	if err := db.Find(&shortSellActiveLends, "isSquaredOff = ?", 0).Error; err != nil {
 		l.Errorf("error fetching active lends from db Error : %+v", err)
 		return err
 	}
