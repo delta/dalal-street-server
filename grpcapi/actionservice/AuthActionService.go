@@ -120,6 +120,8 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "Incorrect username/password combination. Please use your Pragyan / Dalal Street credentials.")
 	case err == models.NotRegisteredError:
 		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "You have not registered for Dalal Street on the Pragyan / Dalal Street website")
+	case err == models.UnverifiedUserError:
+		return makeError(actions_pb.LoginResponse_EmailNotVerifiedError, "Please verify your mail to login")
 	case err != nil:
 		l.Errorf("Request failed due to: %+v", err)
 		return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
