@@ -220,6 +220,8 @@ func (d *dalalActionService) ResendVerificationEmail(ctx context.Context, req *a
 			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Maximum email limits reached")
 		} else if err == models.UserNotFoundError {
 			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Please check your email")
+		} else if err == models.EmailAlreadyVerified {
+			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Mail already verified, you can login now!")
 		} else {
 			return makeError(actions_pb.ResendVerificationEmailResponse_InternalServerError, getInternalErrorMessage(err))
 		}

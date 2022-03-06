@@ -14,6 +14,7 @@ var (
 	TransactionError             = errors.New("Transaction failed")
 	AlreadyVerifiedError         = errors.New("Account already verified")
 	MaximumEmailCountReached     = errors.New("Cannot send verification email again")
+	EmailAlreadyVerified         = errors.New("Email already verified")
 )
 
 type Registration struct {
@@ -78,6 +79,10 @@ func ResendVerificationEmail(email string) error {
 	if err := db.Table("Registrations").Where("email = ?", email).First(&registration).Error; err != nil {
 		l.Errorf("Couldn't find the user in registrations, %v", err)
 		return UserNotFoundError
+	}
+
+	if registration.IsVerified {
+		return EmailAlreadyVerified
 	}
 
 	if registration.VerificationEmailCount >= config.MaxVerificationEmailRequestCount {
