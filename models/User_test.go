@@ -161,6 +161,11 @@ func Test_PlaceAskOrder(t *testing.T) {
 	var user = &User{Id: 2}
 	var stock = &Stock{Id: 1, CurrentPrice: 200}
 
+	ssb := &ShortSellBank{
+		StockId:         1,
+		AvailableStocks: 10,
+	}
+
 	transactions := []*Transaction{
 		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
 		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 200, 0, 2000),
@@ -174,10 +179,12 @@ func Test_PlaceAskOrder(t *testing.T) {
 		{makeAsk(2, 1, Limit, 5, 200), true},
 		{makeAsk(2, 1, Limit, 2, 200), true},
 		{makeAsk(2, 1, Limit, 3, 200), true},
+		{makeAsk(2, 1, Limit, 21, 200), true},
 		{makeAsk(2, 1, Limit, 11, 200), false},
 		{makeAsk(2, 1, Limit, 11, 2000), false}, // too high a price won't be allowed
 		{makeAsk(2, 1, Limit, 10, 2000), false}, // with transaction fee, not enough cash
 		{makeAsk(2, 1, Limit, 11, 2), false},    // too low a price won't be allowed
+		{makeAsk(2, 1, Limit, 30, 200), false},  // short sell fails here, not enough stock to lend
 	}
 
 	db := getDB()
@@ -191,6 +198,8 @@ func Test_PlaceAskOrder(t *testing.T) {
 		db.Exec("DELETE FROM OrderDepositTransactions")
 		db.Exec("DELETE FROM Transactions") // Because we create additional OrderFee Transactions
 		db.Exec("DELETE FROM StockHistory")
+		db.Exec("DELETE FROM ShortSellLends")
+		db.Delete(ssb)
 		db.Delete(stock)
 		db.Delete(user)
 
@@ -201,6 +210,9 @@ func Test_PlaceAskOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(ssb).Error; err != nil {
 		t.Fatal(err)
 	}
 	LoadStocks()
@@ -241,14 +253,19 @@ func Test_PlaceAskOrder(t *testing.T) {
 
 	wg.Wait()
 
-	tid, terr := PlaceAskOrder(2, testcases[len(testcases)-2].ask)
+	tid, terr := PlaceAskOrder(2, testcases[len(testcases)-3].ask)
 	if terr == nil {
 		t.Fatalf("Did not expect success. Failing %+v %+v", tid, terr)
 	}
 
-	id, err := PlaceAskOrder(2, testcases[len(testcases)-1].ask)
+	id, err := PlaceAskOrder(2, testcases[len(testcases)-2].ask)
 	if err == nil {
 		t.Fatalf("Did not expect success. Failing %+v %+v", id, err)
+	}
+
+	sid, serr := PlaceAskOrder(2, testcases[len(testcases)-1].ask)
+	if err == nil {
+		t.Fatalf("Did not expect success. Failing %+v %+v", sid, serr)
 	}
 }
 
@@ -394,6 +411,11 @@ func Test_CancelOrder(t *testing.T) {
 	var user = &User{Id: 2, Cash: 3000, ReservedCash: 0}
 	var stock = &Stock{Id: 1}
 
+	ssb := ShortSellBank{
+		StockId:         1,
+		AvailableStocks: 7,
+	}
+
 	var bids = []*Bid{
 		makeBid(2, 150, 1, Limit, 5, 200),
 		makeBid(2, 160, 1, Limit, 2, 200),
@@ -430,6 +452,8 @@ func Test_CancelOrder(t *testing.T) {
 		db.Exec("DELETE FROM OrderDepositTransactions")
 		db.Exec("DELETE FROM Transactions")
 		db.Exec("DELETE FROM StockHistory")
+		db.Exec("DELETE FROM ShortSellLends")
+		db.Delete(ssb)
 		db.Delete(stock)
 		db.Delete(user)
 
@@ -440,6 +464,9 @@ func Test_CancelOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.Create(stock).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(ssb).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -498,7 +525,6 @@ func Test_GetCashSpent(t *testing.T) {
 	users := []*User{
 		{Id: 2, Email: "a@b.com", Cash: 2000},
 		{Id: 3, Email: "c@d.com", Cash: 1000},
-		{Id: 4, Email: "e@f.com", Cash: 5000},
 	}
 
 	stocks := []*Stock{
@@ -508,29 +534,22 @@ func Test_GetCashSpent(t *testing.T) {
 	}
 
 	transactions := []*Transaction{
-		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 1, 0, 2000),
-		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 2, 0, 2000),
-		makeTrans(2, 2, FromExchangeTransaction, 0, 10, 1, 0, 2000),
-		makeTrans(3, 1, FromExchangeTransaction, 0, 10, 1, 0, 2000),
-		makeTrans(3, 3, FromExchangeTransaction, 0, 10, 2, 0, 2000),
-		makeTrans(4, 2, FromExchangeTransaction, 0, 10, 2, 0, 2000),
-		makeTrans(4, 2, FromExchangeTransaction, 0, 10, 1, 0, 2000),
-		makeTrans(4, 2, FromExchangeTransaction, 0, 10, 1, 0, 2000),
-		makeTrans(4, 3, FromExchangeTransaction, 0, 10, 1, 0, 2000),
-		makeTrans(3, 1, OrderFillTransaction, -20, 0, 2000, 0, 2000),
-		makeTrans(4, 2, OrderFillTransaction, -5, 0, 200, 0, 2000),
-		makeTrans(3, 1, OrderFillTransaction, 0, 10, 1000, 0, 2000),
-		makeTrans(4, 2, OrderFillTransaction, 0, 3, 500, 0, 2000),
-		makeTrans(4, 3, OrderFillTransaction, 0, 2, 200, 0, 2000),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 10, 100, 0, 0),
+		makeTrans(2, 1, FromExchangeTransaction, 0, 5, 100, 0, 0),
+		makeTrans(2, 1, MortgageTransaction, 0, -5, 100, 0, 0),
+		makeTrans(2, 1, OrderFillTransaction, -5, 0, 95, 0, 0),
+		makeTrans(2, 2, FromExchangeTransaction, 0, 10, 100, 0, 0),
+		makeTrans(2, 2, OrderFillTransaction, -10, 0, 100, 0, 0),
+		makeTrans(2, 3, FromExchangeTransaction, 0, 2, 100, 0, 0),
+		makeTrans(2, 3, OrderFillTransaction, -10, 0, 100, 0, 0),
 	}
 
 	testcases := []struct {
 		userId   uint32
 		expected map[uint32]int32
 	}{
-		{userId: 2, expected: map[uint32]int32{1: 30, 2: 10}},
-		{userId: 3, expected: map[uint32]int32{1: 0, 3: 20}},
-		{userId: 4, expected: map[uint32]int32{2: 1530, 3: 410}},
+		{userId: 2, expected: map[uint32]int32{1: 525, 2: 0, 3: -800}},
+		{userId: 3, expected: map[uint32]int32{}},
 	}
 
 	db := getDB()

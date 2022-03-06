@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -30,7 +31,8 @@ var (
 	config *utils.Config
 	logger *logrus.Entry
 
-	grpcServer *grpc.Server
+	grpcServer    *grpc.Server
+	wrappedServer *grpcweb.WrappedGrpcServer
 )
 
 func authFunc(ctx context.Context) (context.Context, error) {
@@ -215,9 +217,19 @@ func Init(conf *utils.Config, matchingEngine matchingengine.MatchingEngine, dsm 
 
 	pb.RegisterDalalActionServiceServer(grpcServer, actionservice.NewDalalActionService(matchingEngine))
 	pb.RegisterDalalStreamServiceServer(grpcServer, streamservice.NewDalalStreamService(dsm))
+
+	wrappedServer = grpcweb.WrapServer(grpcServer,
+		grpcweb.WithOriginFunc(func(origin string) bool {
+			return true
+		}),
+	)
 }
 
 // Handler func to handle incoming grpc requests
 func GrpcHandlerFunc(resp http.ResponseWriter, req *http.Request) {
-	grpcServer.ServeHTTP(resp, req)
+	if wrappedServer.IsGrpcWebRequest(req) { // to support dalal-street-web
+		wrappedServer.ServeHTTP(resp, req)
+	} else {
+		grpcServer.ServeHTTP(resp, req)
+	}
 }
