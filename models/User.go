@@ -954,87 +954,69 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 	}
 	l.Debugf("Check1: Passed.")
 
-	// Second Check: User should have enough stocks
 	numStocks, err := getSingleStockCount(user, ask.StockId)
 	if err != nil {
 		return 0, err
 	}
-	var numStocksLeft = numStocks - int64(ask.StockQuantity)
+	// stock qty user wish to short sell
+	var shortsellQty int64 = 0
 
-	l.Debugf("Check2: Current stocks: %d. Stocks after trade: %d.", numStocks, numStocksLeft)
+	if numStocks >= 0 {
+		shortsellQty = -(numStocks - int64(ask.StockQuantity))
+	} else {
+		shortsellQty = int64(ask.StockQuantity)
+	}
 
-	if numStocksLeft < -SHORT_SELL_BORROW_LIMIT {
-		l.Debugf("Check2: Failed. Not enough stocks.")
-		currentAllowedQty := numStocks + SHORT_SELL_BORROW_LIMIT
-		if currentAllowedQty > ASK_LIMIT {
-			currentAllowedQty = ASK_LIMIT
+	if shortsellQty > 0 {
+		l.Debugf("Check2: short sell limit check, ask shortsell quantity : %d ", shortsellQty)
+
+		// check if stocks is available for lending which will be used for shorting
+		availableStocks, err := getAvailableLendStocks(ask.StockId)
+
+		l.Debugf("Check2: available stocks for shorting %d vs ask shorting stocks %d", availableStocks, shortsellQty)
+
+		if err != nil {
+			return 0, err
 		}
-		return 0, NotEnoughStocksError{currentAllowedQty}
+
+		if shortsellQty > int64(availableStocks) {
+			l.Debug("Check2: failed, not enough stock for lending")
+			return 0, NotEnoughStocksError{int64(availableStocks)}
+		}
+
+		// checking intra day limit for user
+		lentStocks, err := getUserShortSellStocks(ask.StockId, ask.UserId)
+
+		if err != nil {
+			return 0, err
+		}
+
+		if lentStocks+uint32(shortsellQty) > SHORT_SELL_BORROW_LIMIT {
+			l.Debug("Check2: failed, user crossed intra-day limit")
+			currentAllowedQty := SHORT_SELL_BORROW_LIMIT - int64(lentStocks)
+
+			return 0, NotEnoughStocksError{currentAllowedQty}
+		}
+
+		l.Debug("check2 : passed")
 	}
-
-	l.Debugf("Check2: Passed.")
-
-	var shortSellMin = numStocksLeft * int64(ask.Price)
-	var stockWorth int64 = 0
-
-	db := getDB()
-
-	sql := "Select stockId, sum(stockQuantity) as stockQuantity from Transactions where userId=? group by stockId"
-	rows, err := db.Raw(sql, userId).Rows()
-	if err != nil {
-		l.Error(err)
-		return 0, err
-	}
-	defer rows.Close()
-
-	stocksOwned := make(map[uint32]int64)
-	for rows.Next() {
-		var stockId uint32
-		var stockQty int64
-		rows.Scan(&stockId, &stockQty)
-
-		stocksOwned[stockId] = stockQty
-	}
-
-	// Find Stock worth of user
-	for id, number := range stocksOwned {
-		allStocks.m[id].RLock()
-		stockWorth = stockWorth + int64(allStocks.m[id].stock.CurrentPrice)*number
-		allStocks.m[id].RUnlock()
-	}
-
-	//Actual worth of user includes only
-	//Stock worth and cash
-	//Does not include reserved cash and stocks
-	var actualWorth = int64(user.Cash) + stockWorth
-
-	l.Debugf("Check3: Current stocks: %d. Stocks after trade: %d. User Actual Worth(Cash in hand + Stock Worth) %d", numStocks, numStocksLeft, user.Total)
-
-	//Check if networth of user is more than the number of stocks
-	//which are short sold
-	if numStocksLeft < 0 && -(actualWorth) > shortSellMin {
-		l.Debugf("Check3: Failed. Not enough actual worth to short sell.")
-		return 0, NotEnoughActualWorthError{-shortSellMin}
-	}
-
-	l.Debugf("Check3: Passed.")
 
 	orderPrice := getOrderFeePrice(ask.Price, ask.StockId, ask.OrderType)
 	orderFee := getOrderFee(ask.StockQuantity, orderPrice)
 	cashLeft := int64(user.Cash) - int64(orderFee)
 
-	l.Debugf("Check4: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
+	l.Debugf("Check3: User has %d cash currently. Will be left with %d cash after trade.", user.Cash, cashLeft)
 
 	if cashLeft < MINIMUM_CASH_LIMIT {
-		l.Debugf("Check4: Failed. Not enough cash.")
+		l.Debugf("Check3: Failed. Not enough cash.")
 		return 0, NotEnoughCashError{}
 	}
 
-	l.Debugf("Check4: Passed. Creating Ask.")
+	l.Debugf("Check3: Passed. Creating Ask.")
 
 	oldCash := user.Cash
 
-	db = getDB()
+	db := getDB()
 	tx := db.Begin()
 
 	var errorHelper = func(format string, args ...interface{}) (uint32, error) {
@@ -1071,6 +1053,25 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 
 	l.Infof("Saved OrderFeeTransaction for bid %d", ask.Id)
 
+	var shortSellTransaction *Transaction
+
+	// lend transaction only happens while shorting
+	if shortsellQty > 0 {
+		allStocks.m[ask.StockId].RLock()
+		currentPrice := allStocks.m[ask.StockId].stock.CurrentPrice
+		allStocks.m[ask.StockId].RUnlock()
+
+		shortSellTransaction = GetTransactionRef(userId, ask.StockId, ShortSellTransaction, 0, shortsellQty, currentPrice, 0, 0)
+
+		l.Infof("Saving ShortSellTransaction for Ask %d", ask.Id)
+
+		if err := saveShortSellLendTransaction(shortSellTransaction, tx); err != nil {
+			return errorHelper("Error lending stocks, Rolling back Error: %+v", err)
+		}
+
+		l.Infof("%d Stocks transferred to user %d ", shortsellQty, ask.Id)
+	}
+
 	// Going to reserve stocks for this order
 	placeOrderTransaction := GetTransactionRef(
 		userId,
@@ -1093,7 +1094,7 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 		return errorHelper("Error committing the transaction. Failing. %+v", err)
 	}
 
-	l.Infof("Commited successfully for bid %d", ask.Id)
+	l.Infof("Committed successfully for bid %d", ask.Id)
 
 	// Update datastreams to add newly placed order in OpenOrders
 	go func(ask *Ask, orderFeeTransaction, placeOrderTransaction *Transaction) {
@@ -1109,6 +1110,10 @@ func PlaceAskOrder(userId uint32, ask *Ask) (uint32, error) {
 			OrderType:     ask.ToProto().OrderType,
 			StockQuantity: ask.StockQuantity,
 		})
+
+		if shortSellTransaction != nil {
+			transactionsStream.SendTransaction(shortSellTransaction.ToProto())
+		}
 		transactionsStream.SendTransaction(orderFeeTransaction.ToProto())
 		transactionsStream.SendTransaction(placeOrderTransaction.ToProto())
 
@@ -2365,59 +2370,29 @@ func GetCashSpent(userId uint32) (map[uint32]int64, error) {
 
 	l.Info("GetCashSpent requested")
 
+	cashSpentMap := make(map[uint32]int64)
+
 	db := getDB()
 
-	//Getting the total number of stocks sold for each stockId
-	sql := "Select stockId, sum(reservedStockQuantity*-1) as soldstockstotal from Transactions where userId=? and stockQuantity=0 and type='OrderFillTransaction' group by stockId"
-	rows, err := db.Raw(sql, userId).Rows()
+	query := "SELECT stockId, IFNULL(SUM(cast(price as SIGNED) * cast(reservedStockQuantity as SIGNED) + cast(price as SIGNED) * cast(stockQuantity as SIGNED)),0) AS cashSpent FROM Transactions Where userId = ? GROUP BY stockId;"
+
+	rows, err := db.Raw(query, userId).Rows()
+
 	if err != nil {
 		l.Error(err)
 		return nil, err
 	}
+
 	defer rows.Close()
 
-	soldStocksTotal := make(map[uint32]int64)
 	for rows.Next() {
 		var stockId uint32
-		var soldstocks int64
-		rows.Scan(&stockId, &soldstocks)
+		var cashSpent int64
+		rows.Scan(&stockId, &cashSpent)
 
-		soldStocksTotal[stockId] = soldstocks
+		cashSpentMap[stockId] = cashSpent
 	}
-
-	//Getting the stockquantity and price of the stocks bought to calculate cash spent on each stack
-	//using fifo algorithm, table entries are already sorted according to time
-	sql1 := "Select stockId, stockQuantity, price from Transactions where userId=? and stockQuantity>0 and (type='OrderFillTransaction' or type='FromExchangeTransaction') order by createdAt;"
-	rows1, err := db.Raw(sql1, userId).Rows()
-	if err != nil {
-		l.Error(err)
-		return nil, err
-	}
-	defer rows1.Close()
-
-	cashSpent := make(map[uint32]int64)
-	for rows1.Next() {
-		var stockId uint32
-		var buyStocks int64
-		var buyPrice uint64
-		rows1.Scan(&stockId, &buyStocks, &buyPrice)
-
-		//subtracting the number of stocks sold from the number of stocks bought
-		//so as to nullify their effect in the total cash spent on a particular stock
-		if soldStocksTotal[stockId] > 0 {
-			if soldStocksTotal[stockId] > buyStocks {
-				soldStocksTotal[stockId] = soldStocksTotal[stockId] - buyStocks
-			} else {
-				buyStocks = buyStocks - soldStocksTotal[stockId]
-				soldStocksTotal[stockId] = 0
-				cashSpent[stockId] += buyStocks * int64(buyPrice)
-			}
-		} else {
-			cashSpent[stockId] += buyStocks * int64(buyPrice)
-		}
-	}
-
-	return cashSpent, nil
+	return cashSpentMap, nil
 }
 
 // savePlaceOrderTransaction saves PlaceOrderTransaction and creates a mapping between orderId and

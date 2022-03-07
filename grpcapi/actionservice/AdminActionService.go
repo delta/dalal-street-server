@@ -842,3 +842,34 @@ func (d *dalalActionService) InspectConnectedComponents(ctx context.Context, req
 	return res, nil
 
 }
+
+func (d *dalalActionService) SquareOffShortSells(ctx context.Context, req *actions_pb.SquareOffShortSellRequest) (*actions_pb.SquareOffShortSellResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "SquareOffShortSells",
+	})
+
+	l.Debugf("SquareOffShortSells requested")
+
+	res := &actions_pb.SquareOffShortSellResponse{}
+
+	makeError := func(st actions_pb.SquareOffShortSellResponse_StatusCode, msg string) (*actions_pb.SquareOffShortSellResponse, error) {
+		res.StatusCode = st
+		res.StatusMessage = msg
+		return res, nil
+	}
+
+	userId := getUserId(ctx)
+
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.SquareOffShortSellResponse_NotAdminUserError, "User is not Admin")
+	}
+
+	if err := models.SquareOffLends(); err != nil {
+		l.Errorf("failed to square off short sell stocks %+v", err)
+		return makeError(actions_pb.SquareOffShortSellResponse_InternalServerError, err.Error())
+	}
+
+	res.StatusCode = actions_pb.SquareOffShortSellResponse_OK
+	res.StatusMessage = "successfully squared off short sell stocks"
+	return res, nil
+}

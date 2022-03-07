@@ -1,6 +1,6 @@
 package models
 
-const SHORT_SELL_BORROW_LIMIT = 50
+const SHORT_SELL_BORROW_LIMIT = 20
 const BID_LIMIT = 50
 const ASK_LIMIT = 50
 const BUY_LIMIT = 30
