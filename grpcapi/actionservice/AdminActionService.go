@@ -897,9 +897,9 @@ func (d *dalalActionService) OpenIpoBidding(ctx context.Context, req *actions_pb
 	err := models.AllowIpoBidding(req.IpoStockId)
 
 	switch err.(type) {
-	case models.InvalidOrderIDError:
+	case models.InvalidStockIdError:
 		return makeError(actions_pb.OpenIpoBiddingResponse_InvalidIpoStockId, "Invalid IPO stock ID. Cannot open this IPO for bidding")
-	case models.AlreadyClosedError:
+	case models.IpoAlreadyOpenError:
 		return makeError(actions_pb.OpenIpoBiddingResponse_AlreadyOpenError, "This IPO is already open to bidding")
 	}
 
@@ -937,10 +937,10 @@ func (d *dalalActionService) CloseIpoBidding(ctx context.Context, req *actions_p
 	err := models.AllotSlots(req.IpoStockId)
 
 	switch err.(type) {
-	case models.InvalidOrderIDError:
+	case models.InvalidStockIdError:
 		return makeError(actions_pb.CloseIpoBiddingResponse_InvalidIpoStockId, "Invalid IPO stock ID. Cannot allot this Ipo")
-	case models.AlreadyClosedError:
-		return makeError(actions_pb.CloseIpoBiddingResponse_AlreadyClosedError, "This IPO has already been alloted")
+	case models.IpoNotBiddableError:
+		return makeError(actions_pb.CloseIpoBiddingResponse_AlreadyClosedError, "This IPO is not open to bidding - might already have been alloted")
 	}
 	if err != nil {
 		l.Errorf("Request failed due to %+v: ", err)

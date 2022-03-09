@@ -4,25 +4,24 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/delta/dalal-street-server/proto_build/models"
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
+	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 )
 
 type IpoStock struct {
-	Id             uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	ShortName      string `gorm:"column:shortName;not null" json:"short_name"`
-	FullName       string `gorm:"column:fullName;not null" json:"full_name"`
-	Description    string `gorm:"column:description;not null" json:"description"`
-	CreatedAt      string `gorm:"column:createdAt;not null" json:"created_at"`
-	UpdatedAt      string `gorm:"column:updatedAt;not null" json:"updated_at"`
-	IsBiddable     bool   `gorm:"column:isBiddable;not null" json:"is_biddable"`
-	GivesDividends bool   `gorm:"column:givesDividends;not null" json:"gives_dividends"`
-	SlotPrice      uint64 `gorm:"column:slotPrice;not null"  json:"slot_price"`
-	StockPrice     uint64 `gorm:"column:stockPrice;not null"  json:"stock_price"`
-	SlotQuantity   uint32 `gorm:"column:slotQuantity;not null"  json:"slot_quantity"`
-	StocksPerSlot  uint32 `gorm:"column:stocksPerSlot;not null"  json:"stock_per_slot"`
+	Id            uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	ShortName     string `gorm:"column:shortName;not null" json:"short_name"`
+	FullName      string `gorm:"column:fullName;not null" json:"full_name"`
+	Description   string `gorm:"column:description;not null" json:"description"`
+	CreatedAt     string `gorm:"column:createdAt;not null" json:"created_at"`
+	UpdatedAt     string `gorm:"column:updatedAt;not null" json:"updated_at"`
+	IsBiddable    bool   `gorm:"column:isBiddable;not null" json:"is_biddable"`
+	SlotPrice     uint64 `gorm:"column:slotPrice;not null"  json:"slot_price"`
+	StockPrice    uint64 `gorm:"column:stockPrice;not null"  json:"stock_price"`
+	SlotQuantity  uint32 `gorm:"column:slotQuantity;not null"  json:"slot_quantity"`
+	StocksPerSlot uint32 `gorm:"column:stocksPerSlot;not null"  json:"stocks_per_slot"`
 }
 
 func (IpoStock) TableName() string {
@@ -31,19 +30,30 @@ func (IpoStock) TableName() string {
 
 func (gIpoStock *IpoStock) ToProto() *models_pb.IpoStock {
 	return &models_pb.IpoStock{
-		Id:             gIpoStock.Id,
-		ShortName:      gIpoStock.ShortName,
-		FullName:       gIpoStock.FullName,
-		Description:    gIpoStock.Description,
-		SlotPrice:      gIpoStock.SlotPrice,
-		StockPrice:     gIpoStock.StockPrice,
-		SlotQuantity:   gIpoStock.SlotQuantity,
-		StocksPerSlot:  gIpoStock.StocksPerSlot,
-		CreatedAt:      gIpoStock.CreatedAt,
-		UpdatedAt:      gIpoStock.UpdatedAt,
-		IsBiddable:     gIpoStock.IsBiddable,
-		GivesDividends: gIpoStock.GivesDividends,
+		Id:            gIpoStock.Id,
+		ShortName:     gIpoStock.ShortName,
+		FullName:      gIpoStock.FullName,
+		Description:   gIpoStock.Description,
+		SlotPrice:     gIpoStock.SlotPrice,
+		StockPrice:    gIpoStock.StockPrice,
+		SlotQuantity:  gIpoStock.SlotQuantity,
+		StocksPerSlot: gIpoStock.StocksPerSlot,
+		CreatedAt:     gIpoStock.CreatedAt,
+		UpdatedAt:     gIpoStock.UpdatedAt,
+		IsBiddable:    gIpoStock.IsBiddable,
 	}
+}
+
+type IpoNotBiddableError struct{ IpoStockId uint32 }
+
+func (e IpoNotBiddableError) Error() string {
+	return fmt.Sprintf("IPO is not biddable for stock %d", e.IpoStockId)
+}
+
+type IpoAlreadyOpenError struct{ IpoStockId uint32 }
+
+func (e IpoAlreadyOpenError) Error() string {
+	return fmt.Sprintf("IPO bidding has already been opened for stock %d", e.IpoStockId)
 }
 
 // Refer models/stock.go
@@ -83,24 +93,24 @@ func AllowIpoBidding(IpoStockId uint32) error {
 
 	db := getDB()
 
-	IpoStock := &IpoStock{}
-	if err := db.First(IpoStock, IpoStockId).Error; err != nil {
+	IpoStock1 := &IpoStock{}
+	if err := db.First(IpoStock1, IpoStockId).Error; err != nil {
 		l.Error(err)
 		return err
 	}
 
-	if IpoStock == nil {
-		return InvalidOrderIDError{}
+	if IpoStock1 == nil {
+		return InvalidStockIdError{}
 	}
 
-	if IpoStock.IsBiddable == true {
-		return AlreadyClosedError{IpoStockId}
+	if IpoStock1.IsBiddable == true {
+		return IpoAlreadyOpenError{IpoStockId}
 	}
 
-	IpoStock.IsBiddable = true
-	IpoStock.UpdatedAt = utils.GetCurrentTimeISO8601()
+	IpoStock1.IsBiddable = true
+	IpoStock1.UpdatedAt = utils.GetCurrentTimeISO8601()
 
-	if err := db.Save(IpoStock).Error; err != nil {
+	if err := db.Save(IpoStock1).Error; err != nil {
 		l.Error(err)
 		return err
 	}
@@ -125,11 +135,11 @@ func AllotSlots(IpoStockId uint32) error {
 	}
 
 	if IpoStock == nil {
-		return InvalidOrderIDError{}
+		return InvalidStockIdError{}
 	}
 
 	if IpoStock.IsBiddable == false {
-		return AlreadyClosedError{IpoStockId}
+		return IpoNotBiddableError{IpoStockId}
 	}
 
 	IpoStock.IsBiddable = false
@@ -146,20 +156,29 @@ func AllotSlots(IpoStockId uint32) error {
 	//Load open ipoBid orders from database
 	if err := db.Where("IpoStockId = ? AND isClosed = ?", IpoStockId, 0).Find(&openIpoBids).Error; err != nil {
 		l.Error(err)
+		return err
 	}
 
-	if openIpoBids == nil {
-		return AlreadyClosedError{}
-	}
-
-	l.Infof("Done")
+	l.Infof("Fetched %d open ipoBids for IpoStockId= %d. Attempting to allot these stocks", len(openIpoBids), IpoStockId)
 
 	totalbids := len(openIpoBids)
 	var subscriptionRatio = float64(totalbids) / float64(totalslots)
 	var IpoStocksInMarket uint64
 	var ListingPrice uint64
 
-	newStock := &models.Stock{
+	if subscriptionRatio <= 1.05 && subscriptionRatio >= 0.95 {
+		ListingPrice = IpoStock.StockPrice
+	} else if subscriptionRatio < 1.20 && subscriptionRatio > 1.05 {
+		ListingPrice = IpoStock.StockPrice * 105 / 100
+	} else if subscriptionRatio < 0.95 && subscriptionRatio > 0.80 {
+		ListingPrice = IpoStock.StockPrice * 95 / 100
+	} else if subscriptionRatio >= 1.20 {
+		ListingPrice = IpoStock.StockPrice * 110 / 100
+	} else { // if subscriptionRatio <= 0.80
+		ListingPrice = IpoStock.StockPrice * 90 / 100
+	}
+
+	newStock := &Stock{
 		ShortName:        IpoStock.ShortName,
 		FullName:         IpoStock.FullName,
 		Description:      IpoStock.Description,
@@ -175,7 +194,7 @@ func AllotSlots(IpoStockId uint32) error {
 		LastTradePrice:   ListingPrice,
 		RealAvgPrice:     float64(ListingPrice),
 		CreatedAt:        utils.GetCurrentTimeISO8601(),
-		GivesDividends:   IpoStock.GivesDividends,
+		GivesDividends:   false,
 		IsBankrupt:       false,
 	}
 	newStock.UpdatedAt = newStock.CreatedAt
@@ -185,31 +204,17 @@ func AllotSlots(IpoStockId uint32) error {
 		return err
 	}
 
-	cost := int64(uint64(IpoStock.SlotQuantity) * IpoStock.SlotPrice)
-	// NewStockId = newStock.Id // Will this be defined or do i have to check db to get it?
+	cost := int64(IpoStock.SlotPrice)
 
 	if subscriptionRatio <= 1.00 {
 		for _, ipoBid := range openIpoBids {
-			// allot 1 slot worth of stocks to userid
-			AllotIpoTransaction := GetTransactionRef(ipoBid.UserId, newStock.Id, IpoAllotmentTransaction, 0, int64(IpoStock.SlotQuantity*IpoStock.StocksPerSlot), 0, -cost, 0)
 
-			ipoBid.IsFulfilled = true
-			ipoBid.IsClosed = true
-			ipoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
-
-			l.Infof("Saving AllotIpoTransaction, IpoStockId : %d, SlotQuantity : %d, UserId : %d, Cost: %d", ipoBid.IpoStockId, ipoBid.SlotQuantity, ipoBid.UserId, cost)
-
-			if err := db.Save(AllotIpoTransaction).Error; err != nil {
+			if err := AllotIpoSlotToUser(ipoBid, newStock.Id, ipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, db); err != nil {
 				l.Error(err)
 				return err
 			}
 
-			if err := db.Save(ipoBid).Error; err != nil {
-				l.Error(err)
-				return err
-			}
-
-			IpoStocksInMarket = uint64(len(openIpoBids))
+			IpoStocksInMarket = uint64(uint32(len(openIpoBids)) * IpoStock.StocksPerSlot)
 
 		}
 	} else {
@@ -224,21 +229,7 @@ func AllotSlots(IpoStockId uint32) error {
 
 		for _, AllotedIpoBid := range AllotedIpoBids {
 
-			//F allot 1 slot worth of stocks to userid
-			AllotIpoTransaction := GetTransactionRef(AllotedIpoBid.UserId, newStock.Id, IpoAllotmentTransaction, 0, int64(IpoStock.SlotQuantity*IpoStock.StocksPerSlot), 0, -cost, 0)
-
-			AllotedIpoBid.IsFulfilled = true
-			AllotedIpoBid.IsClosed = true
-			AllotedIpoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
-
-			l.Infof("Saving AllotIpoTransaction, IpoStockId : %d, SlotQuantity : %d, UserId : %d, Cost: %d", AllotedIpoBid.IpoStockId, AllotedIpoBid.SlotQuantity, AllotedIpoBid.UserId, cost)
-
-			if err := db.Save(AllotIpoTransaction).Error; err != nil {
-				l.Error(err)
-				return err
-			}
-
-			if err := db.Save(AllotedIpoBid).Error; err != nil {
+			if err := AllotIpoSlotToUser(AllotedIpoBid, newStock.Id, AllotedIpoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, db); err != nil {
 				l.Error(err)
 				return err
 			}
@@ -254,19 +245,7 @@ func AllotSlots(IpoStockId uint32) error {
 
 		for _, UnfulipoBid := range UnfulIpoBids {
 			//  Refund slotprice amount to userid
-			IpoRefundTransaction := GetTransactionRef(UnfulipoBid.UserId, newStock.Id, IpoAllotmentTransaction, 0, 0, 0, cost, -cost)
-
-			UnfulipoBid.IsClosed = true
-			UnfulipoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
-
-			l.Infof("Saving IpoRefundTransaction, IpoStockId : %d, SlotQuantity : %d, UserId : %d, Cost: %d", UnfulipoBid.IpoStockId, UnfulipoBid.SlotQuantity, UnfulipoBid.UserId, cost)
-
-			if err := db.Save(IpoRefundTransaction).Error; err != nil {
-				l.Error(err)
-				return err
-			}
-
-			if err := db.Save(UnfulipoBid).Error; err != nil {
+			if err := RefundIpoSlotToUser(UnfulipoBid, newStock.Id, UnfulipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, db); err != nil {
 				l.Error(err)
 				return err
 			}
@@ -275,30 +254,15 @@ func AllotSlots(IpoStockId uint32) error {
 		IpoStocksInMarket = uint64(totalslots * IpoStock.StocksPerSlot)
 	}
 
-	if subscriptionRatio <= 1.05 && subscriptionRatio >= 0.95 {
-		ListingPrice = IpoStock.StockPrice
-	} else if subscriptionRatio <= 1.20 && subscriptionRatio >= 1.05 {
-		ListingPrice = IpoStock.StockPrice * 105 / 100
-	} else if subscriptionRatio <= 0.95 && subscriptionRatio >= 0.80 {
-		ListingPrice = IpoStock.StockPrice * 95 / 100
-	} else if subscriptionRatio >= 1.20 {
-		ListingPrice = IpoStock.StockPrice * 110 / 100
-	} else { // if subscriptionRatio <= 0.80
-		ListingPrice = IpoStock.StockPrice * 90 / 100
-	}
-
 	// Update stock values
-	newStock.CurrentPrice = ListingPrice
-	newStock.DayHigh = ListingPrice
-	newStock.DayLow = ListingPrice
-	newStock.AllTimeHigh = ListingPrice
-	newStock.AllTimeLow = ListingPrice
+
 	newStock.StocksInMarket = IpoStocksInMarket
-	newStock.PreviousDayClose = ListingPrice
-	newStock.LastTradePrice = ListingPrice
-	newStock.RealAvgPrice = float64(ListingPrice)
 	newStock.UpdatedAt = utils.GetCurrentTimeISO8601()
 
+	if err := db.Save(newStock).Error; err != nil {
+		l.Error(err)
+		return err
+	}
 	SendPushNotification(0, PushNotification{
 		Title:    fmt.Sprintf("IPO Allotment has just happened for %v", IpoStock.FullName),
 		Message:  fmt.Sprintf("IPO Allotment has just happened for  %v. Click here to know more.", IpoStock.FullName),
@@ -309,7 +273,103 @@ func AllotSlots(IpoStockId uint32) error {
 	LoadStocks() // does it overwrite the existing stock values (the regular ones, not IPO stocks)?
 	// called when market day opens
 
-	//  ToDo: Streams stuff - user portfolio is updated and regarding parts where stock price is updated(LoadStocks()??)
+	return nil
+}
+
+func AllotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64, tx *gorm.DB) error {
+	l := logger.WithFields(logrus.Fields{
+		"method":   "AllotIpoSlotToUser",
+		"IpoBidId": ipoBid.Id,
+	})
+	// allot 1 slot worth of stocks to userid
+	AllotIpoTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, int64(SlotQuantity*StocksPerSlot), 0, -cost, 0)
+
+	ipoBid.IsFulfilled = true
+	ipoBid.IsClosed = true
+	ipoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
+
+	ch, AllotedUser, err := getUserExclusively(ipoBid.UserId)
+	l.Debugf("Acquired")
+
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	if err != nil {
+		l.Errorf("Error acquiring user. Failing. %+v", err)
+		return InternalServerError
+	}
+
+	AllotedUser.ReservedCash -= uint64(cost)
+
+	l.Infof("Saving AllotIpoTransaction, IpoStockId : %d, SlotQuantity : %d, UserId : %d, Cost: %d", ipoBid.IpoStockId, ipoBid.SlotQuantity, ipoBid.UserId, cost)
+
+	if err := tx.Create(AllotIpoTransaction).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	if err := tx.Save(ipoBid).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	if err := tx.Save(&AllotedUser).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+	transactionsStream := datastreamsManager.GetTransactionsStream()
+	transactionsStream.SendTransaction(AllotIpoTransaction.ToProto())
+
+	return nil
+}
+
+func RefundIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64, tx *gorm.DB) error {
+	l := logger.WithFields(logrus.Fields{
+		"method":   "RefundIpoSlotToUser",
+		"IpoBidId": ipoBid.Id,
+	})
+	// allot 1 slot worth of stocks to userid
+	IpoRefundTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, 0, 0, cost, -cost)
+
+	ipoBid.IsClosed = true
+	ipoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
+
+	ch, AllotedUser, err := getUserExclusively(ipoBid.UserId)
+	l.Debugf("Acquired")
+
+	defer func() {
+		close(ch)
+		l.Debugf("Released exclusive write on user")
+	}()
+
+	if err != nil {
+		l.Errorf("Error acquiring user. Failing. %+v", err)
+		return InternalServerError
+	}
+
+	AllotedUser.Cash += uint64(cost)
+	AllotedUser.ReservedCash -= uint64(cost)
+
+	l.Infof("Saving IpoRefundTransaction, IpoStockId : %d, SlotQuantity : %d, UserId : %d, Cost: %d", ipoBid.IpoStockId, ipoBid.SlotQuantity, ipoBid.UserId, cost)
+
+	if err := tx.Create(IpoRefundTransaction).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	if err := tx.Save(ipoBid).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	if err := tx.Save(&AllotedUser).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+	transactionsStream := datastreamsManager.GetTransactionsStream()
+	transactionsStream.SendTransaction(IpoRefundTransaction.ToProto())
 
 	return nil
 }

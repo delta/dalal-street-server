@@ -178,13 +178,10 @@ func (d *dalalActionService) PlaceIpoBid(ctx context.Context, req *actions_pb.Pl
 		return makeError(actions_pb.PlaceIpoBidResponse_UserBlockedError, "Your account has been blocked due to malpractice.")
 	}
 
-	var IpoBidId uint32
-	var err error
-
-	IpoBidId, err = models.CreateIpoBid(userId, req.StockId, req.SlotQuantity, req.SlotPrice)
+	IpoBidId, err := models.CreateIpoBid(userId, req.StockId, req.SlotQuantity, req.SlotPrice)
 
 	switch e := err.(type) {
-	case models.OrderStockLimitExceeded:
+	case models.IpoOrderStockLimitExceeded:
 		return makeError(actions_pb.PlaceIpoBidResponse_SlotQuantityLimitExceededError, e.Error())
 	case models.NotEnoughCashError:
 		return makeError(actions_pb.PlaceIpoBidResponse_NotEnoughCashError, e.Error())
