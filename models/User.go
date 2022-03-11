@@ -286,7 +286,7 @@ func RegisterUser(email, password, fullName, referralCode string) error {
 	// Send verification email only if running on docker
 	if config.Stage == "docker" {
 		l.Debugf("Sending verification email to %s", email)
-		verificationURL := fmt.Sprintf("https://dalal.pragyan.org/api/verify?key=%s", verificationKey)
+		verificationURL := fmt.Sprintf("https://api.dalal.pragyan.org/verify?key=%s", verificationKey)
 		htmlContent := fmt.Sprintf(`%s
 							%s
 							%s`, templates.HtmlEmailVerificationTemplateHead, verificationURL, templates.HtmlEmailVerificationTemplateTail)
@@ -431,7 +431,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	}
 
 	l.Debugf("Attempting login to Pragyan")
-	resp, err := http.PostForm("https://api.pragyan.org/21/event/login", form)
+	resp, err := http.PostForm("https://api.pragyan.org/22/events/login", form)
 	if err != nil {
 		l.Errorf("Pragyan API call failed: '%s'", err)
 		return pragyanUser{}, err

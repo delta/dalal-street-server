@@ -36,12 +36,12 @@ services:
         depends_on:
             - db
 
-    dalalenvoy:
-        container_name: dalalstreet-envoy
-        image: dalalstreet_envoy
-        restart: always
-        build: 
-            context: ./dalal-envoy-proxy/
-            dockerfile: dockerfiles/Dockerfile.dev
-        ports:
-            - "${ENVOY_PORT}:3000"
+    # dalalenvoy:
+    #     container_name: dalalstreet-envoy
+    #     image: dalalstreet_envoy
+    #     restart: always
+    #     build: 
+    #         context: ./dalal-envoy-proxy/
+    #         dockerfile: dockerfiles/Dockerfile.dev
+    #     ports:
+    #         - "${ENVOY_PORT}:3000"

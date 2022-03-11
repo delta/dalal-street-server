@@ -64,7 +64,7 @@ func main() {
 				if req.Method == http.MethodOptions && config.Stage != "Prod" {
 					resp.Header().Add("Access-Control-Allow-Origin", "*")
 					resp.Header().Add("Access-Control-Allow-Methods", "*")
-					resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web,sessionid")
+					resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web,sessionid,x-user-agent")
 					resp.Header().Add("Access-Control-Max-Age", "600")
 					resp.Write([]byte("OK"))
 					return

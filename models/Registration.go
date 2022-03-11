@@ -86,7 +86,7 @@ func ResendVerificationEmail(email string) error {
 
 	verificationKey := registration.VerificationKey
 	l.Debugf("Sending verification email to %s", email)
-	verificationURL := fmt.Sprintf("https://dalal.pragyan.org/api/verify?key=%s", verificationKey)
+	verificationURL := fmt.Sprintf("https://api.dalal.pragyan.org/verify?key=%s", verificationKey)
 	htmlContent := fmt.Sprintf(`%s
 							%s
 							%s`, templates.HtmlEmailVerificationTemplateHead, verificationURL, templates.HtmlEmailVerificationTemplateTail)
