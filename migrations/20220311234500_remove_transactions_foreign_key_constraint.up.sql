@@ -1,1 +1,0 @@
-ALTER TABLE Transactions DROP FOREIGN KEY Transactions_ibfk_2;
