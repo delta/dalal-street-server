@@ -1,0 +1,1 @@
+ALTER TABLE MarketEvents MODIFY stockId int(11) UNSIGNED NULL;

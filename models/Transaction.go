@@ -74,7 +74,7 @@ func (trType TransactionType) String() string {
 type Transaction struct {
 	Id                    uint32          `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId                uint32          `gorm:"column:userId;not null" json:"user_id"`
-	StockId               uint32          `gorm:"column:stockId;not null" json:"stock_id"`
+	StockId               uint32          `gorm:"column:stockId" json:"stock_id"`
 	Type                  TransactionType `gorm:"column:type;not null" json:"type"`
 	ReservedStockQuantity int64           `gorm:"column:reservedStockQuantity;not null" json:"reserved_stock_quantity"`
 	StockQuantity         int64           `gorm:"column:stockQuantity;not null" json:"stock_quantity"`
