@@ -431,7 +431,7 @@ func postLoginToPragyan(email, password string) (pragyanUser, error) {
 	}
 
 	l.Debugf("Attempting login to Pragyan")
-	resp, err := http.PostForm("https://api.pragyan.org/22/events/login", form)
+	resp, err := http.PostForm("https://api.pragyan.org/22/event/login", form)
 	if err != nil {
 		l.Errorf("Pragyan API call failed: '%s'", err)
 		return pragyanUser{}, err
