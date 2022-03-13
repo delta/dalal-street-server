@@ -120,6 +120,8 @@ func (d *dalalActionService) Login(ctx context.Context, req *actions_pb.LoginReq
 		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "Incorrect username/password combination. Please use your Pragyan / Dalal Street credentials.")
 	case err == models.NotRegisteredError:
 		return makeError(actions_pb.LoginResponse_InvalidCredentialsError, "You have not registered for Dalal Street on the Pragyan / Dalal Street website")
+	case err == models.UnverifiedUserError:
+		return makeError(actions_pb.LoginResponse_EmailNotVerifiedError, "Please verify your mail to login")
 	case err != nil:
 		l.Errorf("Request failed due to: %+v", err)
 		return makeError(actions_pb.LoginResponse_InternalServerError, getInternalErrorMessage(err))
@@ -217,7 +219,9 @@ func (d *dalalActionService) ResendVerificationEmail(ctx context.Context, req *a
 		if err == models.MaximumEmailCountReached {
 			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Maximum email limits reached")
 		} else if err == models.UserNotFoundError {
-			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Please check your email")
+			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Email not registered")
+		} else if err == models.EmailAlreadyVerified {
+			return makeError(actions_pb.ResendVerificationEmailResponse_MaxEmailResendCountReached, "Mail already verified, you can login now!")
 		} else {
 			return makeError(actions_pb.ResendVerificationEmailResponse_InternalServerError, getInternalErrorMessage(err))
 		}
