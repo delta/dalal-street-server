@@ -1,7 +1,9 @@
 package templates
 
-func VerificationEmailTemplate(verificationURL string) string{
-  var htmlContent=`<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional //EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+import "fmt"
+
+func VerificationEmailTemplate(verificationURL string) string {
+	var htmlContent = fmt.Sprintf(`<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional //EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
   <html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -88,7 +90,7 @@ func VerificationEmailTemplate(verificationURL string) string{
   <body class="clean-body u_body" style="margin: 0;padding: 0;-webkit-text-size-adjust: 100%;background-color: #f9f9f9;color: #000000">
     <!--[if IE]><div class="ie-container"><![endif]-->
     <!--[if mso]><div class="mso-container"><![endif]-->
-    <table style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;min-width: 320px;Margin: 0 auto;background-color: #f9f9f9;width:100%" cellpadding="0" cellspacing="0">
+    <table style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspci: 0pt;mso-table-rspace: 0pt;vertical-align: top;min-width: 320px;Margin: 0 auto;background-color: #f9f9f9;width:100%" cellpadding="0" cellspacing="0">
     <tbody>
     <tr style="vertical-align: top">
       <td style="word-break: break-word;border-collapse: collapse !important;vertical-align: top">
@@ -181,7 +183,7 @@ func VerificationEmailTemplate(verificationURL string) string{
         <td class="v-container-padding-padding" style="overflow-wrap:break-word;word-break:break-word;padding:10px 10px 33px;font-family:'Montserrat',sans-serif;" align="left">
           
   <div class="v-text-align" align="center">
-    <!--[if mso]><table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing: 0; border-collapse: collapse; mso-table-lspace:0pt; mso-table-rspace:0pt;font-family:'Montserrat',sans-serif;"><tr><td class="v-text-align" style="font-family:'Montserrat',sans-serif;" align="center"><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="" style="height:47px; v-text-anchor:middle; width:182px;" arcsize="8.5%" stroke="f" fillcolor="#3ae044"><w:anchorlock/><center style="color:#FFFFFF;font-family:'Montserrat',sans-serif;"><![endif]-->
+    <!--[if mso]><table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing: 0; border-collapse: collapse; mso-table-spaced:0pt; mso-table-rspace:0pt;font-family:'Montserrat',sans-serif;"><tr><td class="v-text-align" style="font-family:'Montserrat',sans-serif;" align="center"><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="" style="height:47px; v-text-anchor:middle; width:182px;" arcsize="8.5%" stroke="f" fillcolor="#3ae044"><w:anchorlock/><center style="color:#FFFFFF;font-family:'Montserrat',sans-serif;"><![endif]-->
       <a href=%s target="_blank" style="box-sizing: border-box;display: inline-block;font-family:'Montserrat',sans-serif;text-decoration: none;-webkit-text-size-adjust: none;text-align: center;color: #FFFFFF; background-color: #3ae044; border-radius: 4px;-webkit-border-radius: 4px; -moz-border-radius: 4px; width:auto; max-width:100%; overflow-wrap: break-word; word-break: break-word; word-wrap:break-word; mso-border-alt: none;">
       <span class="v-line-height v-padding" style="display:block;padding:14px 20px;line-height:120%;"><strong><span style="font-size: 16px; line-height: 19.2px;">Verify Account &rarr;</span></strong></span>
       </a>
@@ -396,9 +398,9 @@ func VerificationEmailTemplate(verificationURL string) string{
       <!--[if mso]></div><![endif]-->
       <!--[if IE]></div><![endif]-->
       </body>
-      </html>`
+      </html>`, verificationURL)
 
-      return htmlContent
+	return htmlContent
 }
 
 var PlainEmailVerificationTemplate = `Please verify your account at %s`
