@@ -19,7 +19,6 @@ func Init() {
 		resp.Header().Add("Access-Control-Allow-Methods", "*")
 		resp.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-grpc-web,sessionid,x-user-agent")
 		resp.Header().Add("Access-Control-Max-Age", "600")
-		resp.Write([]byte("OK"))
 		http.FileServer(http.Dir("./public"))
 	})))
 }
