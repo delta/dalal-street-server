@@ -2,6 +2,10 @@
 
 if [[ $(docker ps --filter status=running |grep dalalstreet-db) ]]
 then
+    # cd into the server dir
+    SCRIPT=$(readlink -f "$0")
+    cd "$(dirname "$SCRIPT")/../"
+
     mkdir -p dumps
     time=$(date +%d-%m-%Y-%H-%M-%S)
 
