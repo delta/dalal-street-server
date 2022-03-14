@@ -1,1 +1,1 @@
-ALTER TABLE Transactions MODIFY stockId int(11) UNSIGNED NULL;
+ALTER TABLE Transactions MODIFY stockId int(11) UNSIGNED DEFAULT NULL;
