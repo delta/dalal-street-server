@@ -86,7 +86,8 @@ func GetCurrentTimeISO8601() string {
 }
 
 func GetImageBasePath() string {
-	return "../public/"
+	st, _ := os.Getwd()
+	return st + "/public/"
 }
 
 func IsProdEnv() bool {
