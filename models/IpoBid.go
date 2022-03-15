@@ -44,51 +44,10 @@ func (ipoBid *IpoBid) ToProto() *models_pb.IpoBid {
 	return pIpoBid
 }
 
-var IpoBidsMap = struct {
-	m map[uint32]*IpoBid
-}{
-	make(map[uint32]*IpoBid),
-}
-
 type IpoOrderStockLimitExceeded struct{}
 
 func (e IpoOrderStockLimitExceeded) Error() string {
-	return fmt.Sprintf("A user can only bid for a maximum of 1 IPO slot")
-}
-
-// Is this function even needed?
-func getIpoBid(id uint32) (*IpoBid, error) {
-	var l = logger.WithFields(logrus.Fields{
-		"method":   "getIpoBid",
-		"param_id": id,
-	})
-
-	l.Debugf("Attempting")
-
-	/* Check if the ipoBid is there in the map */
-	_, ok := IpoBidsMap.m[id]
-	if ok {
-		l.Debugf("Found ipoBid in IpoBidsMap")
-		return IpoBidsMap.m[id], nil
-	}
-
-	/* Otherwise load from database */
-	l.Debugf("Loading ipoBid from database")
-	db := getDB()
-
-	ipoBid := &IpoBid{}
-	db.First(ipoBid, id)
-
-	if ipoBid == nil {
-		l.Errorf("Attempted to get non-existing IpoBid")
-		return nil, fmt.Errorf("IpoBid with id %d does not exist", id)
-	}
-
-	IpoBidsMap.m[id] = ipoBid
-
-	l.Debugf("Loaded ipoBid from db: %+v", ipoBid)
-
-	return ipoBid, nil
+	return "A user can only bid for a maximum of 1 IPO slot"
 }
 
 func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPrice uint64) (uint32, error) {
@@ -107,22 +66,27 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	}
 
 	db := getDB()
+	ch, user, err := getUserExclusively(UserId)
 
-	BiddingUser := &User{}
-	db.First(BiddingUser, UserId)
+	if err != nil {
+		l.Errorf("Error fetching user form db %+v", err)
+		return 0, err
+	}
 
-	if BiddingUser.Cash < SlotPrice {
+	if user.Cash < SlotPrice {
 		return 0, NotEnoughCashError{}
 	}
 
+	close(ch)
+
 	IpoStock := &IpoStock{}
 	db.First(IpoStock, IpoStockId)
-	if IpoStock.IsBiddable == false {
+
+	if !IpoStock.IsBiddable {
 		return 0, IpoNotBiddableError{IpoStockId}
 	}
 
 	OldIpoBid := &IpoBid{}
-
 	if !db.Where("userId = ? AND isClosed = ? AND ipoStockId = ?", UserId, false, IpoStockId).First(&OldIpoBid).RecordNotFound() {
 		return 0, IpoOrderStockLimitExceeded{}
 	}
@@ -139,13 +103,11 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	NewIpoBid.UpdatedAt = NewIpoBid.CreatedAt
 
 	price := uint64(SlotQuantity) * SlotPrice
-
-	if err := SaveNewIpoBidTransaction(NewIpoBid, UserId, price, db); err != nil {
+	// add ipo transaction in transaction table
+	if err := SaveNewIpoBidTransaction(NewIpoBid, UserId, price); err != nil {
 		l.Error(err)
 		return 0, err
 	}
-
-	IpoBidsMap.m[NewIpoBid.Id] = NewIpoBid
 
 	l.Debugf("Created ipoBid. Id: %d", NewIpoBid.Id)
 
@@ -174,21 +136,21 @@ func CancelIpoBid(IpoBidId uint32) error {
 
 	IpoStock1 := &IpoStock{}
 	db.First(IpoStock1, IpoBidToCancel.IpoStockId)
-	if IpoStock1.IsBiddable == false {
+
+	if !IpoStock1.IsBiddable {
 		return IpoNotBiddableError{IpoBidToCancel.IpoStockId}
 	}
 
 	IpoBidToCancel.IsClosed = true
 	IpoBidToCancel.UpdatedAt = utils.GetCurrentTimeISO8601()
 
+	// check transaction
 	price := uint64(IpoBidToCancel.SlotQuantity) * IpoBidToCancel.SlotPrice
 
 	if err := SaveCancelledIpoBidTransaction(IpoBidToCancel, price, db); err != nil {
 		l.Error(err)
 		return err
 	}
-
-	delete(IpoBidsMap.m, IpoBidId)
 
 	l.Debugf("Done")
 	return nil
@@ -207,6 +169,7 @@ func GetMyIpoBids(userId uint32) ([]*IpoBid, error) {
 	var myIpoBids []*IpoBid
 
 	if err := db.Where("userId = ?", userId).Find(&myIpoBids).Error; err != nil {
+		// add error log
 		return nil, err
 	}
 
@@ -214,11 +177,15 @@ func GetMyIpoBids(userId uint32) ([]*IpoBid, error) {
 	return myIpoBids, nil
 }
 
-func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64, tx *gorm.DB) error {
+// change below 2 func properly
+func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "SaveNewIpoBidTransaction",
 		"IpoStockId": NewIpoBid.Id,
 	})
+
+	db := getDB()
+	tx := db.Begin()
 
 	ch, BiddingUser, err := getUserExclusively(UserId)
 	l.Debugf("Acquired")
@@ -233,17 +200,29 @@ func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64, tx
 		return InternalServerError
 	}
 
+	oldCash := BiddingUser.Cash
+	oldReservedCash := BiddingUser.ReservedCash
+
 	BiddingUser.Cash -= price
 	BiddingUser.ReservedCash += price
 
 	if err := tx.Create(NewIpoBid).Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Error("Error creating ipo bid %+v", err)
+		tx.Rollback()
 		return err
 	}
 
 	if err := tx.Save(&BiddingUser).Error; err != nil {
-		l.Error(err)
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Error("Error saving user %+v", err)
+		tx.Rollback()
 		return err
 	}
+
+	tx := GetTransactionRef(UserId, 0, IpoAllotmentTransaction, 0, 0, 0, int64(price), -int64(price))
 
 	return nil
 }
