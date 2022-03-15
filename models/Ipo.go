@@ -54,6 +54,41 @@ type IpoAlreadyOpenError struct{ IpoStockId uint32 }
 func (e IpoAlreadyOpenError) Error() string {
 	return fmt.Sprintf("IPO bidding has already been opened for stock %d", e.IpoStockId)
 }
+
+// var allIpoStocks = struct {
+// 	m map[uint32]*ipoStockAndLock
+// }{
+// 	make(map[uint32]*ipoStockAndLock),
+// }
+
+// type ipoStockAndLock struct {
+// 	ipostock *IpoStock
+// }
+
+func GetAllIpoStocks() map[uint32]*IpoStock {
+	var l = logger.WithFields(logrus.Fields{
+		"method": "GetAllIpoStocks",
+	})
+
+	db := getDB()
+	var allIpoStocks []IpoStock
+
+	if err := db.Find(&allIpoStocks).Error; err != nil {
+		l.Error(err)
+		// return err
+	}
+	var allIpoStocksMap = make(map[uint32]*IpoStock)
+
+	for _, ipoStock := range allIpoStocks {
+		fmt.Println(ipoStock)
+		allIpoStocksMap[ipoStock.Id] = &ipoStock
+	}
+
+	l.Infof("all ipo stocks : %v", allIpoStocksMap)
+
+	return allIpoStocksMap
+}
+
 func AllowIpoBidding(IpoStockId uint32) error {
 	var l = logger.WithFields(logrus.Fields{
 		"method":           "OpenIpoBidding",
@@ -89,7 +124,7 @@ func AllowIpoBidding(IpoStockId uint32) error {
 	go func() {
 		n := &Notification{
 			UserId:      0,
-			Text:        IpoStock1.FullName + "Initial public offering is listed in the market, you can start placing orders",
+			Text:        IpoStock1.FullName + " Initial public offering is listed in the market, you can start placing orders",
 			IsBroadcast: true,
 			CreatedAt:   utils.GetCurrentTimeISO8601(),
 		}

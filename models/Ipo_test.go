@@ -29,6 +29,42 @@ func TestIpoStockToProto(t *testing.T) {
 	}
 }
 
+// func TestGetAllStocks(t *testing.T) {
+// 	stock := &Stock{
+// 		// Id:               10010,
+// 		CurrentPrice:     1000,
+// 		AllTimeLow:       1000,
+// 		PreviousDayClose: 1000,
+// 		AllTimeHigh:      1000,
+// 		StocksInExchange: 0,
+// 		StocksInMarket:   200,
+// 		RealAvgPrice:     1000,
+// 	}
+// 	db := getDB()
+// 	if err := db.Create(stock).Error; err != nil {
+// 		t.Fatal(err)
+// 	}
+
+// 	fmt.Print(stock.Id)
+
+// 	var TestallStocksMap = make(map[uint32]*Stock)
+// 	TestallStocksMap = GetAllStocks()
+// 	fmt.Printf("lenght of map : %+v", len(TestallStocksMap))
+// 	fmt.Printf("all stocks in test : %+v", TestallStocksMap)
+// }
+
+// func WWWTest_GetAllIpoStocks(t *testing.T) {
+// 	ipoStock := &IpoStock{StocksPerSlot: 20, IsBiddable: true}
+// 	db := getDB()
+// 	if err := db.Create(ipoStock).Error; err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	var TestallIpoStocksMap = make(map[uint32]*IpoStock)
+// 	TestallIpoStocksMap = GetAllIpoStocks()
+// 	fmt.Printf("lenght of map : %+v", len(TestallIpoStocksMap))
+// 	fmt.Printf("all ipo stocks in test : %+v", TestallIpoStocksMap)
+// }
+
 func Test_AllowIpoBidding(t *testing.T) {
 
 	IpoStock1 := &IpoStock{

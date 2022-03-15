@@ -4,13 +4,11 @@ import (
 	"fmt"
 
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
-	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 
 	"github.com/delta/dalal-street-server/utils"
 )
 
-// refer models/Bid.go
 type IpoBid struct {
 	Id           uint32 `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
 	UserId       uint32 `gorm:"column:userId;not null" json:"user_id"`
@@ -59,7 +57,7 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 		"param_slotQuantity": fmt.Sprintf("%+v", SlotQuantity),
 	})
 
-	l.Debugf("Attempting")
+	l.Debugf("Attempting to create ipoBid")
 
 	if SlotQuantity != 1 {
 		return 0, IpoOrderStockLimitExceeded{}
@@ -144,10 +142,9 @@ func CancelIpoBid(IpoBidId uint32) error {
 	IpoBidToCancel.IsClosed = true
 	IpoBidToCancel.UpdatedAt = utils.GetCurrentTimeISO8601()
 
-	// check transaction
 	price := uint64(IpoBidToCancel.SlotQuantity) * IpoBidToCancel.SlotPrice
 
-	if err := SaveCancelledIpoBidTransaction(IpoBidToCancel, price, db); err != nil {
+	if err := SaveCancelledIpoBidTransaction(IpoBidToCancel, price); err != nil {
 		l.Error(err)
 		return err
 	}
@@ -169,7 +166,7 @@ func GetMyIpoBids(userId uint32) ([]*IpoBid, error) {
 	var myIpoBids []*IpoBid
 
 	if err := db.Where("userId = ?", userId).Find(&myIpoBids).Error; err != nil {
-		// add error log
+		l.Error(err)
 		return nil, err
 	}
 
@@ -177,7 +174,6 @@ func GetMyIpoBids(userId uint32) ([]*IpoBid, error) {
 	return myIpoBids, nil
 }
 
-// change below 2 func properly
 func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "SaveNewIpoBidTransaction",
@@ -209,7 +205,7 @@ func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) er
 	if err := tx.Create(NewIpoBid).Error; err != nil {
 		BiddingUser.Cash = oldCash
 		BiddingUser.ReservedCash = oldReservedCash
-		l.Error("Error creating ipo bid %+v", err)
+		l.Errorf("Error creating ipo bid %+v", err)
 		tx.Rollback()
 		return err
 	}
@@ -217,21 +213,40 @@ func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) er
 	if err := tx.Save(&BiddingUser).Error; err != nil {
 		BiddingUser.Cash = oldCash
 		BiddingUser.ReservedCash = oldReservedCash
-		l.Error("Error saving user %+v", err)
+		l.Errorf("Error saving user %+v", err)
 		tx.Rollback()
 		return err
 	}
 
-	tx := GetTransactionRef(UserId, 0, IpoAllotmentTransaction, 0, 0, 0, int64(price), -int64(price))
+	PlaceIpoBidTransaction := GetTransactionRef(UserId, 0, IpoAllotmentTransaction, 0, 0, 0, int64(price), -int64(price))
+
+	if err := tx.Create(PlaceIpoBidTransaction).Error; err != nil {
+		l.Error(err)
+		return err
+	}
+
+	transactionsStream := datastreamsManager.GetTransactionsStream()
+	transactionsStream.SendTransaction(PlaceIpoBidTransaction.ToProto())
+
+	if err := tx.Commit().Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error saving user %+v", err)
+		tx.Rollback()
+		return err
+	}
 
 	return nil
 }
 
-func SaveCancelledIpoBidTransaction(IpoBidToCancel *IpoBid, price uint64, tx *gorm.DB) error {
+func SaveCancelledIpoBidTransaction(IpoBidToCancel *IpoBid, price uint64) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":     "SaveCancelledIpoBidTransaction",
 		"IpoStockId": IpoBidToCancel.Id,
 	})
+
+	db := getDB()
+	tx := db.Begin()
 
 	ch, BiddingUser, err := getUserExclusively(IpoBidToCancel.UserId)
 	l.Debugf("Acquired")
@@ -246,17 +261,37 @@ func SaveCancelledIpoBidTransaction(IpoBidToCancel *IpoBid, price uint64, tx *go
 		return InternalServerError
 	}
 
+	oldCash := BiddingUser.Cash
+	oldReservedCash := BiddingUser.ReservedCash
+
 	BiddingUser.Cash += price
 	BiddingUser.ReservedCash -= price
 
 	if err := tx.Save(IpoBidToCancel).Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error cancelling ipo bid %+v", err)
+		tx.Rollback()
 		return err
 	}
 
 	if err := tx.Save(&BiddingUser).Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error cancelling ipo bid %+v", err)
+		tx.Rollback()
+		return err
+	}
+
+	CancelIpoBidTransaction := GetTransactionRef(BiddingUser.Id, 0, IpoAllotmentTransaction, 0, 0, 0, -int64(price), int64(price))
+
+	if err := tx.Create(CancelIpoBidTransaction).Error; err != nil {
 		l.Error(err)
 		return err
 	}
+
+	transactionsStream := datastreamsManager.GetTransactionsStream()
+	transactionsStream.SendTransaction(CancelIpoBidTransaction.ToProto())
 
 	return nil
 }
