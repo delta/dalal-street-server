@@ -54,7 +54,7 @@ func (e IpoAlreadyOpenError) Error() string {
 	return fmt.Sprintf("IPO bidding has already been opened for stock %d", e.IpoStockId)
 }
 
-func GetAllIpoStocks() map[uint32]*IpoStock {
+func GetAllIpoStocks() (map[uint32]IpoStock, error) {
 	var l = logger.WithFields(logrus.Fields{
 		"method": "GetAllIpoStocks",
 	})
@@ -64,18 +64,18 @@ func GetAllIpoStocks() map[uint32]*IpoStock {
 
 	if err := db.Find(&allIpoStocks).Error; err != nil {
 		l.Error(err)
-		// return err
+		return make(map[uint32]IpoStock), err
 	}
-	var allIpoStocksMap = make(map[uint32]*IpoStock)
+	var allIpoStocksMap = make(map[uint32]IpoStock)
 
 	for _, ipoStock := range allIpoStocks {
-		fmt.Println(ipoStock)
-		allIpoStocksMap[ipoStock.Id] = &ipoStock
+		fmt.Println("ipoStock", ipoStock)
+		allIpoStocksMap[ipoStock.Id] = ipoStock
 	}
 
 	l.Infof("all ipo stocks : %v", allIpoStocksMap)
 
-	return allIpoStocksMap
+	return allIpoStocksMap, nil
 }
 
 func AllowIpoBidding(IpoStockId uint32) error {

@@ -35,8 +35,11 @@ func Test_GetAllIpoStocks(t *testing.T) {
 	if err := db.Create(ipoStock).Error; err != nil {
 		t.Fatal(err)
 	}
-	var TestallIpoStocksMap = make(map[uint32]*IpoStock)
-	TestallIpoStocksMap = GetAllIpoStocks()
+	// var TestallIpoStocksMap = make(map[uint32]*IpoStock)
+	TestallIpoStocksMap, err := GetAllIpoStocks()
+	if err != nil {
+		t.Fatalf("Unable to get all stocks %v", err)
+	}
 	fmt.Printf("lenght of map : %+v", len(TestallIpoStocksMap))
 	fmt.Printf("all ipo stocks in test : %+v", TestallIpoStocksMap)
 }
