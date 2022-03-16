@@ -29,41 +29,17 @@ func TestIpoStockToProto(t *testing.T) {
 	}
 }
 
-// func TestGetAllStocks(t *testing.T) {
-// 	stock := &Stock{
-// 		// Id:               10010,
-// 		CurrentPrice:     1000,
-// 		AllTimeLow:       1000,
-// 		PreviousDayClose: 1000,
-// 		AllTimeHigh:      1000,
-// 		StocksInExchange: 0,
-// 		StocksInMarket:   200,
-// 		RealAvgPrice:     1000,
-// 	}
-// 	db := getDB()
-// 	if err := db.Create(stock).Error; err != nil {
-// 		t.Fatal(err)
-// 	}
-
-// 	fmt.Print(stock.Id)
-
-// 	var TestallStocksMap = make(map[uint32]*Stock)
-// 	TestallStocksMap = GetAllStocks()
-// 	fmt.Printf("lenght of map : %+v", len(TestallStocksMap))
-// 	fmt.Printf("all stocks in test : %+v", TestallStocksMap)
-// }
-
-// func WWWTest_GetAllIpoStocks(t *testing.T) {
-// 	ipoStock := &IpoStock{StocksPerSlot: 20, IsBiddable: true}
-// 	db := getDB()
-// 	if err := db.Create(ipoStock).Error; err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	var TestallIpoStocksMap = make(map[uint32]*IpoStock)
-// 	TestallIpoStocksMap = GetAllIpoStocks()
-// 	fmt.Printf("lenght of map : %+v", len(TestallIpoStocksMap))
-// 	fmt.Printf("all ipo stocks in test : %+v", TestallIpoStocksMap)
-// }
+func Test_GetAllIpoStocks(t *testing.T) {
+	ipoStock := &IpoStock{StocksPerSlot: 20, IsBiddable: true}
+	db := getDB()
+	if err := db.Create(ipoStock).Error; err != nil {
+		t.Fatal(err)
+	}
+	var TestallIpoStocksMap = make(map[uint32]*IpoStock)
+	TestallIpoStocksMap = GetAllIpoStocks()
+	fmt.Printf("lenght of map : %+v", len(TestallIpoStocksMap))
+	fmt.Printf("all ipo stocks in test : %+v", TestallIpoStocksMap)
+}
 
 func Test_AllowIpoBidding(t *testing.T) {
 
@@ -79,15 +55,18 @@ func Test_AllowIpoBidding(t *testing.T) {
 		SlotQuantity:  10,
 		StocksPerSlot: 10,
 	}
+
 	users := []*User{
 		{Id: 201, Cash: 100000, Email: "201@gmail.com"},
 		{Id: 202, Cash: 100000, Email: "202@gmail.com"},
 	}
 
 	db := getDB()
+
 	defer func() {
 		db.Exec("DELETE FROM IpoBids")
 		db.Exec("DELETE FROM IpoStocks")
+		db.Exec("DELETE FROM Transactions")
 		for _, user := range users {
 			db.Delete(user)
 		}
@@ -125,6 +104,7 @@ func Test_AllowIpoBidding(t *testing.T) {
 }
 
 func Test_AllotIpoSlots(t *testing.T) {
+
 	users := []*User{
 		{Id: 301, Cash: 100000, Email: "301@gmail.com"},
 		{Id: 302, Cash: 100000, Email: "302@gmail.com"},
@@ -146,6 +126,7 @@ func Test_AllotIpoSlots(t *testing.T) {
 		SlotQuantity:  5,
 		StocksPerSlot: 20,
 	}
+
 	ipoStock2 := &IpoStock{
 		ShortName:     "ABC",
 		FullName:      "TestStock2",
@@ -165,8 +146,8 @@ func Test_AllotIpoSlots(t *testing.T) {
 		db.Exec("DELETE FROM IpoBids")
 		db.Exec("DELETE FROM IpoStocks")
 		db.Exec("DELETE FROM Transactions")
-		db.Delete(ipoStock1)
-		db.Delete(ipoStock2)
+		// db.Delete(ipoStock1)
+		// db.Delete(ipoStock2)
 		for _, user := range users {
 			db.Delete(user)
 		}

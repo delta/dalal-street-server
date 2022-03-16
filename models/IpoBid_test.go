@@ -42,10 +42,15 @@ func Test_CreateIpoBid(t *testing.T) {
 	ipoStock := &IpoStock{StocksPerSlot: 20, IsBiddable: true}
 
 	db := getDB()
+	// remove later
+	// for _, user := range users {
+	// 	db.Delete(user)
+	// }
 
 	defer func() {
 		db.Exec("DELETE FROM IpoBids")
 		db.Exec("DELETE FROM IpoStocks")
+		db.Exec("DELETE FROM Transactions")
 		for _, user := range users {
 			db.Delete(user)
 		}

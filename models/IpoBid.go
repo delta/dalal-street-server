@@ -218,10 +218,21 @@ func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) er
 		return err
 	}
 
-	PlaceIpoBidTransaction := GetTransactionRef(UserId, 0, IpoAllotmentTransaction, 0, 0, 0, int64(price), -int64(price))
+	if err := tx.Exec("INSERT INTO Transactions (UserId, StockId, Type, ReservedStockQuantity, StockQuantity, Price, ReservedCashTotal, Total, CreatedAt) VALUES (?, NULL, 10, 0, 0, 0, ?, ?, ?);", BiddingUser.Id, int64(price), -int64(price), utils.GetCurrentTimeISO8601()).Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error saving transaction %+v", err)
+		tx.Rollback()
+		return err
+	}
 
-	if err := tx.Create(PlaceIpoBidTransaction).Error; err != nil {
-		l.Error(err)
+	PlaceIpoBidTransaction := &Transaction{}
+
+	if err := tx.First(&PlaceIpoBidTransaction, "userId = ? AND type = ? AND total = ?", BiddingUser.Id, IpoAllotmentTransaction, -int64(price)).Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error retreivng transaction %+v", err)
+		tx.Rollback()
 		return err
 	}
 
@@ -231,7 +242,7 @@ func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) er
 	if err := tx.Commit().Error; err != nil {
 		BiddingUser.Cash = oldCash
 		BiddingUser.ReservedCash = oldReservedCash
-		l.Errorf("Error saving user %+v", err)
+		l.Errorf("Error committing transaction %+v", err)
 		tx.Rollback()
 		return err
 	}
@@ -283,15 +294,34 @@ func SaveCancelledIpoBidTransaction(IpoBidToCancel *IpoBid, price uint64) error 
 		return err
 	}
 
-	CancelIpoBidTransaction := GetTransactionRef(BiddingUser.Id, 0, IpoAllotmentTransaction, 0, 0, 0, -int64(price), int64(price))
+	if err := tx.Exec("INSERT INTO Transactions (UserId, StockId, Type, ReservedStockQuantity, StockQuantity, Price, ReservedCashTotal, Total, CreatedAt) VALUES (?, NULL, 10, 0, 0, 0, ?, ?, ?);", BiddingUser.Id, -int64(price), int64(price), utils.GetCurrentTimeISO8601()).Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error saving transaction %+v", err)
+		tx.Rollback()
+		return err
+	}
 
-	if err := tx.Create(CancelIpoBidTransaction).Error; err != nil {
-		l.Error(err)
+	CancelIpoBidTransaction := &Transaction{}
+
+	if err := tx.First(&CancelIpoBidTransaction, "userId = ? AND type = ? AND total = ?", BiddingUser.Id, IpoAllotmentTransaction, -int64(price)).Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error retreivng transaction %+v", err)
+		tx.Rollback()
 		return err
 	}
 
 	transactionsStream := datastreamsManager.GetTransactionsStream()
 	transactionsStream.SendTransaction(CancelIpoBidTransaction.ToProto())
+
+	if err := tx.Commit().Error; err != nil {
+		BiddingUser.Cash = oldCash
+		BiddingUser.ReservedCash = oldReservedCash
+		l.Errorf("Error committing transaction %+v", err)
+		tx.Rollback()
+		return err
+	}
 
 	return nil
 }
