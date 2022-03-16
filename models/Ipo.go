@@ -5,7 +5,6 @@ import (
 
 	models_pb "github.com/delta/dalal-street-server/proto_build/models"
 	"github.com/delta/dalal-street-server/utils"
-	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,16 +53,6 @@ type IpoAlreadyOpenError struct{ IpoStockId uint32 }
 func (e IpoAlreadyOpenError) Error() string {
 	return fmt.Sprintf("IPO bidding has already been opened for stock %d", e.IpoStockId)
 }
-
-// var allIpoStocks = struct {
-// 	m map[uint32]*ipoStockAndLock
-// }{
-// 	make(map[uint32]*ipoStockAndLock),
-// }
-
-// type ipoStockAndLock struct {
-// 	ipostock *IpoStock
-// }
 
 func GetAllIpoStocks() map[uint32]*IpoStock {
 	var l = logger.WithFields(logrus.Fields{
@@ -216,7 +205,7 @@ func AllotSlots(IpoStockId uint32) error {
 		IsBankrupt:       false,
 	}
 	newStock.UpdatedAt = newStock.CreatedAt
-	// todo use transaction
+
 	if err := db.Create(newStock).Error; err != nil {
 		l.Error(err)
 		return err
@@ -227,7 +216,7 @@ func AllotSlots(IpoStockId uint32) error {
 	if subscriptionRatio <= 1.00 {
 		for _, ipoBid := range openIpoBids {
 
-			if err := allotIpoSlotToUser(ipoBid, newStock.Id, ipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, db); err != nil {
+			if err := allotIpoSlotToUser(ipoBid, newStock.Id, ipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost); err != nil {
 				l.Error(err)
 				return err
 			}
@@ -247,7 +236,7 @@ func AllotSlots(IpoStockId uint32) error {
 
 		for _, AllotedIpoBid := range AllotedIpoBids {
 
-			if err := allotIpoSlotToUser(AllotedIpoBid, newStock.Id, AllotedIpoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, db); err != nil {
+			if err := allotIpoSlotToUser(AllotedIpoBid, newStock.Id, AllotedIpoBid.SlotQuantity, IpoStock.StocksPerSlot, cost); err != nil {
 				l.Error(err)
 				return err
 			}
@@ -263,7 +252,7 @@ func AllotSlots(IpoStockId uint32) error {
 
 		for _, UnfulipoBid := range UnfulIpoBids {
 			//  Refund slotprice amount to userid
-			if err := RefundIpoSlotToUser(UnfulipoBid, newStock.Id, UnfulipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, db); err != nil {
+			if err := RefundIpoSlotToUser(UnfulipoBid, newStock.Id, UnfulipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost); err != nil {
 				l.Error(err)
 				return err
 			}
@@ -281,6 +270,7 @@ func AllotSlots(IpoStockId uint32) error {
 		l.Error(err)
 		return err
 	}
+
 	SendPushNotification(0, PushNotification{
 		Title:    fmt.Sprintf("IPO Allotment has just happened for %v", IpoStock.FullName),
 		Message:  fmt.Sprintf("IPO Allotment has just happened for  %v. Click here to know more.", IpoStock.FullName),
@@ -288,18 +278,20 @@ func AllotSlots(IpoStockId uint32) error {
 		ImageUrl: "",
 	})
 
-	LoadStocks() // does it overwrite the existing stock values (the regular ones, not IPO stocks)?
-	// called when market day opens
+	LoadStocks() // reload stocks (usually called when market day opens)
 
 	return nil
 }
 
-func allotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64, tx *gorm.DB) error {
+func allotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":   "allotIpoSlotToUser",
 		"IpoBidId": ipoBid.Id,
 	})
-	// use sql transaction
+
+	db := getDB()
+	tx := db.Begin()
+
 	// allot 1 slot worth of stocks to userid
 	AllotIpoTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, int64(SlotQuantity*StocksPerSlot), 0, -cost, 0)
 
@@ -320,41 +312,58 @@ func allotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot 
 		return InternalServerError
 	}
 
+	oldReservedCash := AllotedUser.ReservedCash
 	AllotedUser.ReservedCash -= uint64(cost)
 
 	l.Infof("Saving AllotIpoTransaction, IpoStockId : %d, SlotQuantity : %d, UserId : %d, Cost: %d", ipoBid.IpoStockId, ipoBid.SlotQuantity, ipoBid.UserId, cost)
 
-	if err := tx.Create(AllotIpoTransaction).Error; err != nil {
-		l.Error(err)
-		return err
-	}
-
 	if err := tx.Save(ipoBid).Error; err != nil {
+		AllotedUser.ReservedCash = oldReservedCash
 		l.Error(err)
+		tx.Rollback()
 		return err
 	}
 
 	if err := tx.Save(&AllotedUser).Error; err != nil {
+		AllotedUser.ReservedCash = oldReservedCash
 		l.Error(err)
+		tx.Rollback()
 		return err
 	}
+
+	if err := tx.Create(AllotIpoTransaction).Error; err != nil {
+		AllotedUser.ReservedCash = oldReservedCash
+		l.Error(err)
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		AllotedUser.ReservedCash = oldReservedCash
+		l.Errorf("Error committing transaction %+v", err)
+		tx.Rollback()
+		return err
+	}
+
 	transactionsStream := datastreamsManager.GetTransactionsStream()
 	transactionsStream.SendTransaction(AllotIpoTransaction.ToProto())
 
 	return nil
 }
 
-func RefundIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64, tx *gorm.DB) error {
+func RefundIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":   "RefundIpoSlotToUser",
 		"IpoBidId": ipoBid.Id,
 	})
-	// use sql transaction
-	// update properly
+
 	IpoRefundTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, 0, 0, cost, -cost)
 
 	ipoBid.IsClosed = true
 	ipoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
+
+	db := getDB()
+	tx := db.Begin()
 
 	ch, AllotedUser, err := getUserExclusively(ipoBid.UserId)
 	l.Debugf("Acquired")
@@ -369,25 +378,43 @@ func RefundIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot
 		return InternalServerError
 	}
 
+	oldReservedCash := AllotedUser.ReservedCash
+	oldCash := AllotedUser.Cash
+
 	AllotedUser.Cash += uint64(cost)
 	AllotedUser.ReservedCash -= uint64(cost)
 
 	l.Infof("Saving IpoRefundTransaction, IpoStockId : %d, SlotQuantity : %d, UserId : %d, Cost: %d", ipoBid.IpoStockId, ipoBid.SlotQuantity, ipoBid.UserId, cost)
 
-	if err := tx.Create(IpoRefundTransaction).Error; err != nil {
-		l.Error(err)
-		return err
-	}
-
 	if err := tx.Save(ipoBid).Error; err != nil {
+		AllotedUser.Cash = oldCash
+		AllotedUser.ReservedCash = oldReservedCash
 		l.Error(err)
 		return err
 	}
 
 	if err := tx.Save(&AllotedUser).Error; err != nil {
+		AllotedUser.Cash = oldCash
+		AllotedUser.ReservedCash = oldReservedCash
 		l.Error(err)
 		return err
 	}
+
+	if err := tx.Create(IpoRefundTransaction).Error; err != nil {
+		AllotedUser.Cash = oldCash
+		AllotedUser.ReservedCash = oldReservedCash
+		l.Error(err)
+		return err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		AllotedUser.Cash = oldCash
+		AllotedUser.ReservedCash = oldReservedCash
+		l.Errorf("Error committing transaction %+v", err)
+		tx.Rollback()
+		return err
+	}
+
 	transactionsStream := datastreamsManager.GetTransactionsStream()
 	transactionsStream.SendTransaction(IpoRefundTransaction.ToProto())
 
