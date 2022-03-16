@@ -48,7 +48,7 @@ func (e IpoOrderStockLimitExceeded) Error() string {
 	return "A user can only bid for a maximum of 1 IPO slot"
 }
 
-func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPrice uint64) (uint32, error) {
+func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32) (uint32, error) {
 
 	var l = logger.WithFields(logrus.Fields{
 		"method":             "CreateIpoBid",
@@ -64,6 +64,10 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	}
 
 	db := getDB()
+
+	IpoStock := &IpoStock{}
+	db.First(IpoStock, IpoStockId)
+
 	ch, user, err := getUserExclusively(UserId)
 
 	if err != nil {
@@ -71,14 +75,11 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 		return 0, err
 	}
 
-	if user.Cash < SlotPrice {
+	if user.Cash < IpoStock.SlotPrice {
 		return 0, NotEnoughCashError{}
 	}
 
 	close(ch)
-
-	IpoStock := &IpoStock{}
-	db.First(IpoStock, IpoStockId)
 
 	if !IpoStock.IsBiddable {
 		return 0, IpoNotBiddableError{IpoStockId}
@@ -92,7 +93,7 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	NewIpoBid := &IpoBid{
 		UserId:       UserId,
 		IpoStockId:   IpoStockId,
-		SlotPrice:    SlotPrice,
+		SlotPrice:    IpoStock.SlotPrice,
 		SlotQuantity: SlotQuantity,
 		CreatedAt:    utils.GetCurrentTimeISO8601(),
 		IsFulfilled:  false,
@@ -100,7 +101,7 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32, SlotPri
 	}
 	NewIpoBid.UpdatedAt = NewIpoBid.CreatedAt
 
-	price := uint64(SlotQuantity) * SlotPrice
+	price := uint64(SlotQuantity) * IpoStock.SlotPrice
 	// add ipo transaction in transaction table
 	if err := SaveNewIpoBidTransaction(NewIpoBid, UserId, price); err != nil {
 		l.Error(err)

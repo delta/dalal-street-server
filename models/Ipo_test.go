@@ -85,7 +85,7 @@ func Test_AllowIpoBidding(t *testing.T) {
 		}
 	}
 
-	ipoBidId1, err := CreateIpoBid(201, IpoStock1.Id, 1, 10000) // fails because ipo stock is not biddable
+	ipoBidId1, err := CreateIpoBid(201, IpoStock1.Id, 1) // fails because ipo stock is not biddable
 	if err != nil {
 		fmt.Printf("Expected Error in CreateIpoBid1 : %+v \n", err)
 	}
@@ -94,7 +94,7 @@ func Test_AllowIpoBidding(t *testing.T) {
 		t.Fatalf("\n  %d", err)
 	}
 
-	ipoBidId2, err := CreateIpoBid(202, IpoStock1.Id, 1, 10000)
+	ipoBidId2, err := CreateIpoBid(202, IpoStock1.Id, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid2 : %+v", err)
 	}
@@ -172,27 +172,27 @@ func Test_AllotIpoSlots(t *testing.T) {
 	ipoStockid := ipoStock1.Id
 
 	fmt.Printf("\n\n Over Subscription: \n\n")
-	ipoBidId1, err := CreateIpoBid(301, ipoStockid, 1, 10000)
+	ipoBidId1, err := CreateIpoBid(301, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId2, err := CreateIpoBid(302, ipoStockid, 1, 10000)
+	ipoBidId2, err := CreateIpoBid(302, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId3, err := CreateIpoBid(303, ipoStockid, 1, 10000)
+	ipoBidId3, err := CreateIpoBid(303, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId4, err := CreateIpoBid(304, ipoStockid, 1, 10000)
+	ipoBidId4, err := CreateIpoBid(304, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId5, err := CreateIpoBid(305, ipoStockid, 1, 10000)
+	ipoBidId5, err := CreateIpoBid(305, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId6, err := CreateIpoBid(306, ipoStockid, 1, 10000)
+	ipoBidId6, err := CreateIpoBid(306, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
@@ -234,27 +234,27 @@ func Test_AllotIpoSlots(t *testing.T) {
 
 	ipoStockid = ipoStock2.Id
 
-	ipoBidId1, err = CreateIpoBid(301, ipoStockid, 1, 10000)
+	ipoBidId1, err = CreateIpoBid(301, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId2, err = CreateIpoBid(302, ipoStockid, 1, 10000)
+	ipoBidId2, err = CreateIpoBid(302, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId3, err = CreateIpoBid(303, ipoStockid, 1, 10000)
+	ipoBidId3, err = CreateIpoBid(303, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId4, err = CreateIpoBid(304, ipoStockid, 1, 10000)
+	ipoBidId4, err = CreateIpoBid(304, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId5, err = CreateIpoBid(305, ipoStockid, 1, 10000)
+	ipoBidId5, err = CreateIpoBid(305, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
-	ipoBidId6, err = CreateIpoBid(306, ipoStockid, 1, 10000)
+	ipoBidId6, err = CreateIpoBid(306, ipoStockid, 1)
 	if err != nil {
 		t.Fatalf("Errored in CreateIpoBid : %+v", err)
 	}
