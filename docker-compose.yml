@@ -8,6 +8,7 @@ services:
         restart: always
         volumes: 
             - ./docker/logs/:/dalal-street-server/logs/
+            - ./public/:/dalal-street-server/public/
         ports:
             - "${SERVER_PORT}:8000"
         depends_on:
