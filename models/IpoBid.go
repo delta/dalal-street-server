@@ -76,19 +76,28 @@ func CreateIpoBid(UserId uint32, IpoStockId uint32, SlotQuantity uint32) (uint32
 	}
 
 	if user.Cash < IpoStock.SlotPrice {
+		l.Errorf("User doesn't have enough cash to place ipoBid")
 		return 0, NotEnoughCashError{}
 	}
+
+	l.Debugf("Check 1 passed, user has enough cash to place ipoBid")
 
 	close(ch)
 
 	if !IpoStock.IsBiddable {
+		l.Errorf("ipoStock is not biddable")
 		return 0, IpoNotBiddableError{IpoStockId}
 	}
 
+	l.Debugf("Check 2 passed, ipoStock is biddable")
+
 	OldIpoBid := &IpoBid{}
 	if !db.Where("userId = ? AND isClosed = ? AND ipoStockId = ?", UserId, false, IpoStockId).First(&OldIpoBid).RecordNotFound() {
+		l.Errorf("user has already placed a ipoBid")
 		return 0, IpoOrderStockLimitExceeded{}
 	}
+
+	l.Debugf("Check 3 passed, user is making a fresh ipoBid")
 
 	NewIpoBid := &IpoBid{
 		UserId:       UserId,
@@ -126,17 +135,20 @@ func CancelIpoBid(IpoBidId uint32) error {
 	IpoBidToCancel := &IpoBid{}
 
 	if err := db.First(&IpoBidToCancel, IpoBidId).Error; err != nil {
+		l.Errorf("Internal server error %v", err)
 		return err
 	}
 
 	if IpoBidToCancel.IsClosed {
+		l.Errorf("Ipo bid has already been cancelled")
 		return AlreadyClosedError{IpoBidToCancel.Id}
 	}
 
 	IpoStock1 := &IpoStock{}
 	db.First(IpoStock1, IpoBidToCancel.IpoStockId)
-
+	
 	if !IpoStock1.IsBiddable {
+		l.Errorf("Ipo stock is not biddable")
 		return IpoNotBiddableError{IpoBidToCancel.IpoStockId}
 	}
 
