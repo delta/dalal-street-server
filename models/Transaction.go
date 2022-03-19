@@ -33,6 +33,8 @@ func (tt *TransactionType) Scan(value interface{}) error {
 		*tt = 8
 	case "ShortSellTransaction":
 		*tt = 9
+	case "IpoAllotmentTransaction":
+		*tt = 10
 	default:
 		return fmt.Errorf("invalid value for TransactionType. Got %s", string(value.([]byte)))
 	}
@@ -52,6 +54,7 @@ const (
 	CancelOrderTransaction
 	ReserveUpdateTransaction
 	ShortSellTransaction
+	IpoAllotmentTransaction
 )
 
 var transactionTypes = [...]string{
@@ -65,6 +68,7 @@ var transactionTypes = [...]string{
 	"CancelOrderTransaction",
 	"ReserveUpdateTransaction",
 	"ShortSellTransaction",
+	"IpoAllotmentTransaction",
 }
 
 func (trType TransactionType) String() string {
@@ -122,6 +126,8 @@ func (t *Transaction) ToProto() *models_pb.Transaction {
 		pTrans.Type = models_pb.TransactionType_RESERVE_UPDATE_TRANSACTION
 	} else if t.Type == ShortSellTransaction {
 		pTrans.Type = models_pb.TransactionType_SHORT_SELL_TRANSACTION
+	} else if t.Type == IpoAllotmentTransaction {
+		pTrans.Type = models_pb.TransactionType_IPO_ALLOTMENT_TRANSACTION
 	}
 
 	return pTrans

@@ -149,3 +149,44 @@ func (d *dalalActionService) GetStockList(ctx context.Context, req *actions_pb.G
 
 	return resp, nil
 }
+
+func (d *dalalActionService) GetIpoStockList(ctx context.Context, req *actions_pb.GetIpoStockListRequest) (*actions_pb.GetIpoStockListResponse, error) {
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "GetIpoStockList",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	l.Infof("GetIpoStockList requested")
+
+	makeError := func(st actions_pb.GetIpoStockListResponse_StatusCode, msg string) (*actions_pb.GetIpoStockListResponse, error) {
+		resp := &actions_pb.GetIpoStockListResponse{}
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	resp := &actions_pb.GetIpoStockListResponse{}
+
+
+	ipoStockList, err := models.GetAllIpoStocks()
+
+	if err != nil {
+		return makeError(actions_pb.GetIpoStockListResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	ipoStockListProto := make(map[uint32]*models_pb.IpoStock)
+
+	for ipoStockId, ipoStock := range ipoStockList {
+		ipoStockListProto[ipoStockId] = ipoStock.ToProto()
+	}
+
+	resp.IpoStockList = ipoStockListProto
+
+	resp.StatusCode = actions_pb.GetIpoStockListResponse_OK
+	resp.StatusMessage = "Success"
+
+	l.Infof("Request completed successfully")
+
+	return resp, nil
+}

@@ -873,3 +873,82 @@ func (d *dalalActionService) SquareOffShortSells(ctx context.Context, req *actio
 	res.StatusMessage = "successfully squared off short sell stocks"
 	return res, nil
 }
+
+func (d *dalalActionService) OpenIpoBidding(ctx context.Context, req *actions_pb.OpenIpoBiddingRequest) (*actions_pb.OpenIpoBiddingResponse, error) {
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "OpenIpoBidding",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	resp := &actions_pb.OpenIpoBiddingResponse{}
+
+	makeError := func(st actions_pb.OpenIpoBiddingResponse_StatusCode, msg string) (*actions_pb.OpenIpoBiddingResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.OpenIpoBiddingResponse_NotAdminUserError, "User is not admin")
+	}
+
+	err := models.AllowIpoBidding(req.IpoStockId)
+
+	switch err.(type) {
+	case models.InvalidStockIdError:
+		return makeError(actions_pb.OpenIpoBiddingResponse_InvalidIpoStockId, "Invalid IPO stock ID. Cannot open this IPO for bidding")
+	case models.IpoAlreadyOpenError:
+		return makeError(actions_pb.OpenIpoBiddingResponse_AlreadyOpenError, "This IPO is already open to bidding")
+	}
+
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.OpenIpoBiddingResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	resp.StatusMessage = "Done"
+	resp.StatusCode = actions_pb.OpenIpoBiddingResponse_OK
+	return resp, nil
+}
+
+func (d *dalalActionService) CloseIpoBidding(ctx context.Context, req *actions_pb.CloseIpoBiddingRequest) (*actions_pb.CloseIpoBiddingResponse, error) {
+
+	var l = logger.WithFields(logrus.Fields{
+		"method":        "CloseIpoBidding",
+		"param_session": fmt.Sprintf("%+v", ctx.Value("session")),
+		"param_req":     fmt.Sprintf("%+v", req),
+	})
+
+	resp := &actions_pb.CloseIpoBiddingResponse{}
+
+	makeError := func(st actions_pb.CloseIpoBiddingResponse_StatusCode, msg string) (*actions_pb.CloseIpoBiddingResponse, error) {
+		resp.StatusCode = st
+		resp.StatusMessage = msg
+		return resp, nil
+	}
+
+	userId := getUserId(ctx)
+	if !models.IsAdminAuth(userId) {
+		return makeError(actions_pb.CloseIpoBiddingResponse_NotAdminUserError, "User is not admin")
+	}
+
+	err := models.AllotSlots(req.IpoStockId)
+
+	switch err.(type) {
+	case models.InvalidStockIdError:
+		return makeError(actions_pb.CloseIpoBiddingResponse_InvalidIpoStockId, "Invalid IPO stock ID. Cannot allot this Ipo")
+	case models.IpoNotBiddableError:
+		return makeError(actions_pb.CloseIpoBiddingResponse_AlreadyClosedError, "This IPO is not open to bidding - might already have been alloted")
+	}
+	if err != nil {
+		l.Errorf("Request failed due to %+v: ", err)
+		return makeError(actions_pb.CloseIpoBiddingResponse_InternalServerError, getInternalErrorMessage(err))
+	}
+
+	resp.StatusMessage = "Done"
+	resp.StatusCode = actions_pb.CloseIpoBiddingResponse_OK
+	return resp, nil
+}
