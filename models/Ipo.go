@@ -69,7 +69,6 @@ func GetAllIpoStocks() (map[uint32]IpoStock, error) {
 	var allIpoStocksMap = make(map[uint32]IpoStock)
 
 	for _, ipoStock := range allIpoStocks {
-		fmt.Println("ipoStock", ipoStock)
 		allIpoStocksMap[ipoStock.Id] = ipoStock
 	}
 
@@ -216,7 +215,7 @@ func AllotSlots(IpoStockId uint32) error {
 	if subscriptionRatio <= 1.00 {
 		for _, ipoBid := range openIpoBids {
 
-			if err := allotIpoSlotToUser(ipoBid, newStock.Id, ipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost); err != nil {
+			if err := allotIpoSlotToUser(ipoBid, newStock.Id, ipoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, ListingPrice); err != nil {
 				l.Error(err)
 				return err
 			}
@@ -236,7 +235,7 @@ func AllotSlots(IpoStockId uint32) error {
 
 		for _, AllotedIpoBid := range AllotedIpoBids {
 
-			if err := allotIpoSlotToUser(AllotedIpoBid, newStock.Id, AllotedIpoBid.SlotQuantity, IpoStock.StocksPerSlot, cost); err != nil {
+			if err := allotIpoSlotToUser(AllotedIpoBid, newStock.Id, AllotedIpoBid.SlotQuantity, IpoStock.StocksPerSlot, cost, ListingPrice); err != nil {
 				l.Error(err)
 				return err
 			}
@@ -283,7 +282,7 @@ func AllotSlots(IpoStockId uint32) error {
 	return nil
 }
 
-func allotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64) error {
+func allotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot uint32, cost int64, stockPrice uint64) error {
 	l := logger.WithFields(logrus.Fields{
 		"method":   "allotIpoSlotToUser",
 		"IpoBidId": ipoBid.Id,
@@ -293,7 +292,7 @@ func allotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot 
 	tx := db.Begin()
 
 	// allot 1 slot worth of stocks to userid
-	AllotIpoTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, int64(SlotQuantity*StocksPerSlot), 0, -cost, 0)
+	AllotIpoTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, int64(SlotQuantity*StocksPerSlot), stockPrice, -cost, 0)
 
 	ipoBid.IsFulfilled = true
 	ipoBid.IsClosed = true
@@ -344,9 +343,10 @@ func allotIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot 
 		tx.Rollback()
 		return err
 	}
-
-	transactionsStream := datastreamsManager.GetTransactionsStream()
-	transactionsStream.SendTransaction(AllotIpoTransaction.ToProto())
+	go func() {
+		transactionsStream := datastreamsManager.GetTransactionsStream()
+		transactionsStream.SendTransaction(AllotIpoTransaction.ToProto())
+	}()
 
 	return nil
 }
@@ -357,7 +357,7 @@ func RefundIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot
 		"IpoBidId": ipoBid.Id,
 	})
 
-	IpoRefundTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, 0, 0, cost, -cost)
+	IpoRefundTransaction := GetTransactionRef(ipoBid.UserId, newStockId, IpoAllotmentTransaction, 0, 0, 0, -cost, cost)
 
 	ipoBid.IsClosed = true
 	ipoBid.UpdatedAt = utils.GetCurrentTimeISO8601()
@@ -414,9 +414,10 @@ func RefundIpoSlotToUser(ipoBid *IpoBid, newStockId, SlotQuantity, StocksPerSlot
 		tx.Rollback()
 		return err
 	}
-
-	transactionsStream := datastreamsManager.GetTransactionsStream()
-	transactionsStream.SendTransaction(IpoRefundTransaction.ToProto())
+	go func() {
+		transactionsStream := datastreamsManager.GetTransactionsStream()
+		transactionsStream.SendTransaction(IpoRefundTransaction.ToProto())
+	}()
 
 	return nil
 }

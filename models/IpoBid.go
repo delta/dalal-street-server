@@ -146,7 +146,7 @@ func CancelIpoBid(IpoBidId uint32) error {
 
 	IpoStock1 := &IpoStock{}
 	db.First(IpoStock1, IpoBidToCancel.IpoStockId)
-	
+
 	if !IpoStock1.IsBiddable {
 		l.Errorf("Ipo stock is not biddable")
 		return IpoNotBiddableError{IpoBidToCancel.IpoStockId}
@@ -249,9 +249,6 @@ func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) er
 		return err
 	}
 
-	transactionsStream := datastreamsManager.GetTransactionsStream()
-	transactionsStream.SendTransaction(PlaceIpoBidTransaction.ToProto())
-
 	if err := tx.Commit().Error; err != nil {
 		BiddingUser.Cash = oldCash
 		BiddingUser.ReservedCash = oldReservedCash
@@ -259,6 +256,11 @@ func SaveNewIpoBidTransaction(NewIpoBid *IpoBid, UserId uint32, price uint64) er
 		tx.Rollback()
 		return err
 	}
+
+	go func() {
+		transactionsStream := datastreamsManager.GetTransactionsStream()
+		transactionsStream.SendTransaction(PlaceIpoBidTransaction.ToProto())
+	}()
 
 	return nil
 }
