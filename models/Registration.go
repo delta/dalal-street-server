@@ -92,9 +92,7 @@ func ResendVerificationEmail(email string) error {
 	verificationKey := registration.VerificationKey
 	l.Debugf("Sending verification email to %s", email)
 	verificationURL := fmt.Sprintf("https://dalal.pragyan.org/api/verify?key=%s", verificationKey)
-	htmlContent := fmt.Sprintf(`%s
-							%s
-							%s`, templates.HtmlEmailVerificationTemplateHead, verificationURL, templates.HtmlEmailVerificationTemplateTail)
+	htmlContent := fmt.Sprintf(`%s`, templates.VerificationEmailTemplate(verificationURL))
 	plainContent := fmt.Sprintf(templates.PlainEmailVerificationTemplate, verificationURL)
 	if err := utils.SendEmail("noreply@dalal.pragyan.org", "Account Verification", email, plainContent, htmlContent); err != nil {
 		l.Errorf("Error while sending verification email to player %s", err)

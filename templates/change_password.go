@@ -13,4 +13,4 @@ var HtmlPasswordResetTemplateTail = `</body>
 </html>
 `
 
-var PlainPasswordResetTemplate = `Please reset your password at https://dalal.pragyan.org/changepassword. Your temporary password is %s`
+var PlainPasswordResetTemplate = `Please reset your password at https://dalal.pragyan.org/resetPassword/. Your temporary password is %s`
